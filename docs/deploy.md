@@ -83,11 +83,49 @@ doctl auth remove --context admin
    staging job will fail because the app doesn't exist yet.  That's
    expected.
 
-5. **Create the production database cluster.**  Databases → Create,
-   PostgreSQL, named `flight-club-production-db`, in the same region as
-   the app (`nyc` in the specs).  Add a database `flightclub` and a user
-   `flightclub`.  Staging uses an App Platform dev database instead,
-   which the app creates for itself.
+5. **Create the database cluster.**  Databases → Create, PostgreSQL,
+   named `flight-club-production-db`, in the same region as the apps
+   (`nyc` in the specs).  Both environments use it, each with its own
+   database and user:
+
+   ```sh
+   doctl databases list                 # note the cluster's ID
+   for name in flightclub flightclub_staging; do
+     doctl databases db create <cluster-id> $name
+     doctl databases user create <cluster-id> $name
+   done
+   ```
+
+   Then make each user the owner of its database.  On Postgres 15 and
+   later, a newly created user can't create schemas or tables in a
+   database it doesn't own, so migrations would fail with "permission
+   denied".  Only the cluster's admin user, `doadmin`, can change
+   ownership, and the cluster only accepts connections from trusted
+   sources, so let your own IP address in for the duration:
+
+   ```sh
+   doctl databases firewalls append <cluster-id> --rule ip_addr:$(curl -s https://ifconfig.me)
+   host=$(doctl databases connection <cluster-id> --format Host --no-header)
+   docker run --rm -it postgres:18-alpine \
+     psql "host=$host port=25060 dbname=defaultdb user=doadmin sslmode=require"
+   ```
+
+   `doctl` masks the password, so psql prompts for it.  Copy it from the
+   control panel: the cluster → Overview → Connection details, user
+   `doadmin`, "show".
+
+   ```sql
+   ALTER DATABASE flightclub OWNER TO flightclub;
+   ALTER DATABASE flightclub_staging OWNER TO flightclub_staging;
+   ```
+
+   Afterwards, remove your IP again: `doctl databases firewalls list
+   <cluster-id>` shows the rule's UUID, and `doctl databases firewalls
+   remove <cluster-id> --uuid <uuid>` deletes it.
+
+   Don't use App Platform dev databases, even for staging.  Their user
+   can't create schemas, and there's no admin access to grant it, so
+   migrations can't run on them.
 
 6. **Create the apps** from the specs, using the SHA from step 4.  Each
    app gets its own freshly generated auth secret:
@@ -198,4 +236,5 @@ ones to roll back to.
 The production cluster has daily backups and point-in-time recovery,
 included with managed databases.  Restore a backup into a new cluster once
 to confirm the procedure works, before there's real member data to lose.
-The staging dev database has no backups; it holds only seed data.
+Staging's database lives on the same cluster, so it's backed up too,
+though it only ever holds seed data.

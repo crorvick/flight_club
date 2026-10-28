@@ -48,7 +48,12 @@ jobs:
         value: ${db.DATABASE_URL}
 
 databases:
-  # A dev database: cheap, but no backups.  Staging holds only seed data.
+  # Its own database and user on the production cluster (see
+  # docs/deploy.md).  Not an App Platform dev database: those don't let the
+  # app's user create schemas, so migrations can't run on them.
   - name: db
     engine: PG
-    production: false
+    production: true
+    cluster_name: flight-club-production-db
+    db_name: flightclub_staging
+    db_user: flightclub_staging
