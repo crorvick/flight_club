@@ -43,7 +43,18 @@ secrets in particular, aren't overwritten.  If you change a spec in
 ## One-time setup
 
 You'll need [`doctl`](https://docs.digitalocean.com/reference/doctl/)
-authenticated against the account (`doctl auth init`).
+authenticated with a **full-access** personal token, separate from the
+scoped token GitHub Actions uses (step 2).  The CI token can update apps
+but not create them or databases, so using it here fails with a 403.
+Give the full-access token a short expiry, and remove it once both apps
+exist:
+
+```sh
+doctl auth init --context admin      # paste the full-access token
+doctl auth switch --context admin
+# ... steps 5–7 ...
+doctl auth remove --context admin
+```
 
 1. **Create a container registry.**  In the DigitalOcean control panel,
    Container Registry → Create.  Note its name; the image will be
@@ -51,7 +62,7 @@ authenticated against the account (`doctl auth init`).
 
 2. **Create an API token.**  API → Tokens → Generate New Token, with
    custom scopes: `registry` (read, update) and `app` (read, update).
-   This is what GitHub Actions uses.
+   This is what GitHub Actions uses; don't use it for `doctl` here.
 
 3. **Configure the GitHub repository.**  In Settings → Secrets and
    variables → Actions:
