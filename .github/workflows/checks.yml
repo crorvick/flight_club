@@ -46,6 +46,8 @@ jobs:
       - run: pnpm test
 
       - run: pnpm db:migrate
+      # Keeps the seed script working as the schema changes.
+      - run: pnpm db:seed
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:e2e

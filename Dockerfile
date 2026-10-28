@@ -41,7 +41,9 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/drizzle ./drizzle
-COPY --from=build --chown=node:node /app/scripts/migrate.mts /app/scripts/approve-member.mts ./scripts/
+COPY --from=build --chown=node:node \
+     /app/scripts/migrate.mts /app/scripts/approve-member.mts /app/scripts/seed.mts \
+     ./scripts/
 COPY --from=build --chown=node:node /migrate/node_modules ./scripts/node_modules
 
 # Last, so a new SHA doesn't invalidate the layers above.
@@ -52,6 +54,8 @@ USER node
 EXPOSE 3000
 # Migrations run separately, before the new version takes traffic:
 #   node scripts/migrate.mts
-# Members are approved from a console on a running instance:
+# Members are approved, and staging seeded, from a console on a running
+# instance:
 #   node scripts/approve-member.mts <email> [role...]
+#   node scripts/seed.mts
 CMD ["node", "server.js"]

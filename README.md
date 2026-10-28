@@ -21,6 +21,7 @@ pnpm install
 cp .env.example .env
 pnpm db:up          # Postgres 18 in Docker Compose
 pnpm db:migrate
+pnpm db:seed        # sample members, aircraft, flights and squawks
 pnpm dev            # http://localhost:3000
 ```
 
@@ -40,6 +41,7 @@ yourself: `pnpm member:approve you@example.com officer pilot`.
 | `pnpm start`          | Run the production build as the image does     |
 | `pnpm db:generate`    | Write a migration from changes to the schema   |
 | `pnpm db:migrate`     | Apply pending migrations                       |
+| `pnpm db:seed`        | Fill an empty database with sample data        |
 | `pnpm db:studio`      | Browse the database in Drizzle Studio          |
 | `pnpm member:approve` | Activate a member and set their roles          |
 

@@ -2,12 +2,22 @@
 // file to produce a migration in drizzle/, and commit both.
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
+  date,
+  foreignKey,
+  type ForeignKeyBuilder,
   index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -109,9 +119,215 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+// ---------------------------------------------------------------------
+// The club's own tables.
+//
+// Rules the database can check are checked here as well as in the app, so
+// a bug or a hand-edited row can't leave the records inconsistent.  History
+// is never deleted out from under anyone: aircraft and members with
+// flights or squawks can't be deleted (deactivate them instead), and
+// deleting a flight takes its meter readings with it.
+
+export const meterKind = pgEnum("meter_kind", ["tach", "hobbs", "air_time"]);
+
+export const squawkCategory = pgEnum("squawk_category", [
+  "engine",
+  "avionics",
+  "airframe",
+  "other",
+]);
+
+export const squawkStatus = pgEnum("squawk_status", [
+  "open",
+  "deferred",
+  "resolved",
+]);
+
+// Meter readings are hours to two decimal places.  Drizzle returns
+// numeric columns as strings, which keeps them exact; do arithmetic on
+// them in integer hundredths, never as floats.
+const hours = (name: string) => numeric(name, { precision: 9, scale: 2 });
+
+// Status (airworthy or grounded) isn't stored: it's derived from open
+// squawks, so it can never disagree with them.
+export const aircraft = pgTable(
+  "aircraft",
+  {
+    id: id(),
+    tailNumber: text("tail_number").notNull().unique(),
+    makeModel: text("make_model").notNull(),
+    active: boolean("active").default(true).notNull(),
+    // Which meter flights are billed by.  Nullable only because an
+    // aircraft has to exist before its meters can.
+    billingMeterId: uuid("billing_meter_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table): ForeignKeyBuilder[] => [
+    // Pairing the meter with this aircraft's id means the billing meter
+    // can only be one of the aircraft's own meters.
+    foreignKey({
+      name: "aircraft_billing_meter_fk",
+      columns: [table.billingMeterId, table.id],
+      foreignColumns: [meter.id, meter.aircraftId],
+    }),
+  ],
+);
+
+// Aircraft carry different instruments, so meters are rows rather than
+// fixed columns: most have tach and Hobbs, some only tach, one all three.
+export const meter = pgTable(
+  "meter",
+  {
+    id: id(),
+    // Annotated (here and on aircraft's foreign key) to break the type
+    // cycle between the two tables.
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references((): AnyPgColumn => aircraft.id),
+    kind: meterKind("kind").notNull(),
+    label: text("label").notNull(),
+    currentReading: hours("current_reading").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("meter_aircraft_kind_unique").on(table.aircraftId, table.kind),
+    // Target for aircraft_billing_meter_fk.
+    unique("meter_id_aircraft_unique").on(table.id, table.aircraftId),
+    check("meter_reading_nonnegative", sql`${table.currentReading} >= 0`),
+  ],
+);
+
+export const flight = pgTable(
+  "flight",
+  {
+    id: id(),
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id),
+    pilotId: uuid("pilot_id")
+      .notNull()
+      .references(() => member.id),
+    date: date("date").notNull(),
+    dayLandings: integer("day_landings").default(0).notNull(),
+    nightLandings: integer("night_landings").default(0).notNull(),
+    notes: text("notes"),
+    // Copied from the aircraft when the flight is logged, so changing an
+    // aircraft's billing meter later never re-bills past flights.
+    billingMeterKind: meterKind("billing_meter_kind").notNull(),
+    billedHours: hours("billed_hours").notNull(),
+    // Set when the next flight on this aircraft is logged; after that only
+    // officers can edit it, and every such edit is audited.
+    lockedAt: timestamptz("locked_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("flight_aircraft_date_idx").on(table.aircraftId, table.date),
+    index("flight_pilot_date_idx").on(table.pilotId, table.date),
+    check(
+      "flight_landings_nonnegative",
+      sql`${table.dayLandings} >= 0 and ${table.nightLandings} >= 0`,
+    ),
+    check("flight_billed_hours_positive", sql`${table.billedHours} > 0`),
+  ],
+);
+
+// One row per meter the aircraft has, whichever one bills.
+export const flightMeterReading = pgTable(
+  "flight_meter_reading",
+  {
+    flightId: uuid("flight_id")
+      .notNull()
+      .references(() => flight.id, { onDelete: "cascade" }),
+    meterId: uuid("meter_id")
+      .notNull()
+      .references(() => meter.id),
+    out: hours("out").notNull(),
+    in: hours("in").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.flightId, table.meterId] }),
+    index("flight_meter_reading_meter_idx").on(table.meterId),
+    check("flight_meter_reading_in_after_out", sql`${table.in} > ${table.out}`),
+  ],
+);
+
+export const squawk = pgTable(
+  "squawk",
+  {
+    id: id(),
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id),
+    reportedById: uuid("reported_by_id")
+      .notNull()
+      .references(() => member.id),
+    reportedAt: timestamptz("reported_at").defaultNow().notNull(),
+    description: text("description").notNull(),
+    category: squawkCategory("category").default("other").notNull(),
+    // An open grounding squawk is what makes an aircraft grounded.
+    grounds: boolean("grounds").notNull(),
+    status: squawkStatus("status").default("open").notNull(),
+    resolvedById: uuid("resolved_by_id").references(() => member.id),
+    resolvedAt: timestamptz("resolved_at"),
+    resolutionNote: text("resolution_note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    // Status checks look only at unresolved squawks.
+    index("squawk_unresolved_idx")
+      .on(table.aircraftId)
+      .where(sql`${table.status} <> 'resolved'`),
+    // A resolved squawk always records who resolved it, when and why;
+    // an unresolved one has none of those.
+    check(
+      "squawk_resolution_complete",
+      sql`case when ${table.status} = 'resolved'
+        then ${table.resolvedById} is not null
+          and ${table.resolvedAt} is not null
+          and ${table.resolutionNote} is not null
+        else ${table.resolvedById} is null
+          and ${table.resolvedAt} is null
+          and ${table.resolutionNote} is null
+      end`,
+    ),
+  ],
+);
+
+// Who changed what, and when, with the record before and after.  Written
+// for officer edits to locked flights and for squawk resolutions; actor is
+// null for changes made by scripts.
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: id(),
+    actorId: uuid("actor_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    // What happened, e.g. "flight.update" or "squawk.resolve".
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("audit_log_entity_idx").on(
+      table.entityType,
+      table.entityId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const memberRelations = relations(member, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  flights: many(flight),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -125,5 +341,64 @@ export const accountRelations = relations(account, ({ one }) => ({
   member: one(member, {
     fields: [account.userId],
     references: [member.id],
+  }),
+}));
+
+export const aircraftRelations = relations(aircraft, ({ one, many }) => ({
+  billingMeter: one(meter, {
+    fields: [aircraft.billingMeterId],
+    references: [meter.id],
+    relationName: "billing_meter",
+  }),
+  meters: many(meter, { relationName: "aircraft_meters" }),
+  flights: many(flight),
+  squawks: many(squawk),
+}));
+
+export const meterRelations = relations(meter, ({ one }) => ({
+  aircraft: one(aircraft, {
+    fields: [meter.aircraftId],
+    references: [aircraft.id],
+    relationName: "aircraft_meters",
+  }),
+}));
+
+export const flightRelations = relations(flight, ({ one, many }) => ({
+  aircraft: one(aircraft, {
+    fields: [flight.aircraftId],
+    references: [aircraft.id],
+  }),
+  pilot: one(member, { fields: [flight.pilotId], references: [member.id] }),
+  readings: many(flightMeterReading),
+}));
+
+export const flightMeterReadingRelations = relations(
+  flightMeterReading,
+  ({ one }) => ({
+    flight: one(flight, {
+      fields: [flightMeterReading.flightId],
+      references: [flight.id],
+    }),
+    meter: one(meter, {
+      fields: [flightMeterReading.meterId],
+      references: [meter.id],
+    }),
+  }),
+);
+
+export const squawkRelations = relations(squawk, ({ one }) => ({
+  aircraft: one(aircraft, {
+    fields: [squawk.aircraftId],
+    references: [aircraft.id],
+  }),
+  reportedBy: one(member, {
+    fields: [squawk.reportedById],
+    references: [member.id],
+    relationName: "squawk_reported_by",
+  }),
+  resolvedBy: one(member, {
+    fields: [squawk.resolvedById],
+    references: [member.id],
+    relationName: "squawk_resolved_by",
   }),
 }));

@@ -116,6 +116,16 @@ doctl auth remove --context admin
 9. **Make yourself an officer** on each environment, as described under
    [Approving members](#approving-members).
 
+10. **Seed staging** with sample aircraft, flights and squawks, from a
+    console on the staging app (never production):
+
+    ```sh
+    doctl apps console <staging-app-id> web
+    node scripts/seed.mts
+    ```
+
+    It refuses to run if any aircraft already exist.
+
 ## Environment variables
 
 The web service needs these at runtime.  The specs in `.do/` set them
