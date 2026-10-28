@@ -1,0 +1,22 @@
+# Local development database.  Start with `docker compose up -d`.
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: flightclub
+      POSTGRES_PASSWORD: flightclub
+      POSTGRES_DB: flightclub
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18 images keep data in a versioned subdirectory of this
+      # path, so mount the parent rather than .../data.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flightclub"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  pgdata:
