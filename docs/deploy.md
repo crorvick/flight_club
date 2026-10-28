@@ -89,11 +89,15 @@ doctl auth remove --context admin
    `flightclub`.  Staging uses an App Platform dev database instead,
    which the app creates for itself.
 
-6. **Create the apps** from the specs, using the SHA from step 4:
+6. **Create the apps** from the specs, using the SHA from step 4.  Each
+   app gets its own freshly generated auth secret:
 
    ```sh
-   sed 's/REPLACE_WITH_SHA/<sha>/' .do/staging.yaml | doctl apps create --spec - --wait
-   sed 's/REPLACE_WITH_SHA/<sha>/' .do/production.yaml | doctl apps create --spec - --wait
+   for env in staging production; do
+     sed -e 's/REPLACE_WITH_SHA/<sha>/' \
+         -e "s|REPLACE_WITH_SECRET|$(openssl rand -base64 32)|" \
+         .do/$env.yaml | doctl apps create --spec - --wait
+   done
    ```
 
    When creating the production app, App Platform adds it to the
@@ -108,6 +112,43 @@ doctl auth remove --context admin
      `https://flight-club-staging-abc12.ondigitalocean.app`.
 
 8. **Re-run the "Deploy to staging" workflow** and confirm it goes green.
+
+9. **Make yourself an officer** on each environment, as described under
+   [Approving members](#approving-members).
+
+## Environment variables
+
+The web service needs these at runtime.  The specs in `.do/` set them
+when an app is created; on an existing app, add or change them in the
+control panel (the app → Settings → the `web` component → Environment
+Variables), since deploys don't apply the specs.
+
+| Variable             | Value                                                  |
+| -------------------- | ------------------------------------------------------ |
+| `DATABASE_URL`       | `${db.DATABASE_URL}`, bound to the app's database      |
+| `BETTER_AUTH_URL`    | `${APP_URL}`, the app's public URL                     |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32`, encrypted, unique per app   |
+
+Changing `BETTER_AUTH_SECRET` signs everyone out.  If any of them is
+missing or invalid, the new version fails its health check and the
+previous one keeps serving, so set them before deploying a commit that
+needs them.
+
+## Approving members
+
+Anyone can create an account, but it starts inactive and without roles.
+Until officers have a page for it, approve members with the script in
+the image, from a console on the running app:
+
+```sh
+doctl apps console <app-id> web
+node scripts/approve-member.mts member@example.com pilot
+```
+
+The roles given replace the member's current ones (`pilot`, `officer`);
+with none, their roles are left as they are.  For the first officer,
+sign up in the app, then run it with `officer pilot`.  Locally, it's
+`pnpm member:approve <email> [role...]`.
 
 ## Promoting to production
 

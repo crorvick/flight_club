@@ -2,6 +2,10 @@ import { z } from "zod";
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  // Signs session cookies.  Generate with `openssl rand -base64 32`.
+  BETTER_AUTH_SECRET: z.string().min(32),
+  // The app's public origin; requests from any other origin are rejected.
+  BETTER_AUTH_URL: z.url({ protocol: /^https?$/ }),
   // Set at image build time; reported by /api/health so deploys can
   // confirm which commit is live.
   GIT_SHA: z.string().default("dev"),

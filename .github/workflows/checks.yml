@@ -28,6 +28,9 @@ jobs:
           --health-retries 15
     env:
       DATABASE_URL: postgres://flightclub:flightclub@localhost:5432/flightclub
+      # Only ever signs sessions for throwaway test accounts.
+      BETTER_AUTH_SECRET: ci-only-secret-for-throwaway-test-sessions
+      BETTER_AUTH_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v6

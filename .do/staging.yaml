@@ -20,6 +20,16 @@ services:
       - key: DATABASE_URL
         scope: RUN_TIME
         value: ${db.DATABASE_URL}
+      - key: BETTER_AUTH_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
+      # Replace before creating the app, with `openssl rand -base64 32`.
+      # The placeholder is too short to pass validation, so the app fails
+      # its health check rather than run with a guessable secret.
+      - key: BETTER_AUTH_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_SECRET
 
 jobs:
   # Runs before each deploy; if it fails, the deploy is aborted and the

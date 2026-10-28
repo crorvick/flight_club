@@ -25,7 +25,11 @@ export default defineConfig({
     // CI tests the production build; locally the dev server is quicker to
     // iterate against.
     command: isCI ? "pnpm start" : `pnpm dev --port ${port}`,
-    env: { PORT: String(port) },
+    env: {
+      PORT: String(port),
+      // Better Auth rejects requests from any origin but its own.
+      BETTER_AUTH_URL: `http://localhost:${port}`,
+    },
     url: `http://localhost:${port}/api/health`,
     reuseExistingServer: !isCI,
     timeout: 120_000,
