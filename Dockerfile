@@ -19,11 +19,15 @@ FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
+# The runtime stage copies these, but neither need exist in a checkout
+# yet: there may be no migrations or static files, and Git doesn't track
+# empty directories.
+RUN mkdir -p drizzle public
 # The migrate script runs outside the Next.js server, so the standalone
 # output's traced node_modules can't be relied on to have everything it
 # imports.  Give it its own copy of the two packages it needs (neither has
 # dependencies of its own); -L resolves pnpm's symlinks.
-RUN mkdir -p drizzle /migrate/node_modules \
+RUN mkdir -p /migrate/node_modules \
  && cp -rL node_modules/drizzle-orm node_modules/postgres /migrate/node_modules/
 
 FROM node:24-slim AS runtime

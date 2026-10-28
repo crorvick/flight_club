@@ -10,7 +10,10 @@ if (!existsSync(`${dir}/server.js`)) {
   process.exit(1);
 }
 
-cpSync("public", `${dir}/public`, { recursive: true });
+// public/ may not exist yet; Git doesn't track empty directories.
+if (existsSync("public")) {
+  cpSync("public", `${dir}/public`, { recursive: true });
+}
 cpSync(".next/static", `${dir}/.next/static`, { recursive: true });
 
 const args = existsSync(".env") ? ["--env-file=.env"] : [];
