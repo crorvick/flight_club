@@ -14,7 +14,7 @@ inputs:
     description: Public base URL of the environment, e.g. https://staging.example.com
     required: true
   token:
-    description: DigitalOcean API token with app read/update access
+    description: DigitalOcean API token with app read/update and database read access
     required: true
 
 runs:

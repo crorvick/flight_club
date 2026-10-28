@@ -61,8 +61,10 @@ doctl auth remove --context admin
    `registry.digitalocean.com/<registry>/flight-club`.
 
 2. **Create an API token.**  API → Tokens → Generate New Token, with
-   custom scopes: `registry` (read, update) and `app` (read, update).
-   This is what GitHub Actions uses; don't use it for `doctl` here.
+   custom scopes: `registry` (read, update), `app` (read, update) and
+   `database` (read).  Deploys don't touch the databases, but updating an
+   app validates its spec, which lists the database clusters.  This is
+   what GitHub Actions uses; don't use it for `doctl` here.
 
 3. **Configure the GitHub repository.**  In Settings → Secrets and
    variables → Actions:
