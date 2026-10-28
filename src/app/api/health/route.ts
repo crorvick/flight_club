@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { serverEnv } from "@/lib/env";
 
 // Used by the deploy workflow to wait for a specific commit to go live,
-// and by Render as the service health check.
+// and by App Platform as the service health check.
 export async function GET() {
   // Render at request time: the SHA and database status are runtime facts.
   await connection();

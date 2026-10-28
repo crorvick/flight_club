@@ -1,0 +1,59 @@
+# Manually promote a commit that's already been built (and deployed to
+# staging) to production. Uses the exact image CI built; nothing is rebuilt.
+#
+# Run from the Actions tab, or: gh workflow run promote.yml -f sha=<commit>
+name: Promote to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to promote (full or short SHA; must be on master)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Add required reviewers to this environment in GitHub to gate promotion.
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: resolve
+        name: Resolve and verify commit
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          sha=$(git rev-parse --verify "${INPUT_SHA}^{commit}")
+          if ! git merge-base --is-ancestor "$sha" origin/master; then
+            echo "::error::$sha is not on master"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Verify an image was built for this commit
+        env:
+          IMAGE: registry.digitalocean.com/${{ vars.DO_REGISTRY }}/flight-club
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: docker buildx imagetools inspect "$IMAGE:$SHA" > /dev/null
+      - uses: ./.github/actions/do-deploy
+        with:
+          app-id: ${{ vars.DO_APP_ID }}
+          sha: ${{ steps.resolve.outputs.sha }}
+          app-url: ${{ vars.APP_URL }}
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}

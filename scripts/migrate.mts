@@ -1,7 +1,7 @@
-// Apply pending migrations from drizzle/.  Runs as Render's pre-deploy
-// command inside the production image, so it uses plain Node (which strips
-// the TypeScript types itself) and only drizzle-orm and postgres; neither
-// drizzle-kit nor a build step is available there.
+// Apply pending migrations from drizzle/.  Runs as a pre-deploy job inside
+// the production image, so it uses plain Node (which strips the TypeScript
+// types itself) and only drizzle-orm and postgres; neither drizzle-kit nor
+// a build step is available there.
 import { existsSync } from "node:fs";
 
 import { drizzle } from "drizzle-orm/postgres-js";

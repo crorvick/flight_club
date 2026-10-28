@@ -2,13 +2,14 @@
 
 A web app for a small flight club: flight logging, squawks and
 maintenance, and pilot qualifications. See `docs/spec.md` for what it
-does and why.
+does and why, and `docs/deploy.md` for how it gets to staging and
+production.
 
 ## Stack
 
 Next.js (App Router) and TypeScript, Postgres through Drizzle ORM, Zod
 for validation, Tailwind CSS and shadcn/ui, Vitest and Playwright for
-tests.
+tests. It ships as a Docker image to DigitalOcean App Platform.
 
 ## Local development
 

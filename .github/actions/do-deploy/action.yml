@@ -1,0 +1,67 @@
+name: Deploy image to DigitalOcean App Platform
+description: >
+  Point an App Platform app at an already-built image, wait for the
+  deployment, and confirm /api/health reports the new commit.
+
+inputs:
+  app-id:
+    description: The App Platform app's ID
+    required: true
+  sha:
+    description: Full commit SHA; the image tag to deploy
+    required: true
+  app-url:
+    description: Public base URL of the environment, e.g. https://staging.example.com
+    required: true
+  token:
+    description: DigitalOcean API token with app read/update access
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ inputs.token }}
+
+    - name: Deploy ${{ inputs.sha }}
+      shell: bash
+      env:
+        APP_ID: ${{ inputs.app-id }}
+        SHA: ${{ inputs.sha }}
+      # Patch only the image tags on the app's live spec rather than
+      # applying the spec from .do/, so anything configured in the
+      # dashboard (secrets in particular) is left alone.  The migrate job
+      # must run the same image as the web service.
+      run: |
+        if [ -z "$APP_ID" ]; then
+          echo "::error::DO_APP_ID is not set for this environment"
+          exit 1
+        fi
+        spec=$(mktemp)
+        doctl apps spec get "$APP_ID" --format yaml > "$spec"
+        yq -i '
+          (.services[] | select(.image) | .image.tag) = strenv(SHA) |
+          with(select(.jobs); (.jobs[] | select(.image) | .image.tag) = strenv(SHA))
+        ' "$spec"
+        doctl apps update "$APP_ID" --spec "$spec" --wait
+
+    - name: Wait for ${{ inputs.sha }} to be live
+      shell: bash
+      env:
+        APP_URL: ${{ inputs.app-url }}
+        SHA: ${{ inputs.sha }}
+      # App Platform keeps the previous version serving if the new one
+      # fails its health check, so check which commit actually answers.
+      run: |
+        for i in $(seq 1 30); do
+          live=$(curl --silent --max-time 10 "$APP_URL/api/health" | jq -r '.sha // empty' || true)
+          if [ "$live" = "$SHA" ]; then
+            echo "Live: $SHA"
+            exit 0
+          fi
+          echo "Waiting (live: ${live:-unreachable})..."
+          sleep 10
+        done
+        echo "::error::$SHA was not live after 5 minutes; check the app's deployment logs"
+        exit 1

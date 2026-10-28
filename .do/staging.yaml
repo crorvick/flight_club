@@ -1,0 +1,44 @@
+# DigitalOcean App Platform spec for staging.  Used once, to create the
+# app (see docs/deploy.md).  After that the deploy workflow changes only
+# the image tag on the app's live spec, so settings made in the dashboard,
+# such as secrets, survive deploys.
+name: flight-club-staging
+region: nyc
+
+services:
+  - name: web
+    image:
+      registry_type: DOCR
+      repository: flight-club
+      tag: REPLACE_WITH_SHA
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    health_check:
+      http_path: /api/health
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+
+jobs:
+  # Runs before each deploy; if it fails, the deploy is aborted and the
+  # previous version keeps serving.
+  - name: migrate
+    kind: PRE_DEPLOY
+    image:
+      registry_type: DOCR
+      repository: flight-club
+      tag: REPLACE_WITH_SHA
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    run_command: node scripts/migrate.mts
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+
+databases:
+  # A dev database: cheap, but no backups.  Staging holds only seed data.
+  - name: db
+    engine: PG
+    production: false
