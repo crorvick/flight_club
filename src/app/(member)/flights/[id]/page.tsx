@@ -81,68 +81,87 @@ async function FlightDetails({
         <p className="text-muted-foreground">{flight.pilot.name}</p>
       </div>
 
-      <table className="w-full text-left tabular-nums">
-        <thead className="text-sm text-muted-foreground">
-          <tr>
-            <th className="py-1 font-normal">Meter</th>
-            <th className="py-1 text-right font-normal">Out</th>
-            <th className="py-1 text-right font-normal">In</th>
-            <th className="py-1 text-right font-normal">Hours</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flight.readings.map((r) => {
-            const out = parseHours(r.out)!;
-            const inH = parseHours(r.in)!;
-            return (
-              <tr key={r.meterId} className="border-t">
-                <td className="py-2">{r.label}</td>
-                <td className="py-2 text-right">{formatHours(out)}</td>
-                <td className="py-2 text-right">{formatHours(inH)}</td>
-                <td className="py-2 text-right">{formatHours(inH - out)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <section
+        aria-label="Flight summary"
+        className="overflow-hidden rounded-xl border bg-card"
+      >
+        <div className="px-5 pt-5 pb-4">
+          <p className="text-sm text-muted-foreground">Billed</p>
+          <p className="text-muted-foreground">
+            <span className="text-4xl font-semibold tracking-tight text-foreground tabular-nums">
+              {formatHours(parseHours(flight.billedHours)!)}
+            </span>{" "}
+            hours ({METER_LABELS[flight.billingMeterKind].toLowerCase()})
+          </p>
+        </div>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <dt className="text-muted-foreground">Billed</dt>
-        <dd className="tabular-nums">
-          {formatHours(parseHours(flight.billedHours)!)} hours (
-          {METER_LABELS[flight.billingMeterKind].toLowerCase()})
-        </dd>
-        {flight.fuelAdded !== null && (
-          <>
-            <dt className="text-muted-foreground">Fuel added</dt>
-            <dd className="tabular-nums">
-              {formatAmount(flight.fuelAdded, "gal")}
-            </dd>
-          </>
+        <table className="w-full border-t text-left tabular-nums">
+          <thead className="bg-muted/50 text-sm text-muted-foreground">
+            <tr>
+              <th className="py-2 pl-5 font-normal">Meter</th>
+              <th className="py-2 text-right font-normal">Out</th>
+              <th className="py-2 text-right font-normal">In</th>
+              <th className="py-2 pr-5 text-right font-normal">Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            {flight.readings.map((r) => {
+              const out = parseHours(r.out)!;
+              const inH = parseHours(r.in)!;
+              return (
+                <tr key={r.meterId} className="border-t">
+                  <td className="py-2.5 pl-5">{r.label}</td>
+                  <td className="py-2.5 text-right">{formatHours(out)}</td>
+                  <td className="py-2.5 text-right">{formatHours(inH)}</td>
+                  <td className="py-2.5 pr-5 text-right font-medium">
+                    {formatHours(inH - out)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {(flight.fuelAdded !== null ||
+          flight.oilAdded !== null ||
+          flight.totalizerFuel !== null) && (
+          <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3">
+            {flight.fuelAdded !== null && (
+              <div>
+                <dt className="text-sm text-muted-foreground">Fuel added</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatAmount(flight.fuelAdded, "gal")}
+                </dd>
+              </div>
+            )}
+            {flight.oilAdded !== null && (
+              <div>
+                <dt className="text-sm text-muted-foreground">Oil added</dt>
+                <dd className="font-medium tabular-nums">
+                  {formatAmount(flight.oilAdded, "qt")}
+                </dd>
+              </div>
+            )}
+            {flight.totalizerFuel !== null && (
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Totalizer at end
+                </dt>
+                <dd className="font-medium tabular-nums">
+                  {formatAmount(flight.totalizerFuel, "gal")} remaining
+                </dd>
+              </div>
+            )}
+          </dl>
         )}
-        {flight.oilAdded !== null && (
-          <>
-            <dt className="text-muted-foreground">Oil added</dt>
-            <dd className="tabular-nums">
-              {formatAmount(flight.oilAdded, "qt")}
-            </dd>
-          </>
-        )}
-        {flight.totalizerFuel !== null && (
-          <>
-            <dt className="text-muted-foreground">Totalizer at end</dt>
-            <dd className="tabular-nums">
-              {formatAmount(flight.totalizerFuel, "gal")} remaining
-            </dd>
-          </>
-        )}
+
         {flight.notes && (
-          <>
-            <dt className="text-muted-foreground">Notes</dt>
-            <dd className="whitespace-pre-wrap">{flight.notes}</dd>
-          </>
+          <div className="border-t px-5 py-4">
+            <p className="text-sm text-muted-foreground">Notes</p>
+            <p className="whitespace-pre-wrap">{flight.notes}</p>
+          </div>
         )}
-      </dl>
+      </section>
 
       {editable ? (
         <Link

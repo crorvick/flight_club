@@ -1,4 +1,5 @@
 import { Field } from "@/components/field";
+import { FormSection } from "@/components/form-section";
 
 export type FluidValues = {
   fuelAdded: string;
@@ -10,11 +11,14 @@ export type FluidValues = {
 // the end of it for aircraft that have one.  Every field shown is
 // required: 0 when nothing was added.
 export function FluidFields({
+  step,
   totalizer,
   values,
   initial,
   errors,
 }: {
+  // Its number, in a form of numbered steps.
+  step?: number;
   totalizer: boolean;
   // What was typed before a failed submit, then the stored values.
   values?: Record<string, string>;
@@ -23,11 +27,11 @@ export function FluidFields({
 }) {
   const value = (name: keyof FluidValues) => values?.[name] ?? initial?.[name];
   return (
-    <fieldset className="flex flex-col gap-3">
-      <legend className="mb-1 text-lg font-semibold">Fuel and oil</legend>
-      <p className="text-sm text-muted-foreground">
-        Enter 0 if none was added.
-      </p>
+    <FormSection
+      step={step}
+      title="Fuel and oil"
+      description="Enter 0 if none was added."
+    >
       <div className="grid grid-cols-2 gap-3">
         <Field
           name="fuelAdded"
@@ -59,6 +63,6 @@ export function FluidFields({
           errors={errors.totalizerFuel}
         />
       )}
-    </fieldset>
+    </FormSection>
   );
 }

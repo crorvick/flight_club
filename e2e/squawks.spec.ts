@@ -139,7 +139,9 @@ test("an IFR-only squawk limits the aircraft to VFR", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: `You have ${aircraft.tailNumber}` }),
   ).toBeVisible();
-  await expect(page.getByText("VFR only ·")).toBeVisible();
+  await expect(
+    page.locator("p", { hasText: "Checked out" }).getByText("VFR only"),
+  ).toBeVisible();
 });
 
 test("a rejected report keeps the photos and description", async ({ page }) => {

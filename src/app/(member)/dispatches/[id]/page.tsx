@@ -4,6 +4,7 @@ import Link from "next/link";
 import { forbidden, notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { AircraftStatusLabel } from "@/components/aircraft-status";
 import { Flash } from "@/components/flash";
 import { LocalTime } from "@/components/local-time";
 import { FormSkeleton } from "@/components/page-skeleton";
@@ -18,6 +19,7 @@ import { requireMember } from "@/lib/session";
 import { FlightForm } from "../../flights/flight-form";
 import { cancelDispatch, checkIn, reviewGap } from "../actions";
 import { ActionButton } from "./action-button";
+import { CancelCheckOut } from "./cancel-check-out";
 
 export const metadata: Metadata = { title: "Checked out · Flight Club" };
 
@@ -84,15 +86,13 @@ async function Dispatch({
               : `${tail} is out with ${row.pilot.name}`
             : `${tail} with ${row.pilot.name}`}
         </h1>
-        <p className="text-muted-foreground">
-          {row.vfrOnly && (
-            <span className="font-medium text-amber-700 dark:text-amber-400">
-              VFR only ·{" "}
-            </span>
-          )}
-          Checked out <LocalTime at={row.checkedOutAt} />
-          {row.status === "cancelled" && " · cancelled"}
-          {row.status === "in" && " · checked in"}
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
+          {row.vfrOnly && <AircraftStatusLabel status="vfr-only" />}
+          <span>
+            Checked out <LocalTime at={row.checkedOutAt} />
+            {row.status === "cancelled" && " · cancelled"}
+            {row.status === "in" && " · checked in"}
+          </span>
         </p>
       </div>
 
@@ -140,7 +140,6 @@ async function Dispatch({
 
       {row.status === "out" ? (
         <>
-          <h2 className="text-lg font-semibold">Check in</h2>
           <FlightForm
             action={checkIn.bind(null, row.id)}
             meters={readings.map((r) => ({
@@ -154,11 +153,9 @@ async function Dispatch({
             pendingLabel="Checking in…"
             offerSquawk
           />
-          <ActionButton
+          <CancelCheckOut
             action={cancelDispatch.bind(null, row.id)}
-            label="Cancel: didn't fly"
-            pendingLabel="Cancelling…"
-            variant="destructive"
+            tailNumber={tail}
           />
         </>
       ) : (

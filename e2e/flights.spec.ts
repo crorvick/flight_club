@@ -70,7 +70,13 @@ test("cancelling records no flight and frees the aircraft", async ({
   page,
 }) => {
   await checkOut(page, aircraft);
-  await page.getByRole("button", { name: "Cancel: didn't fly" }).click();
+  await page
+    .getByRole("button", { name: "Didn't fly? Cancel check-out" })
+    .click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Cancel check-out" })
+    .click();
   await expect(
     page.getByText("Cancelled. No flight was recorded."),
   ).toBeVisible();

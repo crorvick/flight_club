@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { FormError } from "@/components/field";
+import { FormSection } from "@/components/form-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,14 +58,11 @@ export function CheckOutForm({
     >
       <FormError message={state.error} />
 
-      <fieldset className="flex flex-col gap-4">
-        <legend className="mb-1 text-lg font-semibold">
-          Confirm the meters
-        </legend>
-        <p className="text-sm text-muted-foreground">
-          Check each against the panel. If one reads more, enter what it says;
-          officers will account for the unlogged time.
-        </p>
+      <FormSection
+        step={1}
+        title="Confirm the meters"
+        description="Check each against the panel. If one reads more, enter what it says; officers will account for the unlogged time."
+      >
         {meters.map((m) => {
           const name = outField(m.id);
           const expected = parseHours(m.reading)!;
@@ -118,11 +116,14 @@ export function CheckOutForm({
             </div>
           );
         })}
-      </fieldset>
+      </FormSection>
 
       {squawks.length > 0 && (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-lg font-semibold">Open squawks</legend>
+        <FormSection
+          step={2}
+          title="Open squawks"
+          description="Read each one before you fly."
+        >
           {squawks.map((s) => (
             <label
               key={s.id}
@@ -143,7 +144,7 @@ export function CheckOutForm({
               </span>
             </label>
           ))}
-        </fieldset>
+        </FormSection>
       )}
 
       {vfrOnly && (

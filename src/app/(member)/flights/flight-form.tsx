@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Field, FormError } from "@/components/field";
+import { FormSection } from "@/components/form-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -95,8 +96,11 @@ export function FlightForm({
     >
       <FormError message={state.error} />
 
-      <fieldset className="flex flex-col gap-4">
-        <legend className="mb-2 text-lg font-semibold">Meters</legend>
+      <FormSection
+        step={1}
+        title="Meters"
+        description="What each reads at shutdown."
+      >
         {meters.map((m) => (
           <MeterInput
             key={m.id}
@@ -109,52 +113,55 @@ export function FlightForm({
             serverError={state.fieldErrors?.[inField(m.id)]?.[0]}
           />
         ))}
-      </fieldset>
-
-      <Field
-        ref={dateRef}
-        name="date"
-        label="Date"
-        type="date"
-        defaultValue={values?.date ?? initial?.date}
-        errors={state.fieldErrors?.date}
-        required
-      />
+      </FormSection>
 
       <FluidFields
+        step={2}
         totalizer={totalizer}
         values={values}
         initial={initial}
         errors={state.fieldErrors ?? {}}
       />
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="notes">Notes (optional)</Label>
-        <textarea
-          id="notes"
-          name="notes"
-          rows={2}
-          defaultValue={values?.notes ?? initial?.notes}
-          className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+      <FormSection step={3} title="Date and notes">
+        <Field
+          ref={dateRef}
+          name="date"
+          label="Date"
+          type="date"
+          defaultValue={values?.date ?? initial?.date}
+          errors={state.fieldErrors?.date}
+          required
         />
-        {state.fieldErrors?.notes && (
-          <p className="text-sm text-destructive">
-            {state.fieldErrors.notes[0]}
-          </p>
-        )}
-      </div>
 
-      {offerSquawk && (
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-base has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-          <input
-            type="checkbox"
-            name="reportSquawk"
-            defaultChecked={values?.reportSquawk === "on"}
-            className="size-5 accent-primary"
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="notes">Notes (optional)</Label>
+          <textarea
+            id="notes"
+            name="notes"
+            rows={2}
+            defaultValue={values?.notes ?? initial?.notes}
+            className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
           />
-          Report a squawk after logging
-        </label>
-      )}
+          {state.fieldErrors?.notes && (
+            <p className="text-sm text-destructive">
+              {state.fieldErrors.notes[0]}
+            </p>
+          )}
+        </div>
+
+        {offerSquawk && (
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-base has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+            <input
+              type="checkbox"
+              name="reportSquawk"
+              defaultChecked={values?.reportSquawk === "on"}
+              className="size-5 accent-primary"
+            />
+            Report a squawk after logging
+          </label>
+        )}
+      </FormSection>
 
       <Button type="submit" className="h-12 text-base" disabled={pending}>
         {pending ? pendingLabel : submitLabel}
@@ -207,7 +214,6 @@ function MeterInput({
         name={id}
         inputMode="decimal"
         autoComplete="off"
-        placeholder={formatHours(out)}
         defaultValue={defaultValue}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
