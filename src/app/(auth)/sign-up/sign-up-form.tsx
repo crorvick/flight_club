@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 
+import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
+import type { FormState } from "@/lib/form-state";
 
-import { signUp, type FormState } from "../actions";
-import { Field, FormError } from "../field";
+import { signUp } from "../actions";
 
 export function SignUpForm() {
   const [state, action, pending] = useActionState(signUp, {} as FormState);

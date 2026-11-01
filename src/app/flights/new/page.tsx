@@ -1,0 +1,84 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { requireMember } from "@/lib/session";
+
+import { logFlight } from "../actions";
+import { AircraftPicker } from "../aircraft-picker";
+import {
+  getAircraftForLog,
+  lastFlownAircraftId,
+  listActiveAircraft,
+} from "../data";
+import { FlightForm } from "../flight-form";
+
+export const metadata: Metadata = { title: "Log a flight · Flight Club" };
+
+export default function NewFlightPage({
+  searchParams,
+}: PageProps<"/flights/new">) {
+  return (
+    <>
+      <h1 className="text-2xl font-semibold tracking-tight">Log a flight</h1>
+      {/* Reads the session and the URL, so it streams in after the shell. */}
+      <Suspense fallback={<div className="h-96" />}>
+        <LogFlight searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function LogFlight({
+  searchParams,
+}: Pick<PageProps<"/flights/new">, "searchParams">) {
+  const member = await requireMember("pilot");
+  const fleet = await listActiveAircraft();
+  if (fleet.length === 0) {
+    return <p>There are no aircraft yet. An officer needs to add them.</p>;
+  }
+
+  // The aircraft in the URL if it's a real one, else the one this pilot
+  // flew last, else the first.
+  const { aircraft: requested } = await searchParams;
+  const candidates = [
+    typeof requested === "string" ? requested : undefined,
+    await lastFlownAircraftId(member.id),
+  ];
+  const selectedId =
+    candidates.find((id) => fleet.some((a) => a.id === id)) ?? fleet[0].id;
+  const plane = (await getAircraftForLog(selectedId))!;
+
+  return (
+    <>
+      <AircraftPicker fleet={fleet} selectedId={plane.id} />
+
+      {plane.groundingSquawks.length > 0 && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="font-semibold text-destructive">
+            {plane.tailNumber} is grounded
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-sm">
+            {plane.groundingSquawks.map((description) => (
+              <li key={description}>{description}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Keyed so switching aircraft starts with a fresh form. */}
+      <FlightForm
+        key={plane.id}
+        action={logFlight.bind(null, plane.id)}
+        meters={plane.meters.map((m) => ({
+          id: m.id,
+          label: m.label,
+          out: m.reading,
+          billing: m.billing,
+        }))}
+        sendOuts
+        submitLabel={`Log flight in ${plane.tailNumber}`}
+        pendingLabel="Logging…"
+      />
+    </>
+  );
+}

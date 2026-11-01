@@ -1,31 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { expect, test } from "@playwright/test";
 
-import { expect, test, type Page } from "@playwright/test";
-
-// Unique per test and per project, since every device project runs the
-// whole suite against the same database.
-function newMember(testInfo: { project: { name: string } }) {
-  const id = `${testInfo.project.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return {
-    name: `Test ${id}`,
-    email: `${id}@example.com`,
-    password: "correct horse battery",
-  };
-}
-
-async function signUp(page: Page, member: ReturnType<typeof newMember>) {
-  await page.goto("/sign-up");
-  await page.getByLabel("Name").fill(member.name);
-  await page.getByLabel("Email").fill(member.email);
-  await page.getByLabel("Password").fill(member.password);
-  await page.getByRole("button", { name: "Create account" }).click();
-}
-
-function approve(email: string, ...roles: string[]) {
-  execFileSync("pnpm", ["-s", "member:approve", email, ...roles], {
-    stdio: "pipe",
-  });
-}
+import { approve, newMember, signUp } from "./helpers";
 
 test("a new member waits for approval", async ({ page }, testInfo) => {
   const member = newMember(testInfo);

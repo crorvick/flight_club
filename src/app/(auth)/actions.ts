@@ -6,15 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-
-// What a form shows after a failed submit.  `values` echoes back what was
-// typed (never the password) so a member on a bad connection doesn't have
-// to type it all again.
-export type FormState = {
-  error?: string;
-  fieldErrors?: Partial<Record<string, string[]>>;
-  values?: Record<string, string>;
-};
+import { type FormState, formValues } from "@/lib/form-state";
 
 const signInSchema = z.object({
   email: z.email("Enter your email address."),
@@ -30,12 +22,6 @@ const signUpSchema = z.object({
     .min(8, "Use at least 8 characters.")
     .max(128, "Use at most 128 characters."),
 });
-
-function formValues(formData: FormData, keys: string[]) {
-  return Object.fromEntries(
-    keys.map((k) => [k, String(formData.get(k) ?? "")]),
-  );
-}
 
 export async function signIn(
   _prev: FormState,
