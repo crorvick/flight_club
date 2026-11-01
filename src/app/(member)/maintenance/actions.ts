@@ -108,8 +108,6 @@ const itemSchema = z
   .transform(
     ({ calendarInterval, calendarUnit, calendarDeadline, ...item }) => ({
       ...item,
-      // For the previous release, during a deploy (lib/grounding.ts).
-      groundsWhenOverdue: item.grounding !== "none",
       intervalMonths: calendarUnit === "months" ? calendarInterval : null,
       intervalDays: calendarUnit === "days" ? calendarInterval : null,
       dueEndOfMonth:

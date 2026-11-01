@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -12,7 +12,6 @@ import {
 } from "@/db/schema";
 import {
   type AircraftStatus,
-  effectiveGrounding,
   type Grounding,
   GROUNDING_LEVELS,
   statusFor,
@@ -23,26 +22,21 @@ import { maintenanceStatus, type MaintenanceStatus } from "@/lib/maintenance";
 // Open squawks that restrict flying, at the level each restricts it.
 async function restrictingSquawks(aircraftIds: string[]) {
   if (aircraftIds.length === 0) return [];
-  const rows = await db()
+  return db()
     .select({
       aircraftId: squawk.aircraftId,
       description: squawk.description,
       grounding: squawk.grounding,
-      grounds: squawk.grounds,
     })
     .from(squawk)
     .where(
       and(
         inArray(squawk.aircraftId, aircraftIds),
         eq(squawk.status, "open"),
-        or(ne(squawk.grounding, "none"), eq(squawk.grounds, true)),
+        ne(squawk.grounding, "none"),
       ),
     )
     .orderBy(asc(squawk.reportedAt));
-  return rows.map(({ grounds, ...s }) => ({
-    ...s,
-    grounding: effectiveGrounding(s.grounding, grounds),
-  }));
 }
 
 export type MaintenanceAlert = MaintenanceStatus & {
@@ -103,7 +97,7 @@ export async function aircraftAlerts(
         date,
       );
       if (status.state === "ok") continue;
-      const level = effectiveGrounding(item.grounding, item.groundsWhenOverdue);
+      const level = item.grounding;
       entries.get(item.aircraftId)!.maintenance.push({
         ...status,
         id: item.id,
@@ -211,7 +205,6 @@ export async function fleetStatus() {
           id: true,
           description: true,
           grounding: true,
-          grounds: true,
           status: true,
           reportedAt: true,
         },
@@ -223,14 +216,10 @@ export async function fleetStatus() {
     aircraftAlerts(ids),
     activeDispatches(ids),
   ]);
-  return planes.map(({ squawks, ...plane }) => {
+  return planes.map((plane) => {
     const { status, maintenance } = alerts.get(plane.id)!;
     return {
       ...plane,
-      squawks: squawks.map(({ grounds, ...s }) => ({
-        ...s,
-        grounding: effectiveGrounding(s.grounding, grounds),
-      })),
       status,
       maintenance,
       checkedOutTo: out.get(plane.id)?.pilotName,

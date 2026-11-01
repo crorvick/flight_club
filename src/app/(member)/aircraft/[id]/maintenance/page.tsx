@@ -8,7 +8,6 @@ import { Suspense } from "react";
 import { db } from "@/db";
 import { aircraft, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
-import { effectiveGrounding } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
 import { byMeterOrder } from "@/lib/meters";
@@ -97,12 +96,7 @@ async function Maintenance({
                           all: "",
                           ifr: " · grounds for IFR",
                           none: " · warns only",
-                        }[
-                          effectiveGrounding(
-                            item.grounding,
-                            item.groundsWhenOverdue,
-                          )
-                        ]
+                        }[item.grounding]
                       }
                     </span>
                   </span>

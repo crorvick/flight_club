@@ -57,6 +57,13 @@
       "when": 1793515822951,
       "tag": "0007_ifr_grounding",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793516659011,
+      "tag": "0008_drop_superseded_columns",
+      "breakpoints": true
     }
   ]
 }

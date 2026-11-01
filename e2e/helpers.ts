@@ -145,11 +145,10 @@ export async function createSquawk(
   `;
   const [{ id }] = await db`
     insert into squawk (
-      aircraft_id, reported_by_id, description, grounding, grounds
+      aircraft_id, reported_by_id, description, grounding
     )
     values (
-      ${aircraftId}, ${reporterId}, ${squawk.description}, ${grounding},
-      ${grounding !== "none"}
+      ${aircraftId}, ${reporterId}, ${squawk.description}, ${grounding}
     )
     returning id
   `;

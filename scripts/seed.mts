@@ -255,7 +255,7 @@ try {
             insert into maintenance_item (
               aircraft_id, name, interval_months, interval_days,
               interval_hours, meter_id, last_completed_on,
-              last_completed_reading, grounding, grounds_when_overdue
+              last_completed_reading, grounding
             )
             values (
               ${aircraftId}, ${item.name}, ${item.months ?? null},
@@ -264,8 +264,7 @@ try {
               ${item.hours === undefined ? null : meterIds.tach},
               ${isoDaysAgo(item.lastDaysAgo)},
               ${item.lastReading === undefined ? null : toHours(item.lastReading)},
-              ${item.grounding ?? "all"},
-              ${(item.grounding ?? "all") !== "none"}
+              ${item.grounding ?? "all"}
             )
           `;
         }
@@ -345,11 +344,11 @@ try {
         await tx`
           insert into squawk (
             aircraft_id, reported_by_id, reported_at, description, category,
-            grounding, grounds, status, created_at, updated_at
+            grounding, status, created_at, updated_at
           )
           values (
             ${aircraftIds[s.tail]}, ${pick(memberIds)}, ${at}, ${s.description},
-            ${s.category}, ${s.grounding}, ${s.grounding !== "none"},
+            ${s.category}, ${s.grounding},
             ${s.status}, ${at}, ${at}
           )
         `;
@@ -360,12 +359,12 @@ try {
       const [resolved] = await tx`
         insert into squawk (
           aircraft_id, reported_by_id, reported_at, description, category,
-          grounding, grounds, status, resolved_by_id, resolved_at,
+          grounding, status, resolved_by_id, resolved_at,
           resolution_note, created_at, updated_at
         )
         values (
           ${aircraftIds["N182FC"]}, ${memberIds[2]}, ${reportedAt},
-          'Right main tire worn through to the cord.', 'airframe', 'all', true,
+          'Right main tire worn through to the cord.', 'airframe', 'all',
           'resolved', ${officerId}, ${resolvedAt},
           'Tire and tube replaced by the shop; returned to service.',
           ${reportedAt}, ${resolvedAt}

@@ -9,7 +9,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
 import { aircraft, squawk, squawkPhoto } from "@/db/schema";
-import { effectiveGrounding, GROUNDING_LEVELS } from "@/lib/grounding";
+import { GROUNDING_LEVELS } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 import type { FormState } from "@/lib/form-state";
@@ -112,8 +112,6 @@ export async function reportSquawk(
       aircraftId,
       reportedById: member.id,
       ...parsed.data,
-      // For the previous release, during a deploy (lib/grounding.ts).
-      grounds: parsed.data.grounding !== "none",
     });
     if (uploads.length > 0) {
       await tx.insert(squawkPhoto).values(
@@ -180,8 +178,7 @@ export async function changeSquawk(
       .where(eq(squawk.id, squawkId))
       .for("update");
     if (!current) return "No such squawk.";
-    const restricts =
-      effectiveGrounding(current.grounding, current.grounds) !== "none";
+    const restricts = current.grounding !== "none";
     if (
       !allowedChanges({ status: current.status, grounds: restricts }).includes(
         change.intent,

@@ -29,12 +29,3 @@ export const STATUS_LABELS: Record<AircraftStatus, string> = {
   "vfr-only": "VFR only",
   grounded: "Grounded",
 };
-
-// Squawks and maintenance items used to say only whether they grounded
-// the aircraft, as a boolean that's still written alongside the level so
-// the previous release reads them correctly during a deploy.  A row that
-// release created has the level's default, "none", with the boolean set:
-// count that as grounding everything.  Goes once the booleans are dropped.
-export function effectiveGrounding(level: Grounding, legacyGrounds: boolean) {
-  return level === "none" && legacyGrounds ? "all" : level;
-}

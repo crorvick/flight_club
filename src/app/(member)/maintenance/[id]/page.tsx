@@ -8,7 +8,6 @@ import { Suspense } from "react";
 import { db } from "@/db";
 import { maintenanceCompletion, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
-import { effectiveGrounding } from "@/lib/grounding";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
@@ -103,7 +102,7 @@ async function ItemDetails({
               all: "Overdue: the aircraft is grounded",
               ifr: "Overdue: the aircraft is VFR only",
               none: "Overdue",
-            }[effectiveGrounding(item.grounding, item.groundsWhenOverdue)]
+            }[item.grounding]
           : status.state === "due-soon"
             ? "Due soon"
             : "Not due yet"}

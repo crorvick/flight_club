@@ -213,11 +213,6 @@ export const flight = pgTable(
       .notNull()
       .references(() => member.id),
     date: date("date").notNull(),
-    // No longer recorded: pilots track their own currency.  Left in place,
-    // filled by the default, until a release that no longer reads them is
-    // in production; then a migration drops them.
-    dayLandings: integer("day_landings").default(0).notNull(),
-    nightLandings: integer("night_landings").default(0).notNull(),
     notes: text("notes"),
     // Copied from the aircraft when the flight is logged, so changing an
     // aircraft's billing meter later never re-bills past flights.
@@ -232,10 +227,6 @@ export const flight = pgTable(
   (table) => [
     index("flight_aircraft_date_idx").on(table.aircraftId, table.date),
     index("flight_pilot_date_idx").on(table.pilotId, table.date),
-    check(
-      "flight_landings_nonnegative",
-      sql`${table.dayLandings} >= 0 and ${table.nightLandings} >= 0`,
-    ),
     check("flight_billed_hours_positive", sql`${table.billedHours} > 0`),
   ],
 );
@@ -276,10 +267,6 @@ export const squawk = pgTable(
     // An open squawk grounds the aircraft for all flying, for IFR (it can
     // still fly VFR), or not at all.
     grounding: grounding("grounding").default("none").notNull(),
-    // Superseded by grounding, but still written (true unless "none") so
-    // the previous release reads it right during a deploy; dropped once
-    // this release is in production (see lib/grounding.ts).
-    grounds: boolean("grounds").notNull(),
     status: squawkStatus("status").default("open").notNull(),
     resolvedById: uuid("resolved_by_id").references(() => member.id),
     resolvedAt: timestamptz("resolved_at"),
@@ -474,9 +461,6 @@ export const maintenanceItem = pgTable(
     // Chosen per item: an overdue annual grounds the aircraft, an overdue
     // VOR check rules out only IFR, an overdue oil change might only warn.
     grounding: grounding("grounding").default("none").notNull(),
-    // Superseded by grounding, still written for the previous release;
-    // see squawk.grounds.
-    groundsWhenOverdue: boolean("grounds_when_overdue").default(true).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

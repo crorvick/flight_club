@@ -10,7 +10,6 @@ import { db } from "@/db";
 import { squawk } from "@/db/schema";
 import { STATUS_CLASSES } from "@/components/aircraft-status";
 import { aircraftAlerts } from "@/lib/fleet";
-import { effectiveGrounding } from "@/lib/grounding";
 import { hasRole } from "@/lib/access";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
@@ -67,7 +66,7 @@ async function SquawkDetails({
   const { status } = (await aircraftAlerts([row.aircraft.id])).get(
     row.aircraft.id,
   )!;
-  const grounding = effectiveGrounding(row.grounding, row.grounds);
+  const { grounding } = row;
   const tail = row.aircraft.tailNumber;
   const changeConfirmation =
     typeof changed === "string" && CHANGE_CONFIRMATIONS[changed];
