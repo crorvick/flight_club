@@ -9,6 +9,7 @@ import { MAX_OIL_QUARTS, parseAmount } from "./fluids";
 
 export const MAINTENANCE_KINDS = [
   "general",
+  "annual",
   "vor_check",
   "oil_change",
 ] as const;
@@ -16,6 +17,8 @@ export type MaintenanceKind = (typeof MAINTENANCE_KINDS)[number];
 
 export const KIND_LABELS: Record<MaintenanceKind, string> = {
   general: "General",
+  // Logged like a general item; the mechanic's report counts from it.
+  annual: "Annual inspection",
   vor_check: "VOR check",
   oil_change: "Oil change",
 };
@@ -87,7 +90,7 @@ type Parsed =
   | { fieldErrors: Record<string, string[]> };
 
 // What the completion form sends for an item of this kind, checked.
-// General items have no details.
+// General items and annuals have no details.
 export function parseCompletionDetails(
   kind: MaintenanceKind,
   get: Get,

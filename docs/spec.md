@@ -106,6 +106,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - When overdue: grounds the aircraft, grounds it for IFR only, or only warns (chosen per item)
 - A **kind**, which sets what logging a completion records besides the date, reading and note:
   - **General**: nothing more.
+  - **Annual inspection**: as General; the mechanic's report counts from its last completion.
   - **VOR check** (14 CFR 91.171): how it was checked (VOT, ground checkpoint, airborne checkpoint, or dual VOR), where, and the bearing error of each receiver (or the difference between them on a dual check). A check outside the limit for its method (±4°, or ±6° airborne) is refused: it doesn't count. The member logging it is recorded, standing in for the signature.
   - **Oil change**: quarts put in each engine, the oil used (suggested from the aircraft's last oil change), whether the filter was replaced and an oil sample sent.
 - Each completion keeps its kind's details, so the item's history reads like the logbook entry.
@@ -170,6 +171,13 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 3. Short description; optional category.
 4. Photos straight from the camera.
 5. Confirmation showing the aircraft's updated status.
+
+### Reports
+- For officers (every aircraft) and plane captains (their own), on a tablet or computer; not offered on phones, where the tables don't fit.
+- **Oil**: each oil change (the oil, quarts put in, filter), then the hours run on it, quarts added on flights until the next change, and hours per quart; the oil in it now so far.
+- **Mechanic's report**: from the last completion of the aircraft's **Annual** item: squawks reported since (and any older still open) with their status and resolution, maintenance logged since, and every recurring item's next due.
+- **Flights**: for a period and one or all aircraft, billed hours by aircraft and by pilot (with what each flew), and every flight.
+- Each renders as a page and saves as a PDF through the browser's print dialog, with a print layout (no navigation, ink on white, letter pages).
 
 ### What's new
 - After a release, the first page a member opens shows a popup of brief highlights: every release since they last saw one, not just the latest, newest first. Bullets can be aimed at pilots, officers or plane captains; others don't see them.

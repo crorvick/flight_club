@@ -2,6 +2,7 @@
 
 import { cn } from "cn";
 import {
+  FileText,
   House,
   Megaphone,
   Plane,
@@ -14,7 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export type NavKey =
-  "home" | "fleet" | "squawk" | "profile" | "aircraft" | "members";
+  "home" | "fleet" | "squawk" | "profile" | "aircraft" | "members" | "reports";
 
 type NavItem = {
   href: string;
@@ -23,6 +24,9 @@ type NavItem = {
   // The pages that count as this section, as path prefixes.  The longest
   // match wins, so /squawks/new is Squawk while /squawks/<id> is Fleet.
   sections: string[];
+  // Left out of the tab bar on phones, for pages too wide for them.  A
+  // tablet narrow enough to get the tab bar still gets it.
+  notOnPhones?: boolean;
 };
 
 const ITEMS: Record<NavKey, NavItem> = {
@@ -62,6 +66,13 @@ const ITEMS: Record<NavKey, NavItem> = {
     icon: Users,
     sections: ["/members"],
   },
+  reports: {
+    href: "/reports",
+    label: "Reports",
+    icon: FileText,
+    sections: ["/reports"],
+    notOnPhones: true,
+  },
 };
 
 function currentSection(pathname: string, keys: NavKey[]) {
@@ -98,10 +109,15 @@ export function NavLinks({
       )}
     >
       {keys.map((key) => {
-        const { href, label, icon: Icon } = ITEMS[key];
+        const { href, label, icon: Icon, notOnPhones } = ITEMS[key];
         const active = key === current;
         return (
-          <li key={key}>
+          <li
+            key={key}
+            className={cn(
+              notOnPhones && variant === "tabs" && "hidden sm:block",
+            )}
+          >
             <Link
               href={href}
               aria-current={active ? "page" : undefined}

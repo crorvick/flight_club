@@ -269,7 +269,7 @@ try {
             )
             values (
               ${aircraftId}, ${item.name},
-              ${{ "VOR check": "vor_check", "Oil change": "oil_change" }[item.name] ?? "general"},
+              ${{ "Annual inspection": "annual", "VOR check": "vor_check", "Oil change": "oil_change" }[item.name] ?? "general"},
               ${item.months ?? null},
               ${item.days ?? null},
               ${item.hours === undefined ? null : toHours(item.hours)},

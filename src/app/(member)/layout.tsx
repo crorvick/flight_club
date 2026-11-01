@@ -11,7 +11,7 @@ export default function MemberLayout({ children }: LayoutProps<"/">) {
           child "wide" to use the header's full width for lists and the
           dashboard.  Bottom padding keeps the end of the page clear of
           the tab bar on phones. */}
-      <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-[1fr_min(42rem,100%)_1fr] content-start gap-y-6 px-4 pt-6 pb-28 *:col-start-2 md:pb-10 [&>.wide]:col-span-full [&>.wide]:col-start-1">
+      <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-[1fr_min(42rem,100%)_1fr] content-start gap-y-6 px-4 pt-6 pb-28 *:col-start-2 md:pb-10 print:max-w-none print:p-0 [&>.wide]:col-span-full [&>.wide]:col-start-1">
         {children}
       </main>
       <TabBar />

@@ -43,6 +43,10 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "Logging a VOR check or oil change asks for what the logbook needs: bearing errors, oil per engine and the oil used.",
         for: ["officer", "captain"],
       },
+      {
+        text: "Reports, on a tablet or computer: oil use between changes, a mechanic's report of everything since the annual, and who flew what. Each saves as a PDF.",
+        for: ["officer", "captain"],
+      },
     ],
   },
 ];

@@ -190,3 +190,28 @@
     @apply font-sans;
   }
 }
+
+/* Printing, and saving a report as a PDF: ink on white whatever the
+   theme on screen, on letter paper.  Later than, and as specific as, the
+   dark rules above, so it wins over them. */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.6in;
+  }
+  :root[data-theme],
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --muted: #f3f4f6;
+    --muted-foreground: #4b5563;
+    --border: #d1d5db;
+    --primary: #1e3a5f;
+  }
+  body {
+    font-size: 11pt;
+  }
+}

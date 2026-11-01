@@ -231,9 +231,10 @@ export async function logFlight(
   page: Page,
   plane: Plane,
   ins: Record<string, string>,
+  fluids: { fuel?: string; oil?: string; totalizer?: string } = {},
 ) {
   await checkOut(page, plane);
-  await checkIn(page, plane, ins);
+  await checkIn(page, plane, ins, fluids);
   await expect(page.getByText("Flight logged.")).toBeVisible();
   return page.url().split("?")[0];
 }

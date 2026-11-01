@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { hasRole } from "@/lib/access";
+import { maintainedAircraft } from "@/lib/captains";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { AccountMenu } from "./account-menu";
@@ -9,9 +10,10 @@ import { BrandMark } from "./brand-mark";
 import { type NavKey, NavLinks } from "./nav-links";
 
 // What a member can reach from anywhere: everyone sees the fleet, pilots
-// fly and report squawks, officers manage the aircraft and members.  The
-// pages check permissions themselves; this only decides what to offer.
-function navKeys(member: Member | null): NavKey[] {
+// fly and report squawks, officers manage the aircraft and members, and
+// officers and plane captains get reports.  The pages check permissions
+// themselves; this only decides what to offer.
+async function navKeys(member: Member | null): Promise<NavKey[]> {
   if (!member?.active) return [];
   const pilot = hasRole(member, "pilot");
   const officer = hasRole(member, "officer");
@@ -21,12 +23,14 @@ function navKeys(member: Member | null): NavKey[] {
   // Five tabs is as many as a phone fits; officers reach their profile
   // from the account menu instead.
   else if (pilot) keys.push("profile");
+  const maintained = await maintainedAircraft(member);
+  if (maintained === "all" || maintained.length > 0) keys.push("reports");
   return keys;
 }
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur-md print:hidden">
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-6 px-4">
         <Link
           href="/"
@@ -46,10 +50,11 @@ export function SiteHeader() {
 
 async function HeaderNav() {
   const member = await getCurrentMember();
+  const keys = await navKeys(member);
   return (
     <>
       <nav aria-label="Main" className="hidden md:block">
-        <NavLinks keys={navKeys(member)} variant="header" />
+        <NavLinks keys={keys} variant="header" />
       </nav>
       {/* Signed out, the page itself offers to sign in. */}
       {member && (
@@ -76,12 +81,12 @@ export function TabBar() {
 }
 
 async function Tabs() {
-  const keys = navKeys(await getCurrentMember());
+  const keys = await navKeys(await getCurrentMember());
   if (keys.length === 0) return null;
   return (
     <nav
       aria-label="Tabs"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
     >
       <NavLinks keys={keys} variant="tabs" />
     </nav>

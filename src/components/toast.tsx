@@ -26,7 +26,7 @@ export function ToastMessage({
   if (!open) return null;
   return (
     // Above the tab bar on phones, bottom right on wider screens.
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-50 flex justify-center px-4 md:inset-x-auto md:right-6 md:bottom-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-50 flex justify-center px-4 md:inset-x-auto md:right-6 md:bottom-6 print:hidden">
       <div
         role="status"
         className="pointer-events-auto flex animate-in items-center gap-3 rounded-xl border bg-popover py-3 pr-2 pl-4 text-popover-foreground shadow-lg fade-in-0 slide-in-from-bottom-4"
