@@ -83,7 +83,15 @@ export async function aircraftAlerts(
       restrictingSquawks(aircraftIds),
       db().query.maintenanceItem.findMany({
         where: inArray(maintenanceItem.aircraftId, aircraftIds),
-        with: { meter: { columns: { label: true, currentReading: true } } },
+        // Hours intervals count on the aircraft's logbook meter.
+        with: {
+          aircraft: {
+            columns: {},
+            with: {
+              logbookMeter: { columns: { label: true, currentReading: true } },
+            },
+          },
+        },
       }),
     ]);
     for (const s of squawks) {
@@ -93,7 +101,10 @@ export async function aircraftAlerts(
     const date = today();
     for (const item of items) {
       const status = maintenanceStatus(
-        { ...item, currentReading: item.meter?.currentReading ?? null },
+        {
+          ...item,
+          currentReading: item.aircraft.logbookMeter?.currentReading ?? null,
+        },
         date,
       );
       if (status.state === "ok") continue;
@@ -103,7 +114,7 @@ export async function aircraftAlerts(
         id: item.id,
         name: item.name,
         grounding: level,
-        meterLabel: item.meter?.label,
+        meterLabel: item.aircraft.logbookMeter?.label,
       });
       if (status.state === "overdue") levels.get(item.aircraftId)!.push(level);
     }

@@ -96,6 +96,8 @@ export async function createAircraft(
     returning id
   `;
   const labels = { tach: "Tach", hobbs: "Hobbs", air_time: "Air time" };
+  // The logbook time is the tach when it has one, as for most aircraft.
+  const logbook = "tach" in meters ? "tach" : billing;
   for (const [kind, reading] of Object.entries(meters)) {
     const [meter] = await db`
       insert into meter (aircraft_id, kind, label, current_reading)
@@ -104,6 +106,9 @@ export async function createAircraft(
     `;
     if (kind === billing) {
       await db`update aircraft set billing_meter_id = ${meter.id} where id = ${id}`;
+    }
+    if (kind === logbook) {
+      await db`update aircraft set logbook_meter_id = ${meter.id} where id = ${id}`;
     }
   }
   return { id: id as string, tailNumber };
@@ -131,7 +136,10 @@ export async function deleteAircraft(id: string) {
     `;
     await tx`delete from squawk where aircraft_id = ${id}`;
     await tx`delete from maintenance_item where aircraft_id = ${id}`;
-    await tx`update aircraft set billing_meter_id = null where id = ${id}`;
+    await tx`
+      update aircraft set billing_meter_id = null, logbook_meter_id = null
+      where id = ${id}
+    `;
     await tx`delete from meter where aircraft_id = ${id}`;
     await tx`delete from aircraft where id = ${id}`;
   });

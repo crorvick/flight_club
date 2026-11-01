@@ -6,6 +6,7 @@ import {
   describeDue,
   dueDate,
   maintenanceStatus,
+  moveReading,
   type MaintenanceInput,
 } from "./maintenance";
 
@@ -250,5 +251,18 @@ describe("due-soon window for short hours intervals", () => {
       maintenanceStatus({ ...short, currentReading: "115.00" }, "2026-11-01")
         .state,
     ).toBe("due-soon");
+  });
+});
+
+describe("moveReading", () => {
+  it("keeps the hours left when moving to another meter", () => {
+    // Done at 1200.0 on the Hobbs, which now reads 1250.0: 50 hours ago.
+    // The tach reads 980.0, so on the tach it was done at 930.0.
+    expect(moveReading("1200.00", "1250.00", "980.00")).toBe("930.00");
+    expect(moveReading("930.00", "980.00", "1250.00")).toBe("1200.00");
+  });
+
+  it("never goes below zero", () => {
+    expect(moveReading("10.00", "500.00", "20.00")).toBe("0.00");
   });
 });

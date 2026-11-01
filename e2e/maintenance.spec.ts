@@ -66,11 +66,10 @@ async function addItem(
   if (item.exact) await page.getByLabel("To the day").check();
   if (item.hours) {
     await page.getByLabel("Hours", { exact: true }).fill(item.hours);
-    await page.getByLabel("On the").selectOption({ label: "Tach" });
   }
   await page.getByLabel("Date").fill(item.lastOn);
   if (item.lastReading) {
-    await page.getByLabel("At meter reading").fill(item.lastReading);
+    await page.getByLabel("Logbook reading").fill(item.lastReading);
   }
   if (item.grounds === false) await page.getByLabel(/Only warn/).check();
   if (item.grounds === "ifr") {
@@ -220,7 +219,7 @@ test("an item needs an interval, and a reading for hours", async ({ page }) => {
   await page.getByLabel("Hours", { exact: true }).fill("100");
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(
-    page.getByText("Enter that meter's reading when it was last done."),
+    page.getByText("Enter the logbook reading when it was last done."),
   ).toBeVisible();
 });
 

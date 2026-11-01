@@ -65,6 +65,7 @@ Environment rules:
 ### Aircraft
 - id, tail number, make/model, active flag, whether it has a fuel totalizer
 - `billingMeterId` → references one of this aircraft's meters
+- `logbookMeterId` → the meter that is its time in the maintenance logs (usually tach); hours intervals count on it
 - Status is **derived**: `grounded` if any open squawk or overdue maintenance item grounds it for all flying; otherwise `VFR only` if one grounds it for IFR; otherwise `airworthy`.
 
 ### Meter (configurable per aircraft)
@@ -97,7 +98,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### MaintenanceItem
 - id, aircraftId, name (annual, 100-hour, ELT, transponder, pitot-static, AD #…, etc.)
-- Recurring: due by **calendar time**, by **hours on a specified meter** (usually tach), or **whichever comes first**
+- Recurring: due by **calendar time**, by **hours on the aircraft's logbook meter** (usually tach), or **whichever comes first**
 - Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days)
 - Last completed date/reading, interval, computed next due
 - When overdue: grounds the aircraft, grounds it for IFR only, or only warns (chosen per item)
@@ -116,6 +117,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 **Meters & billing**
 - Each aircraft's billing meter is a setting (any of its meters; typically Hobbs or tach).
 - Every flight records **all** of the aircraft's meters, regardless of which one bills.
+- Each aircraft's logbook meter is a setting too, independent of billing (billed by Hobbs, maintained by tach). Changing it moves hours-based maintenance items to the new meter, each keeping the hours it has left.
 - Logging a flight updates each meter's `currentReading` to the flight's `in` value.
 
 **Flight entry validation**
@@ -164,7 +166,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 ### Also needed (simpler, officer-facing)
 - Fleet status overview (what's flyable, what's coming due)
 - Manage members & role tags
-- Manage aircraft & their meters / billing meter
+- Manage aircraft & their meters / billing and logbook meters
 - Manage maintenance items; log maintenance completion
 - Resolve squawks
 - Edit locked flights (audited)

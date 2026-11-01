@@ -79,7 +79,8 @@ export function NewAircraftForm({
         <legend className="mb-1 font-semibold">Meters</legend>
         <p className="text-sm text-muted-foreground">
           Enter the current reading of each meter it has; leave the others
-          blank. Then choose the one flights are billed by.
+          blank. Then choose the one flights are billed by, and the one that is
+          its time in the maintenance logs (usually the tach).
         </p>
         {kinds.map((kind) => (
           <div key={kind} className="flex items-end gap-3">
@@ -104,9 +105,21 @@ export function NewAircraftForm({
               Bills
               <span className="sr-only"> by {METER_LABELS[kind]}</span>
             </label>
+            <label className="flex h-11 cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="logbook"
+                value={kind}
+                defaultChecked={(values?.logbook ?? "tach") === kind}
+                className="size-5 accent-primary"
+              />
+              Logbook
+              <span className="sr-only"> time on {METER_LABELS[kind]}</span>
+            </label>
           </div>
         ))}
         <ErrorText errors={errors.billing} />
+        <ErrorText errors={errors.logbook} />
       </fieldset>
 
       <label className="flex min-h-11 cursor-pointer items-center gap-3">
@@ -141,6 +154,7 @@ export function DetailsForm({
     active: boolean;
     hasFuelTotalizer: boolean;
     billingMeterId: string | null;
+    logbookMeterId: string | null;
   };
   meters: { id: string; label: string }[];
 }) {
@@ -148,6 +162,7 @@ export function DetailsForm({
   const values = state.values;
   const errors = state.fieldErrors ?? {};
   const billing = values?.billing ?? aircraft.billingMeterId;
+  const logbook = values?.logbook ?? aircraft.logbookMeterId;
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
@@ -190,6 +205,31 @@ export function DetailsForm({
         </p>
         <ErrorText errors={errors.billing} />
       </fieldset>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 font-medium">Logbook time</legend>
+        <div className="flex flex-wrap gap-2">
+          {meters.map((m) => (
+            <label
+              key={m.id}
+              className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border px-3"
+            >
+              <input
+                type="radio"
+                name="logbook"
+                value={m.id}
+                defaultChecked={logbook === m.id}
+                className="size-5 accent-primary"
+              />
+              {m.label}
+            </label>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Hours-based maintenance counts on it. Changing it moves those items
+          over, each keeping the hours it has left.
+        </p>
+        <ErrorText errors={errors.logbook} />
+      </fieldset>
       <label className="flex min-h-11 cursor-pointer items-center gap-3">
         <input
           type="checkbox"
@@ -228,6 +268,7 @@ export function MeterForm({
   removeAction,
   meter,
   billing,
+  logbook,
   removable,
 }: {
   action: Action;
@@ -235,6 +276,8 @@ export function MeterForm({
   meter: { id: string; label: string; reading: string };
   // Flights are billed by it.
   billing: boolean;
+  // Hours-based maintenance counts on it.
+  logbook: boolean;
   removable: boolean;
 }) {
   const [state, formAction, pending] = useForm(action);
@@ -257,6 +300,11 @@ export function MeterForm({
             {billing && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
                 billed
+              </span>
+            )}
+            {logbook && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                logbook
               </span>
             )}
           </p>

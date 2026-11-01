@@ -1,17 +1,12 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
 import { type Transaction, writeAudit } from "@/db/audit";
-import {
-  aircraft,
-  maintenanceCompletion,
-  maintenanceItem,
-  meter,
-} from "@/db/schema";
+import { aircraft, maintenanceCompletion, maintenanceItem } from "@/db/schema";
 import { changedFields } from "@/lib/audit-diff";
 import { type FormState, formValues } from "@/lib/form-state";
 import { parseHours, toHours } from "@/lib/hours";
@@ -25,7 +20,6 @@ const ITEM_FIELDS = [
   "calendarUnit",
   "calendarDeadline",
   "intervalHours",
-  "meterId",
   "lastCompletedOn",
   "lastCompletedReading",
   "grounding",
@@ -72,7 +66,6 @@ const itemSchema = z
     calendarUnit: z.enum(["months", "days"]),
     calendarDeadline: z.enum(["end-of-month", "exact"]),
     intervalHours: optionalHours("Enter hours like 100 or 50.5."),
-    meterId: z.string().transform((id) => (id ? id : null)),
     lastCompletedOn: isoDate,
     lastCompletedReading: optionalHours("Enter a reading like 1234.5."),
     grounding: z.enum(
@@ -88,21 +81,12 @@ const itemSchema = z
         message: "Give a calendar interval, hours, or both.",
       });
     }
-    if (item.intervalHours !== null) {
-      if (item.meterId === null || !isUuid(item.meterId)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["meterId"],
-          message: "Choose the meter the hours are counted on.",
-        });
-      }
-      if (item.lastCompletedReading === null) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["lastCompletedReading"],
-          message: "Enter that meter's reading when it was last done.",
-        });
-      }
+    if (item.intervalHours !== null && item.lastCompletedReading === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["lastCompletedReading"],
+        message: "Enter the logbook reading when it was last done.",
+      });
     }
   })
   .transform(
@@ -112,11 +96,8 @@ const itemSchema = z
       intervalDays: calendarUnit === "days" ? calendarInterval : null,
       dueEndOfMonth:
         calendarUnit === "months" && calendarDeadline === "end-of-month",
-      // Without an hours interval the meter and reading mean nothing.
-      ...(item.intervalHours === null && {
-        meterId: null,
-        lastCompletedReading: null,
-      }),
+      // Without an hours interval the reading means nothing.
+      ...(item.intervalHours === null && { lastCompletedReading: null }),
     }),
   );
 
@@ -127,30 +108,30 @@ function parseItem(formData: FormData) {
     calendarUnit: formData.get("calendarUnit") ?? "months",
     calendarDeadline: formData.get("calendarDeadline") ?? "end-of-month",
     intervalHours: formData.get("intervalHours") ?? "",
-    meterId: formData.get("meterId") ?? "",
     lastCompletedOn: formData.get("lastCompletedOn") ?? "",
     lastCompletedReading: formData.get("lastCompletedReading") ?? "",
     grounding: formData.get("grounding") ?? "all",
   });
 }
 
-// The database also enforces this (maintenance_item_meter_fk), but a
-// message beats a constraint error.
-async function meterBelongs(
-  tx: Transaction,
-  meterId: string | null,
-  aircraftId: string,
-) {
-  if (meterId === null) return true;
-  const [row] = await tx
-    .select({ id: meter.id })
-    .from(meter)
-    .where(and(eq(meter.id, meterId), eq(meter.aircraftId, aircraftId)));
-  return row !== undefined;
+// Hours intervals count on the aircraft's logbook meter.  The item's own
+// meter column is kept in step with it for the previous release, which
+// still reads it during a deploy.  Undefined when there's no such
+// aircraft.
+async function logbookMeterOf(tx: Transaction, aircraftId: string) {
+  const [plane] = await tx
+    .select({ logbookMeterId: aircraft.logbookMeterId })
+    .from(aircraft)
+    .where(eq(aircraft.id, aircraftId));
+  return plane && { id: plane.logbookMeterId };
 }
 
-const WRONG_METER = {
-  fieldErrors: { meterId: ["Choose one of this aircraft's meters."] },
+const NO_LOGBOOK_METER = {
+  fieldErrors: {
+    intervalHours: [
+      "Choose which meter is the aircraft's logbook time before adding hours.",
+    ],
+  },
 };
 
 export async function createItem(
@@ -166,17 +147,18 @@ export async function createItem(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
-  const id = await db().transaction(async (tx) => {
-    const [plane] = await tx
-      .select({ id: aircraft.id })
-      .from(aircraft)
-      .where(eq(aircraft.id, aircraftId));
-    if (!plane || !(await meterBelongs(tx, parsed.data.meterId, aircraftId))) {
-      return undefined;
-    }
+  const result = await db().transaction(async (tx) => {
+    const logbook = await logbookMeterOf(tx, aircraftId);
+    if (!logbook) return { error: "No such aircraft." };
+    const hours = parsed.data.intervalHours !== null;
+    if (hours && logbook.id === null) return NO_LOGBOOK_METER;
     const [created] = await tx
       .insert(maintenanceItem)
-      .values({ aircraftId, ...parsed.data })
+      .values({
+        aircraftId,
+        ...parsed.data,
+        meterId: hours ? logbook.id : null,
+      })
       .returning({ id: maintenanceItem.id });
     await writeAudit(tx, {
       actorId: officer.id,
@@ -186,10 +168,10 @@ export async function createItem(
       before: null,
       after: { aircraftId, ...parsed.data },
     });
-    return created.id;
+    return { id: created.id };
   });
-  if (!id) return { ...WRONG_METER, values };
-  redirect(`/maintenance/${id}?saved=created`);
+  if (!("id" in result)) return { ...result, values };
+  redirect(`/maintenance/${result.id}?saved=created`);
 }
 
 export async function updateItem(
@@ -205,21 +187,22 @@ export async function updateItem(
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
-  const ok = await db().transaction(async (tx) => {
+  const error = await db().transaction(async (tx) => {
     const [current] = await tx
       .select()
       .from(maintenanceItem)
       .where(eq(maintenanceItem.id, itemId))
       .for("update");
-    if (!current) return false;
-    if (!(await meterBelongs(tx, parsed.data.meterId, current.aircraftId))) {
-      return false;
-    }
-    const diff = changedFields(current, parsed.data);
-    if (!diff.changed) return true;
+    if (!current) return { error: "No such item." };
+    const logbook = (await logbookMeterOf(tx, current.aircraftId))!;
+    const hours = parsed.data.intervalHours !== null;
+    if (hours && logbook.id === null) return NO_LOGBOOK_METER;
+    const next = { ...parsed.data, meterId: hours ? logbook.id : null };
+    const diff = changedFields(current, next);
+    if (!diff.changed) return undefined;
     await tx
       .update(maintenanceItem)
-      .set(parsed.data)
+      .set(next)
       .where(eq(maintenanceItem.id, itemId));
     await writeAudit(tx, {
       actorId: officer.id,
@@ -229,9 +212,9 @@ export async function updateItem(
       before: diff.before,
       after: diff.after,
     });
-    return true;
+    return undefined;
   });
-  if (!ok) return { ...WRONG_METER, values };
+  if (error) return { ...error, values };
   redirect(`/maintenance/${itemId}?saved=updated`);
 }
 

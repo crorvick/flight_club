@@ -11,7 +11,7 @@ import { FormSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
-import { aircraft, flightMeterReading, maintenanceItem } from "@/db/schema";
+import { aircraft, flightMeterReading } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder, METER_DISPLAY_ORDER } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
@@ -54,23 +54,21 @@ async function AircraftDetails({
   if (!plane) notFound();
   const meters = [...plane.meters].sort(byMeterOrder);
 
-  // Meters flights have recorded, or maintenance is counted on, can't be
-  // removed.
+  // Meters flights have recorded can't be removed, nor can the ones it's
+  // billed by and its logbook time.
   const meterIds = meters.map((m) => m.id);
   const used = new Set(
     meterIds.length === 0
       ? []
-      : [
-          ...(await db()
+      : (
+          await db()
             .selectDistinct({ meterId: flightMeterReading.meterId })
             .from(flightMeterReading)
-            .where(inArray(flightMeterReading.meterId, meterIds))),
-          ...(await db()
-            .selectDistinct({ meterId: maintenanceItem.meterId })
-            .from(maintenanceItem)
-            .where(inArray(maintenanceItem.meterId, meterIds))),
-        ].map((r) => r.meterId),
+            .where(inArray(flightMeterReading.meterId, meterIds))
+        ).map((r) => r.meterId),
   );
+  used.add(plane.billingMeterId!);
+  used.add(plane.logbookMeterId!);
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
   // A save redirects back here; keying on the stored values makes the
   // forms show them rather than what was typed.
@@ -121,7 +119,8 @@ async function AircraftDetails({
                 removeAction={removeMeter.bind(null, m.id)}
                 meter={{ id: m.id, label: m.label, reading: m.currentReading }}
                 billing={m.id === plane.billingMeterId}
-                removable={!used.has(m.id) && m.id !== plane.billingMeterId}
+                logbook={m.id === plane.logbookMeterId}
+                removable={!used.has(m.id)}
               />
             ))}
           </div>

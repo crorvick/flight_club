@@ -1,11 +1,11 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { writeAudit } from "@/db/audit";
+import { type Transaction, writeAudit } from "@/db/audit";
 import {
   aircraft,
   flightMeterReading,
@@ -16,6 +16,7 @@ import { changedFields } from "@/lib/audit-diff";
 import { type FormState, formValues } from "@/lib/form-state";
 import { parseHours, toHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
+import { moveReading } from "@/lib/maintenance";
 import { METER_KINDS, METER_LABELS, type MeterKind } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
@@ -77,6 +78,7 @@ export async function createAircraft(
     "tailNumber",
     "makeModel",
     "billing",
+    "logbook",
     "hasFuelTotalizer",
     ...METER_KINDS.map(readingField),
   ]);
@@ -111,6 +113,16 @@ export async function createAircraft(
       ];
     }
   }
+  // With only one meter, that's its logbook time too.
+  const logbook =
+    meters.length === 1
+      ? meters[0].kind
+      : meters.find((m) => m.kind === values.logbook)?.kind;
+  if (meters.length > 1 && !logbook && !fieldErrors.billing) {
+    fieldErrors.logbook = [
+      "Choose which of its meters is its time in the maintenance logs.",
+    ];
+  }
   if (!details.success || Object.keys(fieldErrors).length > 0) {
     return { fieldErrors, values };
   }
@@ -136,10 +148,13 @@ export async function createAircraft(
           })),
         )
         .returning({ id: meter.id, kind: meter.kind });
-      const billingMeterId = rows.find((r) => r.kind === values.billing)!.id;
+      const meterOf = (kind: string) => rows.find((r) => r.kind === kind)!.id;
       await tx
         .update(aircraft)
-        .set({ billingMeterId })
+        .set({
+          billingMeterId: meterOf(values.billing),
+          logbookMeterId: meterOf(logbook!),
+        })
         .where(eq(aircraft.id, created.id));
       await writeAudit(tx, {
         actorId: officer.id,
@@ -152,6 +167,7 @@ export async function createAircraft(
           hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
           meters: Object.fromEntries(meters.map((m) => [m.kind, m.reading])),
           billing: values.billing,
+          logbook,
         },
       });
       return created.id;
@@ -177,23 +193,35 @@ export async function updateAircraft(
 ): Promise<FormState> {
   const officer = await requireMember("officer");
   if (!isUuid(aircraftId)) return { error: "No such aircraft." };
-  const values = formValues(formData, ["tailNumber", "makeModel", "billing"]);
+  const values = formValues(formData, [
+    "tailNumber",
+    "makeModel",
+    "billing",
+    "logbook",
+  ]);
 
   const parsed = z
-    .object({ tailNumber, makeModel, billingMeterId: z.uuid() })
+    .object({
+      tailNumber,
+      makeModel,
+      billingMeterId: z.uuid(),
+      logbookMeterId: z.uuid(),
+    })
     .safeParse({
       tailNumber: values.tailNumber,
       makeModel: values.makeModel,
       billingMeterId: values.billing,
+      logbookMeterId: values.logbook,
     });
   if (!parsed.success) {
-    const { billingMeterId, ...rest } = z.flattenError(
+    const { billingMeterId, logbookMeterId, ...rest } = z.flattenError(
       parsed.error,
     ).fieldErrors;
     return {
       fieldErrors: {
         ...rest,
         ...(billingMeterId && { billing: ["Choose a billing meter."] }),
+        ...(logbookMeterId && { logbook: ["Choose its logbook time."] }),
       },
       values,
     };
@@ -211,6 +239,7 @@ export async function updateAircraft(
           tailNumber: aircraft.tailNumber,
           makeModel: aircraft.makeModel,
           billingMeterId: aircraft.billingMeterId,
+          logbookMeterId: aircraft.logbookMeterId,
           active: aircraft.active,
           hasFuelTotalizer: aircraft.hasFuelTotalizer,
         })
@@ -219,22 +248,34 @@ export async function updateAircraft(
         .for("update");
       if (!current) throw new Rejected("No such aircraft.");
 
+      // Locked so a check-in can't move a reading while hours items are
+      // moved between meters by it.
+      const meters = await tx
+        .select({ id: meter.id, reading: meter.currentReading })
+        .from(meter)
+        .where(eq(meter.aircraftId, aircraftId))
+        .for("update");
+      const readings = new Map(meters.map((m) => [m.id, m.reading]));
       // Past flights keep the billing meter they were logged with; this
       // only changes how future flights are billed.
-      const [billing] = await tx
-        .select({ id: meter.id })
-        .from(meter)
-        .where(
-          and(
-            eq(meter.id, next.billingMeterId),
-            eq(meter.aircraftId, aircraftId),
-          ),
-        );
-      if (!billing) throw new Rejected("Choose one of its meters.", "billing");
+      if (!readings.has(next.billingMeterId)) {
+        throw new Rejected("Choose one of its meters.", "billing");
+      }
+      if (!readings.has(next.logbookMeterId)) {
+        throw new Rejected("Choose one of its meters.", "logbook");
+      }
 
       const diff = changedFields(current, next);
       if (!diff.changed) return;
       await tx.update(aircraft).set(next).where(eq(aircraft.id, aircraftId));
+      if (next.logbookMeterId !== current.logbookMeterId) {
+        await moveHoursItems(tx, {
+          aircraftId,
+          to: next.logbookMeterId,
+          readings,
+          actorId: officer.id,
+        });
+      }
       await writeAudit(tx, {
         actorId: officer.id,
         action: "aircraft.update",
@@ -256,6 +297,70 @@ export async function updateAircraft(
     return rejection(error, values);
   }
   redirect(`/aircraft/${aircraftId}?saved=details`);
+}
+
+// Hours intervals count on the logbook meter, so when it changes they
+// move to the new one, each keeping the hours it has left (see
+// moveReading).  Each move is audited, since it rewrites the item's
+// last-done reading.
+async function moveHoursItems(
+  tx: Transaction,
+  {
+    aircraftId,
+    to,
+    readings,
+    actorId,
+  }: {
+    aircraftId: string;
+    to: string;
+    readings: Map<string, string>;
+    actorId: string;
+  },
+) {
+  const items = await tx
+    .select({
+      id: maintenanceItem.id,
+      meterId: maintenanceItem.meterId,
+      lastCompletedReading: maintenanceItem.lastCompletedReading,
+    })
+    .from(maintenanceItem)
+    .where(
+      and(
+        eq(maintenanceItem.aircraftId, aircraftId),
+        isNotNull(maintenanceItem.intervalHours),
+      ),
+    )
+    .for("update");
+  for (const item of items) {
+    if (item.meterId === to) continue;
+    const before = {
+      meterId: item.meterId,
+      lastCompletedReading: item.lastCompletedReading,
+    };
+    const after = {
+      meterId: to,
+      lastCompletedReading:
+        item.meterId === null || item.lastCompletedReading === null
+          ? item.lastCompletedReading
+          : moveReading(
+              item.lastCompletedReading,
+              readings.get(item.meterId)!,
+              readings.get(to)!,
+            ),
+    };
+    await tx
+      .update(maintenanceItem)
+      .set(after)
+      .where(eq(maintenanceItem.id, item.id));
+    await writeAudit(tx, {
+      actorId,
+      action: "maintenance.update",
+      entityType: "maintenance_item",
+      entityId: item.id,
+      before,
+      after: { ...after, reason: "The aircraft's logbook meter changed." },
+    });
+  }
 }
 
 // Rename a meter or correct its reading.  A correction moves where the
@@ -392,7 +497,10 @@ export async function removeMeter(meterId: string): Promise<FormState> {
         .for("update");
       if (!current) throw new Rejected("No such meter.");
       const [plane] = await tx
-        .select({ billingMeterId: aircraft.billingMeterId })
+        .select({
+          billingMeterId: aircraft.billingMeterId,
+          logbookMeterId: aircraft.logbookMeterId,
+        })
         .from(aircraft)
         .where(eq(aircraft.id, current.aircraftId));
       if (plane.billingMeterId === meterId) {
@@ -400,19 +508,15 @@ export async function removeMeter(meterId: string): Promise<FormState> {
           "Flights are billed by this meter. Choose another billing meter first.",
         );
       }
+      if (plane.logbookMeterId === meterId) {
+        throw new Rejected(
+          "This meter is the logbook time. Choose another logbook meter first.",
+        );
+      }
       const [{ used }] = await tx
         .select({ used: count() })
         .from(flightMeterReading)
         .where(eq(flightMeterReading.meterId, meterId));
-      const [{ tracked }] = await tx
-        .select({ tracked: count() })
-        .from(maintenanceItem)
-        .where(eq(maintenanceItem.meterId, meterId));
-      if (tracked > 0) {
-        throw new Rejected(
-          "Maintenance is counted on this meter. Move those items to another meter first.",
-        );
-      }
       if (used > 0) {
         throw new Rejected(
           "Flights have recorded this meter, so it can't be removed.",

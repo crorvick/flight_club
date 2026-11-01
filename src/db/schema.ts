@@ -165,6 +165,10 @@ export const aircraft = pgTable(
     // Which meter flights are billed by.  Nullable only because an
     // aircraft has to exist before its meters can.
     billingMeterId: uuid("billing_meter_id"),
+    // Which meter is the aircraft's time in its maintenance logs: hours
+    // intervals count on it.  Usually the tach.  Nullable for the same
+    // reason as the billing meter.
+    logbookMeterId: uuid("logbook_meter_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -174,6 +178,11 @@ export const aircraft = pgTable(
     foreignKey({
       name: "aircraft_billing_meter_fk",
       columns: [table.billingMeterId, table.id],
+      foreignColumns: [meter.id, meter.aircraftId],
+    }),
+    foreignKey({
+      name: "aircraft_logbook_meter_fk",
+      columns: [table.logbookMeterId, table.id],
       foreignColumns: [meter.id, meter.aircraftId],
     }),
   ],
@@ -198,7 +207,7 @@ export const meter = pgTable(
   },
   (table) => [
     unique("meter_aircraft_kind_unique").on(table.aircraftId, table.kind),
-    // Target for aircraft_billing_meter_fk.
+    // Target for aircraft_billing_meter_fk and aircraft_logbook_meter_fk.
     unique("meter_id_aircraft_unique").on(table.id, table.aircraftId),
     check("meter_reading_nonnegative", sql`${table.currentReading} >= 0`),
   ],
@@ -452,7 +461,7 @@ export const aircraftCheckout = pgTable(
 
 // Recurring maintenance: an annual, 100-hour, ELT check, VOR check, AD
 // and so on.  Due by calendar time (months, to the end of the month or to
-// the day, or days), by hours on one of the aircraft's meters, or
+// the day, or days), by hours on the aircraft's logbook meter, or
 // whichever comes first; the next due date and reading are computed from
 // the last completion (lib/maintenance.ts), never stored.
 export const maintenanceItem = pgTable(
@@ -469,6 +478,9 @@ export const maintenanceItem = pgTable(
     // false; days are always exact (a 30-day VOR check).
     dueEndOfMonth: boolean("due_end_of_month").default(true).notNull(),
     intervalHours: hours("interval_hours"),
+    // Superseded by the aircraft's logbook meter, which hours intervals
+    // now count on.  Still written (as the logbook meter) so the previous
+    // release keeps working during a deploy; to be dropped.
     meterId: uuid("meter_id"),
     lastCompletedOn: date("last_completed_on"),
     lastCompletedReading: hours("last_completed_reading"),
@@ -600,6 +612,11 @@ export const aircraftRelations = relations(aircraft, ({ one, many }) => ({
     fields: [aircraft.billingMeterId],
     references: [meter.id],
     relationName: "billing_meter",
+  }),
+  logbookMeter: one(meter, {
+    fields: [aircraft.logbookMeterId],
+    references: [meter.id],
+    relationName: "logbook_meter",
   }),
   meters: many(meter, { relationName: "aircraft_meters" }),
   flights: many(flight),

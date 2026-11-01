@@ -3,7 +3,7 @@
 // never stored, so they can't drift from it.
 
 import { formatDate } from "./dates";
-import { parseHours } from "./hours";
+import { parseHours, toHours } from "./hours";
 
 // Early enough to book the shop, but never more than a quarter of the
 // interval: a 30-day VOR check would otherwise always be "due soon".
@@ -144,6 +144,23 @@ export function maintenanceStatus(
   }
 
   return status;
+}
+
+// The last-done reading of an hours item moving from one meter to
+// another, such as when the aircraft's logbook meter changes.  Meters run
+// at different rates (tach against Hobbs), so there's no exact
+// conversion; keeping the hours it has left is the closest.  Shifts it by
+// the gap between the meters' current readings.
+export function moveReading(
+  lastCompletedReading: string,
+  fromCurrent: string,
+  toCurrent: string,
+) {
+  const moved =
+    parseHours(lastCompletedReading)! +
+    parseHours(toCurrent)! -
+    parseHours(fromCurrent)!;
+  return toHours(Math.max(0, moved));
 }
 
 const hoursText = (hundredths: number) =>

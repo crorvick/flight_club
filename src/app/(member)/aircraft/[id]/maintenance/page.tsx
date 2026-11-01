@@ -13,7 +13,6 @@ import { aircraft, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
-import { byMeterOrder } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
 import { createItem } from "../../../maintenance/actions";
@@ -47,16 +46,13 @@ async function Maintenance({
     where: eq(aircraft.id, id),
     columns: { id: true, tailNumber: true },
     with: {
-      meters: { columns: { id: true, kind: true, label: true } },
-      maintenanceItems: {
-        orderBy: asc(maintenanceItem.name),
-        with: { meter: { columns: { label: true, currentReading: true } } },
-      },
+      // Hours intervals count on it.
+      logbookMeter: { columns: { label: true, currentReading: true } },
+      maintenanceItems: { orderBy: asc(maintenanceItem.name) },
     },
   });
   if (!plane) notFound();
   const date = today();
-  const meters = [...plane.meters].sort(byMeterOrder);
 
   return (
     <>
@@ -74,7 +70,10 @@ async function Maintenance({
         <ul className="divide-y overflow-hidden rounded-xl border bg-card">
           {plane.maintenanceItems.map((item) => {
             const status = maintenanceStatus(
-              { ...item, currentReading: item.meter?.currentReading ?? null },
+              {
+                ...item,
+                currentReading: plane.logbookMeter?.currentReading ?? null,
+              },
               date,
             );
             return (
@@ -86,7 +85,7 @@ async function Maintenance({
                   <span>
                     <span className="block font-medium">{item.name}</span>
                     <span className="block text-sm text-muted-foreground">
-                      {describeDue(status, item.meter?.label)}
+                      {describeDue(status, plane.logbookMeter?.label)}
                       {
                         {
                           all: "",
@@ -118,7 +117,7 @@ async function Maintenance({
         <ItemForm
           key={plane.maintenanceItems.length}
           action={createItem.bind(null, plane.id)}
-          meters={meters.map((m) => ({ id: m.id, label: m.label }))}
+          logbookMeter={plane.logbookMeter?.label}
           submitLabel="Add item"
         />
       </SectionCard>

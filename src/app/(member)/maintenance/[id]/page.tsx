@@ -15,7 +15,6 @@ import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
-import { byMeterOrder } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
 import { completeItem, deleteItem, updateItem } from "../actions";
@@ -52,10 +51,12 @@ async function ItemDetails({
   const item = await db().query.maintenanceItem.findFirst({
     where: eq(maintenanceItem.id, id),
     with: {
-      meter: { columns: { label: true, currentReading: true } },
       aircraft: {
         columns: { id: true, tailNumber: true },
-        with: { meters: { columns: { id: true, kind: true, label: true } } },
+        // Hours intervals count on it.
+        with: {
+          logbookMeter: { columns: { label: true, currentReading: true } },
+        },
       },
       completions: {
         orderBy: desc(maintenanceCompletion.completedOn),
@@ -65,12 +66,13 @@ async function ItemDetails({
   });
   if (!item) notFound();
 
+  const logbook = item.aircraft.logbookMeter;
+  const hours = item.intervalHours !== null;
   const status = maintenanceStatus(
-    { ...item, currentReading: item.meter?.currentReading ?? null },
+    { ...item, currentReading: logbook?.currentReading ?? null },
     today(),
   );
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
-  const meters = [...item.aircraft.meters].sort(byMeterOrder);
 
   return (
     <>
@@ -104,15 +106,15 @@ async function ItemDetails({
             ? "Due soon"
             : "Not due yet"}
         <span className="block text-sm font-normal">
-          {describeDue(status, item.meter?.label)}
+          {describeDue(status, logbook?.label)}
         </span>
       </p>
 
       <CompletionForm
         key={`${item.lastCompletedOn}-${item.lastCompletedReading}`}
         action={completeItem.bind(null, item.id)}
-        meterLabel={item.meter?.label}
-        currentReading={item.meter?.currentReading}
+        meterLabel={hours ? logbook?.label : undefined}
+        currentReading={hours ? logbook?.currentReading : undefined}
       />
 
       {item.completions.length > 0 && (
@@ -139,7 +141,7 @@ async function ItemDetails({
         <ItemForm
           key={item.updatedAt.getTime()}
           action={updateItem.bind(null, item.id)}
-          meters={meters.map((m) => ({ id: m.id, label: m.label }))}
+          logbookMeter={logbook?.label}
           item={item}
           submitLabel="Save item"
         />

@@ -140,7 +140,9 @@ try {
           meterIds[kind as MeterKind] = id;
         }
         await tx`
-          update aircraft set billing_meter_id = ${meterIds[plane.billing]}
+          update aircraft
+          set billing_meter_id = ${meterIds[plane.billing]},
+            logbook_meter_id = ${meterIds.tach}
           where id = ${aircraftId}
         `;
 

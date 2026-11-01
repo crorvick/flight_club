@@ -71,6 +71,13 @@
       "when": 1793518167915,
       "tag": "0009_fuel_and_oil",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793547325326,
+      "tag": "0010_logbook_meter",
+      "breakpoints": true
     }
   ]
 }

@@ -25,7 +25,6 @@ export type ItemValues = {
   intervalDays: number | null;
   dueEndOfMonth: boolean;
   intervalHours: string | null;
-  meterId: string | null;
   lastCompletedOn: string | null;
   lastCompletedReading: string | null;
   grounding: Grounding;
@@ -33,21 +32,19 @@ export type ItemValues = {
 
 export function ItemForm({
   action,
-  meters,
+  logbookMeter,
   item,
   submitLabel,
 }: {
   action: Action;
-  meters: { id: string; label: string }[];
+  // The label of the meter hours intervals count on, if one is chosen.
+  logbookMeter?: string;
   item?: ItemValues;
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const values = state.values;
   const errors = state.fieldErrors ?? {};
-  // Most hours intervals count on the tach.
-  const defaultMeter =
-    meters.find((m) => m.label === "Tach")?.id ?? meters[0]?.id;
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
@@ -122,34 +119,21 @@ export function ItemForm({
             Days are always to the day, e.g. a VOR check every 30 days.
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            name="intervalHours"
-            label="Hours"
-            inputMode="decimal"
-            placeholder="100"
-            defaultValue={
-              values?.intervalHours ?? display(item?.intervalHours ?? null)
-            }
-            errors={errors.intervalHours}
-          />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="meterId">On the</Label>
-            <select
-              id="meterId"
-              name="meterId"
-              defaultValue={values?.meterId ?? item?.meterId ?? defaultMeter}
-              className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
-            >
-              {meters.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <ErrorText errors={errors.meterId} />
-          </div>
-        </div>
+        <Field
+          name="intervalHours"
+          label="Hours"
+          inputMode="decimal"
+          placeholder="100"
+          defaultValue={
+            values?.intervalHours ?? display(item?.intervalHours ?? null)
+          }
+          errors={errors.intervalHours}
+        />
+        <p className="-mt-1 text-sm text-muted-foreground">
+          {logbookMeter
+            ? `Counted on the ${logbookMeter.toLowerCase()}, the aircraft's logbook time.`
+            : "Choose which meter is the aircraft's logbook time to count hours."}
+        </p>
       </fieldset>
 
       <fieldset className="flex flex-col gap-3">
@@ -166,7 +150,7 @@ export function ItemForm({
           />
           <Field
             name="lastCompletedReading"
-            label="At meter reading"
+            label="Logbook reading"
             inputMode="decimal"
             placeholder="For an hours interval"
             defaultValue={

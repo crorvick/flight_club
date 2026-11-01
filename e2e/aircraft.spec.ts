@@ -60,6 +60,14 @@ test("an officer adds an aircraft that pilots can then log", async ({
   await expect(page.getByLabel("Hobbs reads")).toHaveValue("2000.0");
   await expect(page.getByLabel("Tach reads")).toHaveValue("1800.5");
   await expect(page.getByLabel("Hobbs reads")).toHaveAccessibleName(/billed/);
+
+  // Its maintenance logs keep tach time unless told otherwise.
+  const [{ logbook }] = await sql()`
+    select m.kind as logbook
+    from aircraft a join meter m on m.id = a.logbook_meter_id
+    where a.id = ${plane.id}
+  `;
+  expect(logbook).toBe("tach");
 });
 
 test("a duplicate tail number is rejected and the form kept", async ({
@@ -219,4 +227,43 @@ test("pilots can't manage aircraft", async ({ browser }, testInfo) => {
   await page.goto("/aircraft");
   await expect(page.getByText("Not allowed")).toBeVisible();
   await context.close();
+});
+
+test("changing the logbook meter moves hours maintenance to it", async ({
+  page,
+}, testInfo) => {
+  const plane = await createAircraft(
+    testInfo,
+    { hobbs: "1250.00", tach: "980.00" },
+    "hobbs",
+  );
+  created.push(plane.id);
+
+  // Done 50 hours ago on the tach, its logbook time.
+  await page.goto(`/aircraft/${plane.id}/maintenance`);
+  await expect(page.getByText("Counted on the tach")).toBeVisible();
+  await page.getByLabel("Name").fill("Oil change");
+  await page.getByLabel("Hours", { exact: true }).fill("100");
+  await page.getByLabel("Date").fill("2026-10-01");
+  await page.getByLabel("Logbook reading").fill("930.0");
+  await page.getByLabel(/Only warn/).check();
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByText("Item added.")).toBeVisible();
+  await expect(
+    page.getByText("due at 1030.0 on the tach (50.0 hours left)"),
+  ).toBeVisible();
+
+  await page.goto(`/aircraft/${plane.id}`);
+  await page
+    .getByRole("group", { name: "Logbook time" })
+    .getByLabel("Hobbs")
+    .check();
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Details saved.")).toBeVisible();
+
+  // Still 50 hours left, now counted on the Hobbs.
+  await page.goto(`/aircraft/${plane.id}/maintenance`);
+  await expect(
+    page.getByText("due at 1300.0 on the hobbs (50.0 hours left)"),
+  ).toBeVisible();
 });
