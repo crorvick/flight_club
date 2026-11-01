@@ -438,8 +438,9 @@ export const aircraftCheckout = pgTable(
   (table) => [primaryKey({ columns: [table.memberId, table.aircraftId] })],
 );
 
-// Recurring maintenance: an annual, 100-hour, ELT check, AD and so on.
-// Due by calendar months, by hours on one of the aircraft's meters, or
+// Recurring maintenance: an annual, 100-hour, ELT check, VOR check, AD
+// and so on.  Due by calendar time (months, to the end of the month or to
+// the day, or days), by hours on one of the aircraft's meters, or
 // whichever comes first; the next due date and reading are computed from
 // the last completion (lib/maintenance.ts), never stored.
 export const maintenanceItem = pgTable(
@@ -451,6 +452,10 @@ export const maintenanceItem = pgTable(
       .references(() => aircraft.id),
     name: text("name").notNull(),
     intervalMonths: integer("interval_months"),
+    intervalDays: integer("interval_days"),
+    // Months run to the end of the month (annuals, ELTs) unless this is
+    // false; days are always exact (a 30-day VOR check).
+    dueEndOfMonth: boolean("due_end_of_month").default(true).notNull(),
     intervalHours: hours("interval_hours"),
     meterId: uuid("meter_id"),
     lastCompletedOn: date("last_completed_on"),
@@ -472,14 +477,25 @@ export const maintenanceItem = pgTable(
     }),
     check(
       "maintenance_item_has_interval",
-      sql`${table.intervalMonths} is not null or ${table.intervalHours} is not null`,
+      sql`${table.intervalMonths} is not null
+        or ${table.intervalDays} is not null
+        or ${table.intervalHours} is not null`,
+    ),
+    // A calendar interval is months or days, not both.
+    check(
+      "maintenance_item_one_calendar_interval",
+      sql`${table.intervalMonths} is null or ${table.intervalDays} is null`,
     ),
     check(
       "maintenance_item_months_positive",
       sql`${table.intervalMonths} is null or ${table.intervalMonths} > 0`,
     ),
+    check(
+      "maintenance_item_days_positive",
+      sql`${table.intervalDays} is null or ${table.intervalDays} > 0`,
+    ),
     // An hours interval needs a meter to count on and a reading to count
-    // from; a months interval needs a date.
+    // from; a calendar interval needs a date.
     check(
       "maintenance_item_hours_complete",
       sql`(${table.intervalHours} is null) = (${table.meterId} is null)
@@ -488,8 +504,9 @@ export const maintenanceItem = pgTable(
             and ${table.lastCompletedReading} is not null))`,
     ),
     check(
-      "maintenance_item_months_complete",
-      sql`${table.intervalMonths} is null or ${table.lastCompletedOn} is not null`,
+      "maintenance_item_calendar_complete",
+      sql`(${table.intervalMonths} is null and ${table.intervalDays} is null)
+        or ${table.lastCompletedOn} is not null`,
     ),
   ],
 );

@@ -21,6 +21,8 @@ function ErrorText({ errors }: { errors?: string[] }) {
 export type ItemValues = {
   name: string;
   intervalMonths: number | null;
+  intervalDays: number | null;
+  dueEndOfMonth: boolean;
   intervalHours: string | null;
   meterId: string | null;
   lastCompletedOn: string | null;
@@ -61,16 +63,64 @@ export function ItemForm({
         <legend className="mb-1 font-medium">
           Due every… (either or both; whichever comes first)
         </legend>
-        <Field
-          name="intervalMonths"
-          label="Calendar months"
-          inputMode="numeric"
-          placeholder="12"
-          defaultValue={
-            values?.intervalMonths ?? item?.intervalMonths?.toString()
-          }
-          errors={errors.intervalMonths}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            name="calendarInterval"
+            label="Calendar time"
+            inputMode="numeric"
+            placeholder="12"
+            defaultValue={
+              values?.calendarInterval ??
+              (item?.intervalMonths ?? item?.intervalDays)?.toString()
+            }
+            errors={errors.calendarInterval}
+          />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="calendarUnit">In</Label>
+            <select
+              id="calendarUnit"
+              name="calendarUnit"
+              defaultValue={
+                values?.calendarUnit ?? (item?.intervalDays ? "days" : "months")
+              }
+              className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
+            >
+              <option value="months">months</option>
+              <option value="days">days</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 text-sm">
+          <span className="font-medium">For months, due</span>
+          {(
+            [
+              ["end-of-month", "By the end of the month (annual, ELT)"],
+              ["exact", "To the day"],
+            ] as const
+          ).map(([value, label]) => (
+            <label
+              key={value}
+              className="flex min-h-11 cursor-pointer items-center gap-3"
+            >
+              <input
+                type="radio"
+                name="calendarDeadline"
+                value={value}
+                defaultChecked={
+                  (values?.calendarDeadline ??
+                    (item && !item.dueEndOfMonth
+                      ? "exact"
+                      : "end-of-month")) === value
+                }
+                className="size-5 accent-primary"
+              />
+              {label}
+            </label>
+          ))}
+          <span className="text-muted-foreground">
+            Days are always to the day, e.g. a VOR check every 30 days.
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field
             name="intervalHours"

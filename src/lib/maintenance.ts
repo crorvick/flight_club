@@ -4,14 +4,19 @@
 
 import { parseHours } from "./hours";
 
-// Early enough to book the shop.
+// Early enough to book the shop, but never more than a quarter of the
+// interval: a 30-day VOR check would otherwise always be "due soon".
 export const DUE_SOON_DAYS = 30;
 export const DUE_SOON_HUNDREDTHS = 10 * 100;
 
 export type MaintenanceState = "ok" | "due-soon" | "overdue";
 
 export type MaintenanceInput = {
+  // A calendar interval is months or days, not both.  Months run to the
+  // end of the month unless dueEndOfMonth is false; days are always exact.
   intervalMonths: number | null;
+  intervalDays: number | null;
+  dueEndOfMonth: boolean;
   intervalHours: string | null;
   lastCompletedOn: string | null;
   lastCompletedReading: string | null;
@@ -39,6 +44,45 @@ export function dueDate(lastCompletedOn: string, months: number) {
   return end.toISOString().slice(0, 10);
 }
 
+// An exact number of calendar months, to the same day of the month, or
+// the month's last day if it's shorter: 31 January plus one month is 28
+// (or 29) February.
+export function addMonths(isoDate: string, months: number) {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(year, month - 1 + months + 1, 0));
+  return new Date(
+    Date.UTC(year, month - 1 + months, Math.min(day, lastDay.getUTCDate())),
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+export function addDays(isoDate: string, days: number) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// When a calendar interval falls due, counted from the last completion,
+// with roughly how many days it spans for sizing the due-soon window.
+function calendarDue(item: MaintenanceInput, last: string) {
+  if (item.intervalMonths !== null) {
+    return {
+      dueOn: item.dueEndOfMonth
+        ? dueDate(last, item.intervalMonths)
+        : addMonths(last, item.intervalMonths),
+      spanDays: item.intervalMonths * 30,
+    };
+  }
+  if (item.intervalDays !== null) {
+    return {
+      dueOn: addDays(last, item.intervalDays),
+      spanDays: item.intervalDays,
+    };
+  }
+  return undefined;
+}
+
 function daysBetween(from: string, to: string) {
   return Math.round(
     (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
@@ -61,13 +105,21 @@ export function maintenanceStatus(
 ): MaintenanceStatus {
   const status: MaintenanceStatus = { state: "ok" };
 
-  if (item.intervalMonths !== null && item.lastCompletedOn !== null) {
-    status.dueOn = dueDate(item.lastCompletedOn, item.intervalMonths);
+  const calendar =
+    item.lastCompletedOn === null
+      ? undefined
+      : calendarDue(item, item.lastCompletedOn);
+  if (calendar) {
+    status.dueOn = calendar.dueOn;
     status.daysLeft = daysBetween(today, status.dueOn);
+    const window = Math.min(
+      DUE_SOON_DAYS,
+      Math.max(1, Math.floor(calendar.spanDays / 4)),
+    );
     const state =
       status.daysLeft < 0
         ? "overdue"
-        : status.daysLeft <= DUE_SOON_DAYS
+        : status.daysLeft <= window
           ? "due-soon"
           : "ok";
     status.state = worst(status.state, state);
@@ -83,7 +135,8 @@ export function maintenanceStatus(
     const state =
       status.hoursLeft < 0
         ? "overdue"
-        : status.hoursLeft <= DUE_SOON_HUNDREDTHS
+        : status.hoursLeft <=
+            Math.min(DUE_SOON_HUNDREDTHS, Math.floor(interval / 4))
           ? "due-soon"
           : "ok";
     status.state = worst(status.state, state);

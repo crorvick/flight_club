@@ -96,7 +96,8 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### MaintenanceItem
 - id, aircraftId, name (annual, 100-hour, ELT, transponder, pitot-static, AD #…, etc.)
-- Due by **date**, by **hours on a specified meter** (usually tach), or **whichever comes first**
+- Recurring: due by **calendar time**, by **hours on a specified meter** (usually tach), or **whichever comes first**
+- Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days)
 - Last completed date/reading, interval, computed next due
 
 ### PilotQualification

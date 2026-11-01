@@ -208,6 +208,7 @@ try {
         const items: {
           name: string;
           months?: number;
+          days?: number;
           hours?: number;
           lastDaysAgo: number;
           lastReading?: number;
@@ -225,6 +226,8 @@ try {
             months: 24,
             lastDaysAgo: 400,
           },
+          // 30 days to the day; due within the week.
+          { name: "VOR check", days: 30, lastDaysAgo: 25, grounds: false },
         ];
         if (plane.tailNumber === "N172FC") {
           // 6 hours left on the tach.
@@ -248,11 +251,13 @@ try {
         for (const item of items) {
           await tx`
             insert into maintenance_item (
-              aircraft_id, name, interval_months, interval_hours, meter_id,
-              last_completed_on, last_completed_reading, grounds_when_overdue
+              aircraft_id, name, interval_months, interval_days,
+              interval_hours, meter_id, last_completed_on,
+              last_completed_reading, grounds_when_overdue
             )
             values (
               ${aircraftId}, ${item.name}, ${item.months ?? null},
+              ${item.days ?? null},
               ${item.hours === undefined ? null : toHours(item.hours)},
               ${item.hours === undefined ? null : meterIds.tach},
               ${isoDaysAgo(item.lastDaysAgo)},

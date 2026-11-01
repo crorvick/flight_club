@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDays,
+  addMonths,
   describeDue,
   dueDate,
   maintenanceStatus,
@@ -9,6 +11,8 @@ import {
 
 const none: MaintenanceInput = {
   intervalMonths: null,
+  intervalDays: null,
+  dueEndOfMonth: true,
   intervalHours: null,
   lastCompletedOn: null,
   lastCompletedReading: null,
@@ -177,5 +181,74 @@ describe("describeDue", () => {
     ).toBe(
       "due 2027-01-31 (91 days), or due at 4250.0 on the tach (4.0 hours left)",
     );
+  });
+});
+
+describe("addMonths", () => {
+  it("keeps the day of the month", () => {
+    expect(addMonths("2026-01-15", 6)).toBe("2026-07-15");
+  });
+
+  it("falls back to the last day of a shorter month", () => {
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2027-01-31", 13)).toBe("2028-02-29");
+  });
+});
+
+describe("addDays", () => {
+  it("crosses months and years", () => {
+    expect(addDays("2026-10-01", 30)).toBe("2026-10-31");
+    expect(addDays("2026-12-20", 30)).toBe("2027-01-19");
+  });
+});
+
+describe("maintenanceStatus with exact calendar intervals", () => {
+  // 14 CFR 91.171: a VOR check within the preceding 30 days.
+  const vorCheck = { ...none, intervalDays: 30, lastCompletedOn: "2026-10-01" };
+
+  it("is due exactly that many days later", () => {
+    expect(maintenanceStatus(vorCheck, "2026-10-20")).toMatchObject({
+      state: "ok",
+      dueOn: "2026-10-31",
+      daysLeft: 11,
+    });
+    expect(maintenanceStatus(vorCheck, "2026-11-01").state).toBe("overdue");
+  });
+
+  it("warns within a quarter of a short interval, not 30 days", () => {
+    expect(maintenanceStatus(vorCheck, "2026-10-23").state).toBe("ok");
+    expect(maintenanceStatus(vorCheck, "2026-10-24").state).toBe("due-soon");
+  });
+
+  it("can count months to the day instead of the month's end", () => {
+    const exact = {
+      ...none,
+      intervalMonths: 6,
+      dueEndOfMonth: false,
+      lastCompletedOn: "2026-01-15",
+    };
+    expect(maintenanceStatus(exact, "2026-07-15")).toMatchObject({
+      dueOn: "2026-07-15",
+      state: "due-soon",
+    });
+    expect(maintenanceStatus(exact, "2026-07-16").state).toBe("overdue");
+  });
+});
+
+describe("due-soon window for short hours intervals", () => {
+  it("is a quarter of the interval when that's under 10 hours", () => {
+    const short = {
+      ...none,
+      intervalHours: "20.00",
+      lastCompletedReading: "100.00",
+    };
+    expect(
+      maintenanceStatus({ ...short, currentReading: "114.90" }, "2026-11-01")
+        .state,
+    ).toBe("ok");
+    expect(
+      maintenanceStatus({ ...short, currentReading: "115.00" }, "2026-11-01")
+        .state,
+    ).toBe("due-soon");
   });
 });

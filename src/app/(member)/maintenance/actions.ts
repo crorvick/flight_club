@@ -20,7 +20,9 @@ import { requireMember } from "@/lib/session";
 
 const ITEM_FIELDS = [
   "name",
-  "intervalMonths",
+  "calendarInterval",
+  "calendarUnit",
+  "calendarDeadline",
   "intervalHours",
   "meterId",
   "lastCompletedOn",
@@ -52,18 +54,22 @@ const itemSchema = z
       .trim()
       .min(1, "Name the item, e.g. Annual inspection.")
       .max(100, "Keep it under 100 characters."),
-    intervalMonths: z
+    // Every N months or days.  Months either run to the end of the month
+    // (annuals) or to the day; days are always to the day (VOR checks).
+    calendarInterval: z
       .string()
       .trim()
       .transform((typed, ctx) => {
         if (!typed) return null;
-        const months = Number(typed);
-        if (!Number.isInteger(months) || months < 1 || months > 240) {
-          ctx.addIssue({ code: "custom", message: "Enter whole months." });
+        const count = Number(typed);
+        if (!Number.isInteger(count) || count < 1 || count > 3650) {
+          ctx.addIssue({ code: "custom", message: "Enter a whole number." });
           return z.NEVER;
         }
-        return months;
+        return count;
       }),
+    calendarUnit: z.enum(["months", "days"]),
+    calendarDeadline: z.enum(["end-of-month", "exact"]),
     intervalHours: optionalHours("Enter hours like 100 or 50.5."),
     meterId: z.string().transform((id) => (id ? id : null)),
     lastCompletedOn: isoDate,
@@ -71,11 +77,11 @@ const itemSchema = z
     groundsWhenOverdue: z.boolean(),
   })
   .superRefine((item, ctx) => {
-    if (item.intervalMonths === null && item.intervalHours === null) {
+    if (item.calendarInterval === null && item.intervalHours === null) {
       ctx.addIssue({
         code: "custom",
-        path: ["intervalMonths"],
-        message: "Give a number of months, hours, or both.",
+        path: ["calendarInterval"],
+        message: "Give a calendar interval, hours, or both.",
       });
     }
     if (item.intervalHours !== null) {
@@ -95,17 +101,27 @@ const itemSchema = z
       }
     }
   })
-  .transform((item) =>
-    // Without an hours interval the meter and reading mean nothing.
-    item.intervalHours === null
-      ? { ...item, meterId: null, lastCompletedReading: null }
-      : item,
+  .transform(
+    ({ calendarInterval, calendarUnit, calendarDeadline, ...item }) => ({
+      ...item,
+      intervalMonths: calendarUnit === "months" ? calendarInterval : null,
+      intervalDays: calendarUnit === "days" ? calendarInterval : null,
+      dueEndOfMonth:
+        calendarUnit === "months" && calendarDeadline === "end-of-month",
+      // Without an hours interval the meter and reading mean nothing.
+      ...(item.intervalHours === null && {
+        meterId: null,
+        lastCompletedReading: null,
+      }),
+    }),
   );
 
 function parseItem(formData: FormData) {
   return itemSchema.safeParse({
     name: formData.get("name") ?? "",
-    intervalMonths: formData.get("intervalMonths") ?? "",
+    calendarInterval: formData.get("calendarInterval") ?? "",
+    calendarUnit: formData.get("calendarUnit") ?? "months",
+    calendarDeadline: formData.get("calendarDeadline") ?? "end-of-month",
     intervalHours: formData.get("intervalHours") ?? "",
     meterId: formData.get("meterId") ?? "",
     lastCompletedOn: formData.get("lastCompletedOn") ?? "",
@@ -320,6 +336,8 @@ export async function deleteItem(itemId: string): Promise<FormState> {
         aircraftId: item.aircraftId,
         name: item.name,
         intervalMonths: item.intervalMonths,
+        intervalDays: item.intervalDays,
+        dueEndOfMonth: item.dueEndOfMonth,
         intervalHours: item.intervalHours,
         lastCompletedOn: item.lastCompletedOn,
         lastCompletedReading: item.lastCompletedReading,

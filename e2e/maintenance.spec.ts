@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { addMonths } from "../src/lib/maintenance";
+
 import {
   closeSql,
   createAircraft,
@@ -27,6 +29,12 @@ test.afterAll(async () => {
   await closeSql();
 });
 
+function daysAgo(days: number) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
 function monthsAgo(months: number) {
   const date = new Date();
   date.setUTCMonth(date.getUTCMonth() - months);
@@ -38,6 +46,8 @@ async function addItem(
   item: {
     name: string;
     months?: string;
+    days?: string;
+    exact?: boolean;
     hours?: string;
     lastOn: string;
     lastReading?: string;
@@ -46,7 +56,13 @@ async function addItem(
 ) {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Name").fill(item.name);
-  if (item.months) await page.getByLabel("Calendar months").fill(item.months);
+  if (item.months || item.days) {
+    await page.getByLabel("Calendar time").fill((item.months ?? item.days)!);
+    await page
+      .getByLabel("In", { exact: true })
+      .selectOption(item.months ? "months" : "days");
+  }
+  if (item.exact) await page.getByLabel("To the day").check();
   if (item.hours) {
     await page.getByLabel("Hours", { exact: true }).fill(item.hours);
     await page.getByLabel("On the").selectOption({ label: "Tach" });
@@ -132,13 +148,48 @@ test("an hours item that only warns is flagged but doesn't ground", async ({
   ).toHaveCount(0);
 });
 
+test("a day interval is due exactly that many days later", async ({ page }) => {
+  await addItem(page, {
+    name: "VOR check",
+    days: "30",
+    lastOn: daysAgo(25),
+    grounds: false,
+  });
+  // A quarter of 30 days: due soon from 7 days out, not 30.
+  await expect(page.getByText("Due soon")).toBeVisible();
+  await expect(
+    page.getByText(`due ${daysAgo(-5)} (5 days)`, { exact: false }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Log completion" }).click();
+  await expect(page.getByText("Completion logged.")).toBeVisible();
+  await expect(page.getByText("Not due yet")).toBeVisible();
+});
+
+test("months can run to the day instead of the month's end", async ({
+  page,
+}) => {
+  const lastOn = daysAgo(10);
+  await addItem(page, {
+    name: "Fire extinguisher",
+    months: "1",
+    exact: true,
+    lastOn,
+    grounds: false,
+  });
+  // A month to the day, not the end of next month.
+  await expect(
+    page.getByText(`due ${addMonths(lastOn, 1)}`, { exact: false }),
+  ).toBeVisible();
+});
+
 test("an item needs an interval, and a reading for hours", async ({ page }) => {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Name").fill("Mystery item");
   await page.getByLabel("Date").fill(monthsAgo(1));
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(
-    page.getByText("Give a number of months, hours, or both."),
+    page.getByText("Give a calendar interval, hours, or both."),
   ).toBeVisible();
   await expect(page.getByLabel("Name")).toHaveValue("Mystery item");
 

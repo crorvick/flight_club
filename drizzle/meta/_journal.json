@@ -43,6 +43,13 @@
       "when": 1793511630960,
       "tag": "0005_dispatch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793515309402,
+      "tag": "0006_calendar_intervals",
+      "breakpoints": true
     }
   ]
 }
