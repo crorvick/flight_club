@@ -22,6 +22,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { METER_KINDS } from "@/lib/meters";
+import { MEDICAL_CLASSES } from "@/lib/qualifications";
 import { ROLE_TAGS } from "@/lib/roles";
 import { SQUAWK_CATEGORIES } from "@/lib/squawk-rules";
 
@@ -309,6 +310,42 @@ export const squawkPhoto = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("squawk_photo_squawk_idx").on(table.squawkId)],
+);
+
+export const medicalClass = pgEnum("medical_class", MEDICAL_CLASSES);
+
+// A pilot's medical and flight review, one row per member.  The medical's
+// expiry is entered rather than computed: it depends on the class, the
+// pilot's age at the exam and the privileges used, and is printed on the
+// certificate anyway.  The flight review's expiry is computed from its
+// date (lib/qualifications.ts).
+export const pilotQualification = pgTable("pilot_qualification", {
+  memberId: uuid("member_id")
+    .primaryKey()
+    .references(() => member.id, { onDelete: "cascade" }),
+  medicalClass: medicalClass("medical_class"),
+  medicalExpiresOn: date("medical_expires_on"),
+  flightReviewOn: date("flight_review_on"),
+  updatedAt: updatedAt(),
+});
+
+// Which aircraft a pilot has been checked out in.
+export const aircraftCheckout = pgTable(
+  "aircraft_checkout",
+  {
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id, { onDelete: "cascade" }),
+    checkedOutOn: date("checked_out_on").notNull(),
+    recordedById: uuid("recorded_by_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.memberId, table.aircraftId] })],
 );
 
 // Recurring maintenance: an annual, 100-hour, ELT check, AD and so on.

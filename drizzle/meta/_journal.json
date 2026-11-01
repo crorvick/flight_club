@@ -29,6 +29,13 @@
       "when": 1793509257851,
       "tag": "0003_maintenance",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793509909011,
+      "tag": "0004_qualifications",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,9 @@ import { Suspense } from "react";
 
 import { AircraftPicker } from "@/components/aircraft-picker";
 import { PreflightWarnings } from "@/components/preflight-warnings";
-import { listActiveAircraft } from "@/lib/fleet";
+import { listActiveAircraft, today } from "@/lib/fleet";
+import { pilotStatus } from "@/lib/pilots";
+import { pilotWarnings } from "@/lib/qualifications";
 import { requireMember } from "@/lib/session";
 
 import { logFlight } from "../actions";
@@ -45,12 +47,21 @@ async function LogFlight({
   const selectedId =
     candidates.find((id) => fleet.some((a) => a.id === id)) ?? fleet[0].id;
   const plane = (await getAircraftForLog(selectedId))!;
+  const date = today();
+  const warnings = pilotWarnings(
+    await pilotStatus(member.id, plane.id, date),
+    date,
+  );
 
   return (
     <>
       <AircraftPicker fleet={fleet} selectedId={plane.id} path="/flights/new" />
 
-      <PreflightWarnings tailNumber={plane.tailNumber} alerts={plane.alerts} />
+      <PreflightWarnings
+        tailNumber={plane.tailNumber}
+        alerts={plane.alerts}
+        pilot={warnings}
+      />
 
       {/* Keyed so switching aircraft starts with a fresh form. */}
       <FlightForm

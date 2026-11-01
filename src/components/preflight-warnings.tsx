@@ -1,16 +1,22 @@
+import { cn } from "cn";
+
 import type { AircraftAlerts } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
+import type { PilotWarning } from "@/lib/qualifications";
 
 // Shown on the flight log before the pilot enters anything (docs/spec.md,
-// section 6): what grounds the aircraft, then what's due.  Warnings, not
-// blocks; whether to fly is the pilot's call.
+// section 6): what grounds the aircraft, what's due, then anything about
+// the pilot.  Warnings, not blocks; whether to fly is the pilot's call.
 export function PreflightWarnings({
   tailNumber,
   alerts,
+  pilot,
 }: {
   tailNumber: string;
   alerts: AircraftAlerts;
+  pilot: PilotWarning[];
 }) {
+  const serious = pilot.some((w) => w.severity === "expired");
   const grounding = alerts.maintenance.filter(
     (m) => m.state === "overdue" && m.groundsWhenOverdue,
   );
@@ -48,6 +54,32 @@ export function PreflightWarnings({
               <li key={m.id}>
                 {m.name}: {describeDue(m, m.meterLabel)}
               </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {pilot.length > 0 && (
+        <div
+          className={cn(
+            "rounded-lg border p-4",
+            serious
+              ? "border-destructive/50 bg-destructive/10"
+              : "border-amber-600/40 bg-amber-500/10",
+          )}
+        >
+          <p
+            className={cn(
+              "font-semibold",
+              serious
+                ? "text-destructive"
+                : "text-amber-800 dark:text-amber-300",
+            )}
+          >
+            Before you fly
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-sm">
+            {pilot.map((w) => (
+              <li key={w.message}>{w.message}</li>
             ))}
           </ul>
         </div>

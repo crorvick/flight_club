@@ -84,6 +84,15 @@ async function MemberStatus() {
                   Report a squawk
                 </Link>
               </div>
+              <Link
+                href="/qualifications"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "h-11 text-base",
+                )}
+              >
+                My qualifications
+              </Link>
               <RecentFlights member={member} />
             </>
           )}

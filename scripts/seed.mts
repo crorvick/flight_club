@@ -265,6 +265,38 @@ try {
         }
       }
 
+      // Everyone current but Lena, whose medical lapsed last month, and
+      // checked out in everything but Tom in the Cub.
+      const isoFromToday = (days: number) => {
+        const date = new Date();
+        date.setUTCDate(date.getUTCDate() + days);
+        return date.toISOString().slice(0, 10);
+      };
+      for (const [i, memberId] of memberIds.entries()) {
+        await tx`
+          insert into pilot_qualification (
+            member_id, medical_class, medical_expires_on, flight_review_on
+          )
+          values (
+            ${memberId}, ${i === 0 ? "second" : "third"},
+            ${isoFromToday(i === 4 ? -20 : 200 + i * 60)},
+            ${isoFromToday(-100 - i * 90)}
+          )
+        `;
+        for (const plane of fleet) {
+          if (i === 3 && plane.tailNumber === "N3JFC") continue;
+          await tx`
+            insert into aircraft_checkout (
+              member_id, aircraft_id, checked_out_on, recorded_by_id
+            )
+            values (
+              ${memberId}, ${aircraftIds[plane.tailNumber]},
+              ${isoFromToday(-400 - i * 30)}, ${officerId}
+            )
+          `;
+        }
+      }
+
       // One grounded aircraft, a deferred and an open nuisance squawk, and
       // a resolved one with its audit trail.
       const squawks = [

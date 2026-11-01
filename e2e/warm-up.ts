@@ -18,6 +18,7 @@ export default async function warmUp(config: FullConfig) {
     "/members",
     "/aircraft",
     "/aircraft/new",
+    "/qualifications",
   ]) {
     await fetch(new URL(path, baseURL), { redirect: "manual" });
   }

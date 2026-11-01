@@ -68,7 +68,7 @@ test("an officer changes a member's roles and deactivates them", async ({
   await page.getByLabel(/Officer/).check();
   await page.getByLabel(/Pilot/).check();
   await page.getByLabel(/Active/).check();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save member" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   await expect(page.getByLabel(/Officer/)).toBeChecked();
 
@@ -78,7 +78,7 @@ test("an officer changes a member's roles and deactivates them", async ({
   // Deactivated, they keep their roles but can do nothing.  ("Saved." is
   // still showing from the first save, so wait for the database.)
   await page.getByLabel(/Active/).uncheck();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save member" }).click();
   await expect
     .poll(async () => {
       const [row] = await sql()`select active from member where id = ${id}`;
@@ -99,13 +99,13 @@ test("an officer can't lock themselves out", async ({ page }, testInfo) => {
   await page.goto(`/members/${id}`);
 
   await page.getByLabel(/Officer/).uncheck();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save member" }).click();
   await expect(
     page.getByText("You can't remove your own officer role."),
   ).toBeVisible();
 
   await page.getByLabel(/Active/).uncheck();
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save member" }).click();
   await expect(page.getByText("You can't deactivate yourself.")).toBeVisible();
 
   const [row] = await sql()`select active, roles from member where id = ${id}`;

@@ -10,6 +10,7 @@ import { isPending } from "@/lib/member-rules";
 import { isRoleTag } from "@/lib/roles";
 import { requireMember } from "@/lib/session";
 
+import { QualificationsPanel } from "../../qualifications/qualifications-panel";
 import { updateMember } from "../actions";
 import { MemberForm } from "./member-form";
 
@@ -66,6 +67,9 @@ async function MemberDetails({
         roles={roles}
         self={row.id === officer.id}
       />
+      {roles.includes("pilot") && (
+        <QualificationsPanel memberId={row.id} canManageCheckouts />
+      )}
     </>
   );
 }

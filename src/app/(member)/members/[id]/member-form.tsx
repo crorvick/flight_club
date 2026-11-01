@@ -76,7 +76,7 @@ export function MemberForm({
       </label>
 
       <Button type="submit" className="h-11 text-base" disabled={pending}>
-        {pending ? "Saving…" : "Save"}
+        {pending ? "Saving…" : "Save member"}
       </Button>
     </form>
   );
