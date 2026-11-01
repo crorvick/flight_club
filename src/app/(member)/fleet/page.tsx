@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { AircraftStatusLabel } from "@/components/aircraft-status";
 import { fleetStatus, recentlyResolved } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
 import { requireMember } from "@/lib/session";
@@ -37,7 +38,8 @@ async function Fleet() {
               aria-label={plane.tailNumber}
               className={cn(
                 "rounded-lg border",
-                plane.grounded && "border-destructive/50",
+                plane.status === "grounded" && "border-destructive/50",
+                plane.status === "vfr-only" && "border-amber-600/50",
               )}
             >
               <header className="flex items-baseline justify-between gap-2 px-4 py-3">
@@ -48,16 +50,10 @@ async function Fleet() {
                     {plane.checkedOutTo && ` · out with ${plane.checkedOutTo}`}
                   </p>
                 </div>
-                <span
-                  className={cn(
-                    "font-medium",
-                    plane.grounded
-                      ? "text-destructive"
-                      : "text-green-700 dark:text-green-400",
-                  )}
-                >
-                  {plane.grounded ? "Grounded" : "Airworthy"}
-                </span>
+                <AircraftStatusLabel
+                  status={plane.status}
+                  className="font-medium"
+                />
               </header>
               {plane.maintenance.length > 0 && (
                 <ul className="divide-y border-t">
@@ -98,13 +94,17 @@ async function Fleet() {
                         <span
                           className={cn(
                             "shrink-0 text-sm",
-                            s.grounds && s.status === "open"
-                              ? "font-medium text-destructive"
+                            s.status === "open" && s.grounding !== "none"
+                              ? s.grounding === "all"
+                                ? "font-medium text-destructive"
+                                : "font-medium text-amber-700 dark:text-amber-400"
                               : "text-muted-foreground",
                           )}
                         >
-                          {s.grounds && s.status === "open"
-                            ? "Grounding"
+                          {s.status === "open" && s.grounding !== "none"
+                            ? s.grounding === "all"
+                              ? "Grounding"
+                              : "No IFR"
                             : STATUS_LABELS[s.status]}
                         </span>
                       </Link>

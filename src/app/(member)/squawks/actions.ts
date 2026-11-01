@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
 import { aircraft, squawk, squawkPhoto } from "@/db/schema";
+import { effectiveGrounding, GROUNDING_LEVELS } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 import type { FormState } from "@/lib/form-state";
@@ -28,9 +29,10 @@ export type ReportResult = {
 };
 
 const squawkSchema = z.object({
-  grounds: z
-    .enum(["yes", "no"], "Answer whether this grounds the airplane.")
-    .transform((answer) => answer === "yes"),
+  grounding: z.enum(
+    GROUNDING_LEVELS,
+    "Answer whether this grounds the airplane.",
+  ),
   description: z
     .string()
     .trim()
@@ -57,7 +59,7 @@ export async function reportSquawk(
   if (!plane) return { error: "That aircraft isn't in the fleet." };
 
   const parsed = squawkSchema.safeParse({
-    grounds: formData.get("grounds") ?? undefined,
+    grounding: formData.get("grounding") ?? undefined,
     description: formData.get("description") ?? "",
     category: formData.get("category") ?? undefined,
   });
@@ -110,6 +112,8 @@ export async function reportSquawk(
       aircraftId,
       reportedById: member.id,
       ...parsed.data,
+      // For the previous release, during a deploy (lib/grounding.ts).
+      grounds: parsed.data.grounding !== "none",
     });
     if (uploads.length > 0) {
       await tx.insert(squawkPhoto).values(
@@ -176,7 +180,13 @@ export async function changeSquawk(
       .where(eq(squawk.id, squawkId))
       .for("update");
     if (!current) return "No such squawk.";
-    if (!allowedChanges(current).includes(change.intent)) {
+    const restricts =
+      effectiveGrounding(current.grounding, current.grounds) !== "none";
+    if (
+      !allowedChanges({ status: current.status, grounds: restricts }).includes(
+        change.intent,
+      )
+    ) {
       return "Someone else changed this squawk. Review it and try again.";
     }
 

@@ -32,16 +32,21 @@ function Choice({
   value: string;
   label: string;
   defaultChecked?: boolean;
-  tone?: "default" | "danger";
+  tone?: "default" | "warning" | "danger";
   className?: string;
 }) {
   return (
     <label
       className={cn(
         "flex cursor-pointer items-center justify-center rounded-lg border px-3 text-center font-medium select-none has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-        tone === "danger"
-          ? "has-checked:border-destructive has-checked:bg-destructive has-checked:text-white"
-          : "has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground",
+        {
+          danger:
+            "has-checked:border-destructive has-checked:bg-destructive has-checked:text-white",
+          warning:
+            "has-checked:border-amber-600 has-checked:bg-amber-600 has-checked:text-white",
+          default:
+            "has-checked:border-primary has-checked:bg-primary has-checked:text-primary-foreground",
+        }[tone],
         className,
       )}
     >
@@ -144,23 +149,30 @@ export function SquawkForm({
         <legend className="mb-3 text-lg font-semibold">
           Does this ground the airplane?
         </legend>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Choice
-            name="grounds"
-            value="yes"
+            name="grounding"
+            value="all"
             label="Yes, grounded"
             tone="danger"
-            className="h-16 text-lg"
+            className="h-14 text-lg"
           />
           <Choice
-            name="grounds"
-            value="no"
+            name="grounding"
+            value="ifr"
+            label="No IFR, VFR only"
+            tone="warning"
+            className="h-14 text-lg"
+          />
+          <Choice
+            name="grounding"
+            value="none"
             label="No, still flyable"
-            className="h-16 text-lg"
+            className="h-14 text-lg"
           />
         </div>
-        {errors.grounds && (
-          <p className="text-sm text-destructive">{errors.grounds[0]}</p>
+        {errors.grounding && (
+          <p className="text-sm text-destructive">{errors.grounding[0]}</p>
         )}
       </fieldset>
 

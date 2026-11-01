@@ -65,7 +65,7 @@ Environment rules:
 ### Aircraft
 - id, tail number, make/model, active flag
 - `billingMeterId` → references one of this aircraft's meters
-- Status is **derived**: `grounded` if any open squawk on it has `grounds = true`; otherwise `airworthy`. (Overdue maintenance shows as a warning; whether it also grounds is an open question, see §10.)
+- Status is **derived**: `grounded` if any open squawk or overdue maintenance item grounds it for all flying; otherwise `VFR only` if one grounds it for IFR; otherwise `airworthy`.
 
 ### Meter (configurable per aircraft)
 Aircraft have different instruments, so meters are rows, not fixed columns.
@@ -89,7 +89,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - One row per meter the aircraft has.
 
 ### Squawk
-- id, aircraftId, reportedById, reportedAt, description, category (engine, avionics, airframe, other), `grounds` (bool)
+- id, aircraftId, reportedById, reportedAt, description, category (engine, avionics, airframe, other), `grounding`: `none` | `ifr` | `all` (for IFR only, or for all flying)
 - status: `open` | `deferred` | `resolved`
 - resolvedById, resolvedAt, resolutionNote
 - Photos (stored in object storage; URLs on a SquawkPhoto table)
@@ -99,6 +99,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Recurring: due by **calendar time**, by **hours on a specified meter** (usually tach), or **whichever comes first**
 - Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days)
 - Last completed date/reading, interval, computed next due
+- When overdue: grounds the aircraft, grounds it for IFR only, or only warns (chosen per item)
 
 ### PilotQualification
 - Medical (class, expiration), flight review (date → expiration), per-aircraft checkouts
@@ -127,12 +128,14 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Officers can edit locked flights; every such edit writes to the AuditLog.
 
 **Squawks & grounding**
-- Any pilot can report a squawk and mark it as grounding.
-- A grounding squawk immediately makes the aircraft `grounded` (and can notify officers).
+- Any pilot can report a squawk and mark it as grounding the aircraft for all flying or for IFR only.
+- A grounding squawk immediately makes the aircraft `grounded`, or `VFR only` if it grounds only IFR (and can notify officers).
+- Each maintenance item says what happens when it's overdue: ground the aircraft, ground it for IFR only (e.g. VOR check, pitot-static), or only warn.
+- A grounded aircraft can't be checked out.  A `VFR only` aircraft can, once the pilot confirms they'll fly VFR.
 - **Only members tagged `officer` can resolve a grounding squawk / unground an aircraft.** Resolution requires a note and records who/when.
 
 **Pre-flight warnings** (shown on the flight log page)
-- Aircraft has an open grounding squawk.
+- Aircraft is grounded or VFR only, and why.
 - Aircraft has maintenance overdue or due soon.
 - Pilot's medical / flight review is expired or expiring soon.
 - Pilot is not checked out in this aircraft.
@@ -151,7 +154,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### Report a squawk (one-thumb usable)
 1. Aircraft pre-selected when coming from a flight; otherwise a picker.
-2. First question, big yes/no: **"Does this ground the airplane?"**
+2. First question, big buttons: **"Does this ground the airplane?"** Yes / No IFR, VFR only / No.
 3. Short description; optional category.
 4. Photos straight from the camera.
 5. Confirmation showing the aircraft's updated status.
@@ -200,7 +203,6 @@ Build these by hand as needed; no generic admin framework for now. Drizzle Studi
 
 ## 10. Open questions
 
-- Should overdue maintenance automatically ground an aircraft, or only warn?
 - Can pilots delete their own flights (under the same edit-lock rule), or only edit?
 - Who gets notified of a grounding squawk, and how (email, SMS, push)?
 - Where to store squawk photos (Render disk vs. S3-compatible object storage — object storage recommended).

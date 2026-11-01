@@ -51,7 +51,7 @@ async function addItem(
     hours?: string;
     lastOn: string;
     lastReading?: string;
-    grounds?: boolean;
+    grounds?: boolean | "ifr";
   },
 ) {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
@@ -71,8 +71,9 @@ async function addItem(
   if (item.lastReading) {
     await page.getByLabel("At meter reading").fill(item.lastReading);
   }
-  if (item.grounds === false) {
-    await page.getByLabel(/Grounds the aircraft when overdue/).uncheck();
+  if (item.grounds === false) await page.getByLabel(/Only warn/).check();
+  if (item.grounds === "ifr") {
+    await page.getByLabel(/Ground it for IFR only/).check();
   }
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(page.getByText("Item added.")).toBeVisible();
@@ -181,6 +182,28 @@ test("months can run to the day instead of the month's end", async ({
   await expect(
     page.getByText(`due ${addMonths(lastOn, 1)}`, { exact: false }),
   ).toBeVisible();
+});
+
+test("an overdue IFR item limits the aircraft to VFR", async ({ page }) => {
+  await addItem(page, {
+    name: "VOR check",
+    days: "30",
+    lastOn: daysAgo(35),
+    grounds: "ifr",
+  });
+  await expect(
+    page.getByText("Overdue: the aircraft is VFR only"),
+  ).toBeVisible();
+
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
+  await expect(
+    page.getByText(`${aircraft.tailNumber} is VFR only`),
+  ).toBeVisible();
+  await expect(page.getByText(/VOR check: 5 days overdue/)).toBeVisible();
+  await page.goto("/fleet");
+  await expect(
+    page.getByRole("region", { name: aircraft.tailNumber }),
+  ).toContainText("VFR only");
 });
 
 test("an item needs an interval, and a reading for hours", async ({ page }) => {

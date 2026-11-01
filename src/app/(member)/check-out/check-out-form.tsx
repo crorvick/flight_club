@@ -10,7 +10,7 @@ import { checkOutReading } from "@/lib/dispatch-rules";
 import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
-import { ACK_FIELD, expectedField } from "../dispatches/fields";
+import { ACK_FIELD, expectedField, VFR_ONLY_FIELD } from "../dispatches/fields";
 import { outField } from "../flights/fields";
 
 type Meter = { id: string; label: string; reading: string; billing: boolean };
@@ -21,11 +21,14 @@ export function CheckOutForm({
   tailNumber,
   meters,
   squawks,
+  vfrOnly,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   tailNumber: string;
   meters: Meter[];
   squawks: Squawk[];
+  // Limited to VFR by a squawk or overdue maintenance.
+  vfrOnly: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const values = state.values;
@@ -141,6 +144,25 @@ export function CheckOutForm({
             </label>
           ))}
         </fieldset>
+      )}
+
+      {vfrOnly && (
+        <div className="flex flex-col gap-1">
+          <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-amber-600/50 px-3 py-2">
+            <input
+              type="checkbox"
+              name={VFR_ONLY_FIELD}
+              required
+              className="size-5 shrink-0 accent-primary"
+            />
+            <span className="font-medium">I&apos;ll fly VFR only</span>
+          </label>
+          {state.fieldErrors?.[VFR_ONLY_FIELD] && (
+            <p className="text-sm text-destructive">
+              {state.fieldErrors[VFR_ONLY_FIELD][0]}
+            </p>
+          )}
+        </div>
       )}
 
       <Button type="submit" className="h-12 text-base" disabled={pending}>

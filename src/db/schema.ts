@@ -22,6 +22,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { GROUNDING_LEVELS } from "@/lib/grounding";
 import { METER_KINDS } from "@/lib/meters";
 import { MEDICAL_CLASSES } from "@/lib/qualifications";
 import { ROLE_TAGS } from "@/lib/roles";
@@ -135,6 +136,9 @@ export const verification = pgTable(
 export const meterKind = pgEnum("meter_kind", METER_KINDS);
 
 export const squawkCategory = pgEnum("squawk_category", SQUAWK_CATEGORIES);
+
+// How much flying a squawk or overdue maintenance item rules out.
+export const grounding = pgEnum("grounding", GROUNDING_LEVELS);
 
 export const squawkStatus = pgEnum("squawk_status", [
   "open",
@@ -269,7 +273,12 @@ export const squawk = pgTable(
     reportedAt: timestamptz("reported_at").defaultNow().notNull(),
     description: text("description").notNull(),
     category: squawkCategory("category").default("other").notNull(),
-    // An open grounding squawk is what makes an aircraft grounded.
+    // An open squawk grounds the aircraft for all flying, for IFR (it can
+    // still fly VFR), or not at all.
+    grounding: grounding("grounding").default("none").notNull(),
+    // Superseded by grounding, but still written (true unless "none") so
+    // the previous release reads it right during a deploy; dropped once
+    // this release is in production (see lib/grounding.ts).
     grounds: boolean("grounds").notNull(),
     status: squawkStatus("status").default("open").notNull(),
     resolvedById: uuid("resolved_by_id").references(() => member.id),
@@ -344,6 +353,8 @@ export const dispatch = pgTable(
     flightId: uuid("flight_id")
       .unique()
       .references(() => flight.id),
+    // The aircraft could only fly VFR, and the pilot acknowledged it.
+    vfrOnly: boolean("vfr_only").default(false).notNull(),
     // A meter didn't read what the app expected at check-out; an officer
     // marks it reviewed once the missing time is accounted for.
     gapReviewedAt: timestamptz("gap_reviewed_at"),
@@ -461,7 +472,10 @@ export const maintenanceItem = pgTable(
     lastCompletedOn: date("last_completed_on"),
     lastCompletedReading: hours("last_completed_reading"),
     // Chosen per item: an overdue annual grounds the aircraft, an overdue
-    // oil change might only warn.
+    // VOR check rules out only IFR, an overdue oil change might only warn.
+    grounding: grounding("grounding").default("none").notNull(),
+    // Superseded by grounding, still written for the previous release;
+    // see squawk.grounds.
     groundsWhenOverdue: boolean("grounds_when_overdue").default(true).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

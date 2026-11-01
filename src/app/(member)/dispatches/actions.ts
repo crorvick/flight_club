@@ -24,7 +24,7 @@ import { requireMember } from "@/lib/session";
 import { outField } from "../flights/fields";
 import { echo, parseFlightForm } from "../flights/form-data";
 import { recordFlight } from "../flights/record";
-import { ACK_FIELD, expectedField } from "./fields";
+import { ACK_FIELD, expectedField, VFR_ONLY_FIELD } from "./fields";
 
 // Thrown inside a transaction to roll it back with a message.
 class Rejected extends Error {}
@@ -64,6 +64,18 @@ export async function checkOut(
   if (alerts.grounded) {
     return {
       error: `${plane.tailNumber} is grounded and can't be checked out.`,
+    };
+  }
+  // An aircraft limited to VFR can go, once the pilot says that's how
+  // they'll fly it.
+  if (alerts.vfrOnly && formData.get(VFR_ONLY_FIELD) !== "on") {
+    return {
+      fieldErrors: {
+        [VFR_ONLY_FIELD]: [
+          `${plane.tailNumber} can only fly VFR. Confirm you'll fly VFR to check it out.`,
+        ],
+      },
+      values,
     };
   }
 
@@ -122,7 +134,7 @@ export async function checkOut(
 
       const [created] = await tx
         .insert(dispatch)
-        .values({ aircraftId, pilotId: pilot.id })
+        .values({ aircraftId, pilotId: pilot.id, vfrOnly: alerts.vfrOnly })
         .returning({ id: dispatch.id });
       await tx.insert(dispatchMeterReading).values(
         readings.map((r) => ({

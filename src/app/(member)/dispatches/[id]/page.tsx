@@ -79,6 +79,11 @@ async function Dispatch({
             : `${tail} with ${row.pilot.name}`}
         </h1>
         <p className="text-muted-foreground">
+          {row.vfrOnly && (
+            <span className="font-medium text-amber-700 dark:text-amber-400">
+              VFR only ·{" "}
+            </span>
+          )}
           Checked out {time(row.checkedOutAt)}
           {row.status === "cancelled" && " · cancelled"}
           {row.status === "in" && " · checked in"}

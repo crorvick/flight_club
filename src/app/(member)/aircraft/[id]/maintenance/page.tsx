@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { db } from "@/db";
 import { aircraft, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
+import { effectiveGrounding } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
 import { byMeterOrder } from "@/lib/meters";
@@ -91,7 +92,18 @@ async function Maintenance({
                     <span className="block font-medium">{item.name}</span>
                     <span className="block text-sm text-muted-foreground">
                       {describeDue(status, item.meter?.label)}
-                      {!item.groundsWhenOverdue && " · warns only"}
+                      {
+                        {
+                          all: "",
+                          ifr: " · grounds for IFR",
+                          none: " · warns only",
+                        }[
+                          effectiveGrounding(
+                            item.grounding,
+                            item.groundsWhenOverdue,
+                          )
+                        ]
+                      }
                     </span>
                   </span>
                   <span

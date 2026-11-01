@@ -8,7 +8,9 @@ import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { squawk } from "@/db/schema";
+import { STATUS_CLASSES } from "@/components/aircraft-status";
 import { aircraftAlerts } from "@/lib/fleet";
+import { effectiveGrounding } from "@/lib/grounding";
 import { hasRole } from "@/lib/access";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
@@ -62,9 +64,10 @@ async function SquawkDetails({
     },
   });
   if (!row) notFound();
-  const { grounded } = (await aircraftAlerts([row.aircraft.id])).get(
+  const { status } = (await aircraftAlerts([row.aircraft.id])).get(
     row.aircraft.id,
   )!;
+  const grounding = effectiveGrounding(row.grounding, row.grounds);
   const tail = row.aircraft.tailNumber;
   const changeConfirmation =
     typeof changed === "string" && CHANGE_CONFIRMATIONS[changed];
@@ -76,24 +79,25 @@ async function SquawkDetails({
           role="status"
           className={cn(
             "rounded-lg border p-4",
-            grounded
-              ? "border-destructive/50 bg-destructive/10"
-              : "border-green-600/40 bg-green-600/10",
+            {
+              grounded: "border-destructive/50 bg-destructive/10",
+              "vfr-only": "border-amber-600/40 bg-amber-500/10",
+              airworthy: "border-green-600/40 bg-green-600/10",
+            }[status],
           )}
         >
           <p className="font-semibold">
             {changeConfirmation || "Squawk reported."}
           </p>
-          <p
-            className={cn(
-              "text-lg font-semibold",
-              grounded
-                ? "text-destructive"
-                : "text-green-800 dark:text-green-300",
-            )}
-          >
+          <p className={cn("text-lg", STATUS_CLASSES[status])}>
             {tail} is{" "}
-            {grounded ? "grounded" : reported ? "still airworthy" : "airworthy"}
+            {status === "grounded"
+              ? "grounded"
+              : status === "vfr-only"
+                ? "VFR only"
+                : reported
+                  ? "still airworthy"
+                  : "airworthy"}
             .
           </p>
         </div>
@@ -112,7 +116,13 @@ async function SquawkDetails({
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
         <dt className="text-muted-foreground">Grounds the airplane</dt>
-        <dd>{row.grounds ? "Yes" : "No"}</dd>
+        <dd>
+          {grounding === "all"
+            ? "Yes"
+            : grounding === "ifr"
+              ? "IFR only (VFR allowed)"
+              : "No"}
+        </dd>
         <dt className="text-muted-foreground">Category</dt>
         <dd>{CATEGORY_LABELS[row.category]}</dd>
         <dt className="text-muted-foreground">Status</dt>
@@ -132,8 +142,11 @@ async function SquawkDetails({
       {hasRole(member, "officer") && (
         <OfficerControls
           action={changeSquawk.bind(null, row.id)}
-          allowed={allowedChanges(row)}
-          grounds={row.grounds}
+          allowed={allowedChanges({
+            status: row.status,
+            grounds: grounding !== "none",
+          })}
+          grounds={grounding !== "none"}
         />
       )}
 

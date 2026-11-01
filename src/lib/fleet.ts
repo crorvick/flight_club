@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -10,96 +10,129 @@ import {
   member,
   squawk,
 } from "@/db/schema";
+import {
+  type AircraftStatus,
+  effectiveGrounding,
+  type Grounding,
+  GROUNDING_LEVELS,
+  statusFor,
+  worstGrounding,
+} from "@/lib/grounding";
 import { maintenanceStatus, type MaintenanceStatus } from "@/lib/maintenance";
 
-async function groundingSquawks(aircraftIds: string[]) {
+// Open squawks that restrict flying, at the level each restricts it.
+async function restrictingSquawks(aircraftIds: string[]) {
   if (aircraftIds.length === 0) return [];
-  return db()
+  const rows = await db()
     .select({
       aircraftId: squawk.aircraftId,
       description: squawk.description,
+      grounding: squawk.grounding,
+      grounds: squawk.grounds,
     })
     .from(squawk)
     .where(
       and(
         inArray(squawk.aircraftId, aircraftIds),
         eq(squawk.status, "open"),
-        eq(squawk.grounds, true),
+        or(ne(squawk.grounding, "none"), eq(squawk.grounds, true)),
       ),
     )
     .orderBy(asc(squawk.reportedAt));
+  return rows.map(({ grounds, ...s }) => ({
+    ...s,
+    grounding: effectiveGrounding(s.grounding, grounds),
+  }));
 }
 
 export type MaintenanceAlert = MaintenanceStatus & {
   id: string;
   name: string;
-  groundsWhenOverdue: boolean;
+  // What it rules out once overdue.
+  grounding: Grounding;
   meterLabel?: string;
 };
 
 export type AircraftAlerts = {
+  status: AircraftStatus;
   grounded: boolean;
-  groundingSquawks: string[];
+  vfrOnly: boolean;
+  squawks: { description: string; grounding: Grounding }[];
   // Only items due soon or overdue, most urgent first.
   maintenance: MaintenanceAlert[];
 };
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
-// Everything that grounds an aircraft or should be flagged before flying
-// it.  An aircraft is grounded while an open squawk grounds it or an item
-// set to ground it is overdue.  None of this is stored, so it can't
+// Everything that grounds an aircraft, limits it to VFR, or should be
+// flagged before flying it.  An open squawk, or an overdue maintenance
+// item, rules out all flying, IFR only, or nothing; the aircraft's status
+// is the most restrictive of them.  None of this is stored, so it can't
 // disagree with the squawks and maintenance records it comes from.
 export async function aircraftAlerts(
   aircraftIds: string[],
 ): Promise<Map<string, AircraftAlerts>> {
-  const alerts = new Map<string, AircraftAlerts>(
+  const levels = new Map<string, Grounding[]>(
+    aircraftIds.map((id) => [id, []]),
+  );
+  const entries = new Map(
     aircraftIds.map((id) => [
       id,
-      { grounded: false, groundingSquawks: [], maintenance: [] },
+      {
+        squawks: [] as AircraftAlerts["squawks"],
+        maintenance: [] as MaintenanceAlert[],
+      },
     ]),
   );
-  if (aircraftIds.length === 0) return alerts;
-
-  const [squawks, items] = await Promise.all([
-    groundingSquawks(aircraftIds),
-    db().query.maintenanceItem.findMany({
-      where: inArray(maintenanceItem.aircraftId, aircraftIds),
-      with: { meter: { columns: { label: true, currentReading: true } } },
-    }),
-  ]);
-  for (const s of squawks) {
-    const entry = alerts.get(s.aircraftId)!;
-    entry.groundingSquawks.push(s.description);
-    entry.grounded = true;
-  }
-  const date = today();
-  for (const item of items) {
-    const status = maintenanceStatus(
-      { ...item, currentReading: item.meter?.currentReading ?? null },
-      date,
-    );
-    if (status.state === "ok") continue;
-    const entry = alerts.get(item.aircraftId)!;
-    entry.maintenance.push({
-      ...status,
-      id: item.id,
-      name: item.name,
-      groundsWhenOverdue: item.groundsWhenOverdue,
-      meterLabel: item.meter?.label,
-    });
-    if (status.state === "overdue" && item.groundsWhenOverdue) {
-      entry.grounded = true;
+  if (aircraftIds.length > 0) {
+    const [squawks, items] = await Promise.all([
+      restrictingSquawks(aircraftIds),
+      db().query.maintenanceItem.findMany({
+        where: inArray(maintenanceItem.aircraftId, aircraftIds),
+        with: { meter: { columns: { label: true, currentReading: true } } },
+      }),
+    ]);
+    for (const s of squawks) {
+      entries.get(s.aircraftId)!.squawks.push(s);
+      levels.get(s.aircraftId)!.push(s.grounding);
+    }
+    const date = today();
+    for (const item of items) {
+      const status = maintenanceStatus(
+        { ...item, currentReading: item.meter?.currentReading ?? null },
+        date,
+      );
+      if (status.state === "ok") continue;
+      const level = effectiveGrounding(item.grounding, item.groundsWhenOverdue);
+      entries.get(item.aircraftId)!.maintenance.push({
+        ...status,
+        id: item.id,
+        name: item.name,
+        grounding: level,
+        meterLabel: item.meter?.label,
+      });
+      if (status.state === "overdue") levels.get(item.aircraftId)!.push(level);
     }
   }
-  for (const entry of alerts.values()) {
-    entry.maintenance.sort(
-      (a, b) =>
-        Number(b.state === "overdue") - Number(a.state === "overdue") ||
-        Number(b.groundsWhenOverdue) - Number(a.groundsWhenOverdue),
-    );
-  }
-  return alerts;
+
+  const severity = (m: MaintenanceAlert) =>
+    (m.state === "overdue" ? 10 : 0) + GROUNDING_LEVELS.indexOf(m.grounding);
+  return new Map(
+    aircraftIds.map((id) => {
+      const status = statusFor(worstGrounding(levels.get(id)!));
+      const entry = entries.get(id)!;
+      entry.maintenance.sort((a, b) => severity(b) - severity(a));
+      return [
+        id,
+        {
+          ...entry,
+          status,
+          grounded: status === "grounded",
+          vfrOnly: status === "vfr-only",
+        },
+      ];
+    }),
+  );
 }
 
 export type ActiveDispatch = {
@@ -137,7 +170,7 @@ export type AircraftCard = {
   id: string;
   tailNumber: string;
   makeModel: string;
-  grounded: boolean;
+  status: AircraftStatus;
   checkedOutTo?: string;
 };
 
@@ -158,7 +191,7 @@ export async function listActiveAircraft(): Promise<AircraftCard[]> {
   ]);
   return rows.map((r) => ({
     ...r,
-    grounded: alerts.get(r.id)!.grounded,
+    status: alerts.get(r.id)!.status,
     checkedOutTo: out.get(r.id)?.pilotName,
   }));
 }
@@ -173,10 +206,11 @@ export async function fleetStatus() {
     with: {
       squawks: {
         where: ne(squawk.status, "resolved"),
-        orderBy: [desc(squawk.grounds), asc(squawk.reportedAt)],
+        orderBy: [desc(squawk.grounding), asc(squawk.reportedAt)],
         columns: {
           id: true,
           description: true,
+          grounding: true,
           grounds: true,
           status: true,
           reportedAt: true,
@@ -189,11 +223,15 @@ export async function fleetStatus() {
     aircraftAlerts(ids),
     activeDispatches(ids),
   ]);
-  return planes.map((plane) => {
-    const { grounded, maintenance } = alerts.get(plane.id)!;
+  return planes.map(({ squawks, ...plane }) => {
+    const { status, maintenance } = alerts.get(plane.id)!;
     return {
       ...plane,
-      grounded,
+      squawks: squawks.map(({ grounds, ...s }) => ({
+        ...s,
+        grounding: effectiveGrounding(s.grounding, grounds),
+      })),
+      status,
       maintenance,
       checkedOutTo: out.get(plane.id)?.pilotName,
     };

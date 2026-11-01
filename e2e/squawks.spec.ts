@@ -4,6 +4,7 @@ import {
   checkIn,
   checkOut,
   closeSql,
+  openCheckOut,
   createAircraft,
   deleteAircraft,
   signUpPilot,
@@ -104,6 +105,41 @@ test("a squawk that doesn't ground leaves the aircraft airworthy", async ({
   await expect(
     page.getByText(`${aircraft.tailNumber} is still airworthy.`),
   ).toBeVisible();
+});
+
+test("an IFR-only squawk limits the aircraft to VFR", async ({ page }) => {
+  await openSquawkForm(page);
+  await page.getByText("No IFR, VFR only").click();
+  await page.getByLabel("What's wrong?").fill("Glideslope needle stuck.");
+  await submitButton(page).click();
+
+  await expect(page.getByText("Squawk reported.")).toBeVisible();
+  await expect(
+    page.getByText(`${aircraft.tailNumber} is VFR only.`),
+  ).toBeVisible();
+  await expect(page.getByText("IFR only (VFR allowed)")).toBeVisible();
+
+  // It can still be checked out, once the pilot says they'll fly VFR.
+  await openCheckOut(page, aircraft);
+  await expect(
+    page.getByText(`${aircraft.tailNumber} is VFR only`),
+  ).toBeVisible();
+  await page.getByRole("checkbox", { name: /Glideslope/ }).check();
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText("can only fly VFR. Confirm you'll fly VFR"),
+  ).toBeVisible();
+  await page.getByRole("checkbox", { name: /Glideslope/ }).check();
+  await page.getByLabel("I'll fly VFR only").check();
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: `You have ${aircraft.tailNumber}` }),
+  ).toBeVisible();
+  await expect(page.getByText("VFR only ·")).toBeVisible();
 });
 
 test("a rejected report keeps the photos and description", async ({ page }) => {

@@ -212,7 +212,8 @@ try {
           hours?: number;
           lastDaysAgo: number;
           lastReading?: number;
-          grounds?: boolean;
+          // What it rules out once overdue; all flying unless given.
+          grounding?: "all" | "ifr" | "none";
         }[] = [
           // Due within the month for the first aircraft.
           {
@@ -225,9 +226,10 @@ try {
             name: "Transponder and pitot-static",
             months: 24,
             lastDaysAgo: 400,
+            grounding: "ifr",
           },
           // 30 days to the day; due within the week.
-          { name: "VOR check", days: 30, lastDaysAgo: 25, grounds: false },
+          { name: "VOR check", days: 30, lastDaysAgo: 25, grounding: "ifr" },
         ];
         if (plane.tailNumber === "N172FC") {
           // 6 hours left on the tach.
@@ -245,7 +247,7 @@ try {
             hours: 5000,
             lastDaysAgo: 50,
             lastReading: tach - 5300,
-            grounds: false,
+            grounding: "none",
           });
         }
         for (const item of items) {
@@ -253,7 +255,7 @@ try {
             insert into maintenance_item (
               aircraft_id, name, interval_months, interval_days,
               interval_hours, meter_id, last_completed_on,
-              last_completed_reading, grounds_when_overdue
+              last_completed_reading, grounding, grounds_when_overdue
             )
             values (
               ${aircraftId}, ${item.name}, ${item.months ?? null},
@@ -262,7 +264,8 @@ try {
               ${item.hours === undefined ? null : meterIds.tach},
               ${isoDaysAgo(item.lastDaysAgo)},
               ${item.lastReading === undefined ? null : toHours(item.lastReading)},
-              ${item.grounds ?? true}
+              ${item.grounding ?? "all"},
+              ${(item.grounding ?? "all") !== "none"}
             )
           `;
         }
@@ -307,7 +310,7 @@ try {
           tail: "N281FC",
           description: "Left mag drop of 250 RPM on run-up, rough running.",
           category: "engine",
-          grounds: true,
+          grounding: "all",
           status: "open",
           daysAgo: 2,
         },
@@ -315,7 +318,7 @@ try {
           tail: "N172FC",
           description: "Left nav light intermittent.",
           category: "other",
-          grounds: false,
+          grounding: "none",
           status: "deferred",
           daysAgo: 20,
         },
@@ -323,9 +326,18 @@ try {
           tail: "N172FC",
           description: "Passenger door seal torn at the bottom corner.",
           category: "airframe",
-          grounds: false,
+          grounding: "none",
           status: "open",
           daysAgo: 6,
+        },
+        // Limits the 182 to VFR until it's fixed.
+        {
+          tail: "N182FC",
+          description: "Attitude indicator precesses in turns.",
+          category: "avionics",
+          grounding: "ifr",
+          status: "open",
+          daysAgo: 3,
         },
       ];
       for (const s of squawks) {
@@ -333,11 +345,12 @@ try {
         await tx`
           insert into squawk (
             aircraft_id, reported_by_id, reported_at, description, category,
-            grounds, status, created_at, updated_at
+            grounding, grounds, status, created_at, updated_at
           )
           values (
             ${aircraftIds[s.tail]}, ${pick(memberIds)}, ${at}, ${s.description},
-            ${s.category}, ${s.grounds}, ${s.status}, ${at}, ${at}
+            ${s.category}, ${s.grounding}, ${s.grounding !== "none"},
+            ${s.status}, ${at}, ${at}
           )
         `;
       }
@@ -347,12 +360,12 @@ try {
       const [resolved] = await tx`
         insert into squawk (
           aircraft_id, reported_by_id, reported_at, description, category,
-          grounds, status, resolved_by_id, resolved_at, resolution_note,
-          created_at, updated_at
+          grounding, grounds, status, resolved_by_id, resolved_at,
+          resolution_note, created_at, updated_at
         )
         values (
           ${aircraftIds["N182FC"]}, ${memberIds[2]}, ${reportedAt},
-          'Right main tire worn through to the cord.', 'airframe', true,
+          'Right main tire worn through to the cord.', 'airframe', 'all', true,
           'resolved', ${officerId}, ${resolvedAt},
           'Tire and tube replaced by the shop; returned to service.',
           ${reportedAt}, ${resolvedAt}

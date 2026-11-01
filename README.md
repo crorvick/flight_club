@@ -131,12 +131,12 @@ current reading. Readings are handled as integer hundredths of an hour
 A flight starts with a check-out (a `dispatch` in the code, so it isn't
 confused with a pilot's checkout in an aircraft, a qualification). The
 pilot confirms each meter against the panel and acknowledges every
-unresolved squawk. A grounded aircraft can't be checked out, and only
-one pilot can have an aircraft out at a time (a unique index makes
-sure). If a meter reads more than the app expects, someone flew without
-logging it: the meter moves to what the panel reads and the gap is
-listed for officers, on the home page, to account for and mark
-reviewed.
+unresolved squawk. A grounded aircraft can't be checked out; a VFR-only
+one can, once the pilot confirms they'll fly VFR. Only one pilot can
+have an aircraft out at a time (a unique index makes sure). If a meter
+reads more than the app expects, someone flew without logging it: the
+meter moves to what the panel reads and the gap is listed for officers,
+on the home page, to account for and mark reviewed.
 
 A checked-out aircraft is either cancelled, which records nothing, or
 checked in with the in readings, which records the flight:
@@ -155,9 +155,11 @@ Whether an aircraft is grounded, what maintenance is due, and whether a
 pilot's medical and flight review are in date are computed whenever
 they're shown (`src/lib/fleet.ts`,
 `src/lib/maintenance.ts`, `src/lib/qualifications.ts`), so they can't
-disagree with the records they come from. An aircraft is grounded while
-it has an open grounding squawk or an overdue maintenance item set to
-ground it. Only an officer can resolve a grounding squawk, with a note.
+disagree with the records they come from. Each open squawk, and each
+overdue maintenance item, grounds the aircraft for all flying, for IFR
+only, or not at all; the aircraft is grounded, VFR only, or airworthy
+by the most restrictive of them (`src/lib/grounding.ts`). Only an
+officer can resolve a grounding squawk, with a note.
 
 Checking out shows pre-flight warnings for all of it: grounded, due
 or overdue maintenance, an expired medical or flight review, no

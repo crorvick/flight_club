@@ -97,6 +97,7 @@ async function CheckOut({
           tailNumber={plane.tailNumber}
           meters={plane.meters}
           squawks={plane.squawks}
+          vfrOnly={plane.alerts.vfrOnly}
         />
       )}
     </>

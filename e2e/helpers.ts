@@ -133,8 +133,10 @@ export async function deleteAircraft(id: string) {
 
 export async function createSquawk(
   aircraftId: string,
-  squawk: { description: string; grounds: boolean },
+  squawk: { description: string; grounds: boolean | "ifr" },
 ) {
+  const grounding =
+    squawk.grounds === "ifr" ? "ifr" : squawk.grounds ? "all" : "none";
   const db = sql();
   // Any member will do; a seeded one rather than another test's, which
   // the clean-up might be about to remove.
@@ -142,8 +144,13 @@ export async function createSquawk(
     select id from member order by created_at limit 1
   `;
   const [{ id }] = await db`
-    insert into squawk (aircraft_id, reported_by_id, description, grounds)
-    values (${aircraftId}, ${reporterId}, ${squawk.description}, ${squawk.grounds})
+    insert into squawk (
+      aircraft_id, reported_by_id, description, grounding, grounds
+    )
+    values (
+      ${aircraftId}, ${reporterId}, ${squawk.description}, ${grounding},
+      ${grounding !== "none"}
+    )
     returning id
   `;
   return id as string;
@@ -159,7 +166,8 @@ export async function openCheckOut(page: Page, plane: Plane) {
 }
 
 // Check an aircraft out, entering any readings that differ from what the
-// app shows (by meter label) and acknowledging every open squawk.
+// app shows (by meter label), acknowledging every open squawk, and
+// agreeing to fly VFR if it's limited to that.
 export async function checkOut(
   page: Page,
   plane: Plane,
@@ -170,7 +178,7 @@ export async function checkOut(
     await page.getByLabel(`${label} reads`).fill(value);
   }
   for (const box of await page
-    .getByRole("checkbox", { name: /I've read this/ })
+    .getByRole("checkbox", { name: /I've read this|I'll fly VFR only/ })
     .all()) {
     await box.check();
   }

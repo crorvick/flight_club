@@ -6,6 +6,7 @@ import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { FormState } from "@/lib/form-state";
+import type { Grounding } from "@/lib/grounding";
 import { formatHours, parseHours } from "@/lib/hours";
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
@@ -27,7 +28,7 @@ export type ItemValues = {
   meterId: string | null;
   lastCompletedOn: string | null;
   lastCompletedReading: string | null;
-  groundsWhenOverdue: boolean;
+  grounding: Grounding;
 };
 
 export function ItemForm({
@@ -177,26 +178,37 @@ export function ItemForm({
         </div>
       </fieldset>
 
-      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2">
-        <input
-          type="checkbox"
-          name="groundsWhenOverdue"
-          defaultChecked={
-            values
-              ? values.groundsWhenOverdue === "on"
-              : (item?.groundsWhenOverdue ?? true)
-          }
-          className="size-5 accent-primary"
-        />
-        <span>
-          <span className="block font-medium">
-            Grounds the aircraft when overdue
-          </span>
-          <span className="block text-sm text-muted-foreground">
-            Otherwise it&apos;s only a warning before flight.
-          </span>
-        </span>
-      </label>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 font-medium">When it&apos;s overdue</legend>
+        {(
+          [
+            ["all", "Ground the aircraft", "e.g. annual, 100-hour"],
+            ["ifr", "Ground it for IFR only", "e.g. VOR check, pitot-static"],
+            ["none", "Only warn", "e.g. oil change"],
+          ] as const
+        ).map(([value, label, example]) => (
+          <label
+            key={value}
+            className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2"
+          >
+            <input
+              type="radio"
+              name="grounding"
+              value={value}
+              defaultChecked={
+                (values?.grounding ?? item?.grounding ?? "all") === value
+              }
+              className="size-5 accent-primary"
+            />
+            <span>
+              <span className="block font-medium">{label}</span>
+              <span className="block text-sm text-muted-foreground">
+                {example}
+              </span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
 
       <Button type="submit" className="h-11 text-base" disabled={pending}>
         {pending ? "Saving…" : submitLabel}

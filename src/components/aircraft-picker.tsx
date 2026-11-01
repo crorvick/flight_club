@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import type { AircraftCard } from "@/lib/fleet";
 
+import { AircraftStatusLabel } from "./aircraft-status";
+
 // Big cards rather than a dropdown: one tap, and the status is visible
 // before choosing.  Each is a link, so the choice lives in the URL and the
 // page renders that aircraft's meters on the server.
@@ -38,22 +40,16 @@ export function AircraftPicker({
                 <span className="text-lg font-semibold">
                   {plane.tailNumber}
                 </span>
-                <span
-                  className={cn(
-                    "text-sm",
-                    plane.grounded
-                      ? "font-medium text-destructive"
-                      : plane.checkedOutTo
-                        ? "font-medium text-amber-700 dark:text-amber-400"
-                        : "text-muted-foreground",
-                  )}
-                >
-                  {plane.grounded
-                    ? "Grounded"
-                    : plane.checkedOutTo
-                      ? `Out: ${plane.checkedOutTo}`
-                      : "Airworthy"}
-                </span>
+                {plane.checkedOutTo && plane.status !== "grounded" ? (
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Out: {plane.checkedOutTo}
+                  </span>
+                ) : (
+                  <AircraftStatusLabel
+                    status={plane.status}
+                    className="text-sm"
+                  />
+                )}
               </Link>
             </li>
           );

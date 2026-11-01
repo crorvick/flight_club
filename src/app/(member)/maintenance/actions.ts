@@ -15,6 +15,7 @@ import {
 import { changedFields } from "@/lib/audit-diff";
 import { type FormState, formValues } from "@/lib/form-state";
 import { parseHours, toHours } from "@/lib/hours";
+import { GROUNDING_LEVELS } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 
@@ -27,7 +28,7 @@ const ITEM_FIELDS = [
   "meterId",
   "lastCompletedOn",
   "lastCompletedReading",
-  "groundsWhenOverdue",
+  "grounding",
 ];
 
 const isoDate = z.iso.date("Enter a date.");
@@ -74,7 +75,10 @@ const itemSchema = z
     meterId: z.string().transform((id) => (id ? id : null)),
     lastCompletedOn: isoDate,
     lastCompletedReading: optionalHours("Enter a reading like 1234.5."),
-    groundsWhenOverdue: z.boolean(),
+    grounding: z.enum(
+      GROUNDING_LEVELS,
+      "Choose what happens when it's overdue.",
+    ),
   })
   .superRefine((item, ctx) => {
     if (item.calendarInterval === null && item.intervalHours === null) {
@@ -104,6 +108,8 @@ const itemSchema = z
   .transform(
     ({ calendarInterval, calendarUnit, calendarDeadline, ...item }) => ({
       ...item,
+      // For the previous release, during a deploy (lib/grounding.ts).
+      groundsWhenOverdue: item.grounding !== "none",
       intervalMonths: calendarUnit === "months" ? calendarInterval : null,
       intervalDays: calendarUnit === "days" ? calendarInterval : null,
       dueEndOfMonth:
@@ -126,7 +132,7 @@ function parseItem(formData: FormData) {
     meterId: formData.get("meterId") ?? "",
     lastCompletedOn: formData.get("lastCompletedOn") ?? "",
     lastCompletedReading: formData.get("lastCompletedReading") ?? "",
-    groundsWhenOverdue: formData.get("groundsWhenOverdue") === "on",
+    grounding: formData.get("grounding") ?? "all",
   });
 }
 
