@@ -4,6 +4,7 @@ import {
   closeSql,
   createAircraft,
   deleteAircraft,
+  logFlight,
   signUpPilot,
 } from "./helpers";
 
@@ -73,7 +74,7 @@ test("an overdue item that grounds grounds the aircraft until it's done", async 
     page.getByText("Overdue: the aircraft is grounded"),
   ).toBeVisible();
 
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
   await expect(
     page.getByText(`${aircraft.tailNumber} is grounded`),
   ).toBeVisible();
@@ -113,21 +114,16 @@ test("an hours item that only warns is flagged but doesn't ground", async ({
   // 5 hours left on the tach.
   await expect(page.getByText("Due soon")).toBeVisible();
 
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
   await expect(page.getByText("Maintenance due soon")).toBeVisible();
   await expect(
     page.getByText("Oil change: due at 405.0 on the tach (5.0 hours left)"),
   ).toBeVisible();
 
   // Fly past it.
-  await page.getByLabel("Hobbs in").fill("507.0");
-  await page.getByLabel("Tach in").fill("406.0");
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
-  await expect(page.getByText("Flight logged.")).toBeVisible();
+  await logFlight(page, aircraft, { Hobbs: "507.0", Tach: "406.0" });
 
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
   await expect(
     page.getByText("Oil change: 1.0 hours overdue on the tach"),
   ).toBeVisible();

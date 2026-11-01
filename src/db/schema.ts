@@ -18,6 +18,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -312,6 +313,92 @@ export const squawkPhoto = pgTable(
   (table) => [index("squawk_photo_squawk_idx").on(table.squawkId)],
 );
 
+export const dispatchStatus = pgEnum("dispatch_status", [
+  "out",
+  "cancelled",
+  "in",
+]);
+
+// A pilot taking an aircraft out: checked out before the flight, then
+// either cancelled (no flight) or checked in, which records the flight.
+// Called a dispatch in the code so it isn't confused with a pilot's
+// checkout in an aircraft (aircraft_checkout), a qualification.
+export const dispatch = pgTable(
+  "dispatch",
+  {
+    id: id(),
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id),
+    pilotId: uuid("pilot_id")
+      .notNull()
+      .references(() => member.id),
+    status: dispatchStatus("status").default("out").notNull(),
+    checkedOutAt: timestamptz("checked_out_at").defaultNow().notNull(),
+    // Set when it's cancelled or checked in, by whoever did it.
+    closedAt: timestamptz("closed_at"),
+    closedById: uuid("closed_by_id").references(() => member.id),
+    flightId: uuid("flight_id")
+      .unique()
+      .references(() => flight.id),
+    // A meter didn't read what the app expected at check-out; an officer
+    // marks it reviewed once the missing time is accounted for.
+    gapReviewedAt: timestamptz("gap_reviewed_at"),
+    gapReviewedById: uuid("gap_reviewed_by_id").references(() => member.id),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    // One pilot per aircraft, and one aircraft per pilot, at a time.
+    uniqueIndex("dispatch_one_out_per_aircraft")
+      .on(table.aircraftId)
+      .where(sql`${table.status} = 'out'`),
+    uniqueIndex("dispatch_one_out_per_pilot")
+      .on(table.pilotId)
+      .where(sql`${table.status} = 'out'`),
+    // Closed exactly when it's no longer out, and checked in exactly
+    // when it has a flight.
+    check(
+      "dispatch_closed_complete",
+      sql`(${table.status} = 'out') = (${table.closedAt} is null)
+        and (${table.status} = 'in') = (${table.flightId} is not null)`,
+    ),
+  ],
+);
+
+// The readings the pilot confirmed at check-out, and what the app
+// expected them to be.  A difference is time flown without being logged.
+export const dispatchMeterReading = pgTable(
+  "dispatch_meter_reading",
+  {
+    dispatchId: uuid("dispatch_id")
+      .notNull()
+      .references(() => dispatch.id, { onDelete: "cascade" }),
+    meterId: uuid("meter_id")
+      .notNull()
+      .references(() => meter.id),
+    expected: hours("expected").notNull(),
+    out: hours("out").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.dispatchId, table.meterId] }),
+    check("dispatch_meter_reading_nonnegative", sql`${table.out} >= 0`),
+  ],
+);
+
+// Which unresolved squawks the pilot acknowledged before going.
+export const dispatchSquawkAck = pgTable(
+  "dispatch_squawk_ack",
+  {
+    dispatchId: uuid("dispatch_id")
+      .notNull()
+      .references(() => dispatch.id, { onDelete: "cascade" }),
+    squawkId: uuid("squawk_id")
+      .notNull()
+      .references(() => squawk.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.dispatchId, table.squawkId] })],
+);
+
 export const medicalClass = pgEnum("medical_class", MEDICAL_CLASSES);
 
 // A pilot's medical and flight review, one row per member.  The medical's
@@ -569,6 +656,49 @@ export const maintenanceCompletionRelations = relations(
     recordedBy: one(member, {
       fields: [maintenanceCompletion.recordedById],
       references: [member.id],
+    }),
+  }),
+);
+
+export const dispatchRelations = relations(dispatch, ({ one, many }) => ({
+  aircraft: one(aircraft, {
+    fields: [dispatch.aircraftId],
+    references: [aircraft.id],
+  }),
+  pilot: one(member, {
+    fields: [dispatch.pilotId],
+    references: [member.id],
+    relationName: "dispatch_pilot",
+  }),
+  flight: one(flight, { fields: [dispatch.flightId], references: [flight.id] }),
+  readings: many(dispatchMeterReading),
+  acks: many(dispatchSquawkAck),
+}));
+
+export const dispatchMeterReadingRelations = relations(
+  dispatchMeterReading,
+  ({ one }) => ({
+    dispatch: one(dispatch, {
+      fields: [dispatchMeterReading.dispatchId],
+      references: [dispatch.id],
+    }),
+    meter: one(meter, {
+      fields: [dispatchMeterReading.meterId],
+      references: [meter.id],
+    }),
+  }),
+);
+
+export const dispatchSquawkAckRelations = relations(
+  dispatchSquawkAck,
+  ({ one }) => ({
+    dispatch: one(dispatch, {
+      fields: [dispatchSquawkAck.dispatchId],
+      references: [dispatch.id],
+    }),
+    squawk: one(squawk, {
+      fields: [dispatchSquawkAck.squawkId],
+      references: [squawk.id],
     }),
   }),
 );

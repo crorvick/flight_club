@@ -3,7 +3,13 @@ import "server-only";
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { aircraft, maintenanceItem, squawk } from "@/db/schema";
+import {
+  aircraft,
+  dispatch,
+  maintenanceItem,
+  member,
+  squawk,
+} from "@/db/schema";
 import { maintenanceStatus, type MaintenanceStatus } from "@/lib/maintenance";
 
 async function groundingSquawks(aircraftIds: string[]) {
@@ -96,11 +102,43 @@ export async function aircraftAlerts(
   return alerts;
 }
 
+export type ActiveDispatch = {
+  id: string;
+  pilotId: string;
+  pilotName: string;
+  checkedOutAt: Date;
+};
+
+// Who has each aircraft checked out right now, if anyone.
+export async function activeDispatches(
+  aircraftIds: string[],
+): Promise<Map<string, ActiveDispatch>> {
+  if (aircraftIds.length === 0) return new Map();
+  const rows = await db()
+    .select({
+      id: dispatch.id,
+      aircraftId: dispatch.aircraftId,
+      pilotId: dispatch.pilotId,
+      pilotName: member.name,
+      checkedOutAt: dispatch.checkedOutAt,
+    })
+    .from(dispatch)
+    .innerJoin(member, eq(member.id, dispatch.pilotId))
+    .where(
+      and(
+        inArray(dispatch.aircraftId, aircraftIds),
+        eq(dispatch.status, "out"),
+      ),
+    );
+  return new Map(rows.map(({ aircraftId, ...d }) => [aircraftId, d]));
+}
+
 export type AircraftCard = {
   id: string;
   tailNumber: string;
   makeModel: string;
   grounded: boolean;
+  checkedOutTo?: string;
 };
 
 export async function listActiveAircraft(): Promise<AircraftCard[]> {
@@ -113,8 +151,16 @@ export async function listActiveAircraft(): Promise<AircraftCard[]> {
     .from(aircraft)
     .where(eq(aircraft.active, true))
     .orderBy(asc(aircraft.tailNumber));
-  const alerts = await aircraftAlerts(rows.map((r) => r.id));
-  return rows.map((r) => ({ ...r, grounded: alerts.get(r.id)!.grounded }));
+  const ids = rows.map((r) => r.id);
+  const [alerts, out] = await Promise.all([
+    aircraftAlerts(ids),
+    activeDispatches(ids),
+  ]);
+  return rows.map((r) => ({
+    ...r,
+    grounded: alerts.get(r.id)!.grounded,
+    checkedOutTo: out.get(r.id)?.pilotName,
+  }));
 }
 
 // Every active aircraft with its unresolved squawks and maintenance coming
@@ -138,10 +184,19 @@ export async function fleetStatus() {
       },
     },
   });
-  const alerts = await aircraftAlerts(planes.map((p) => p.id));
+  const ids = planes.map((p) => p.id);
+  const [alerts, out] = await Promise.all([
+    aircraftAlerts(ids),
+    activeDispatches(ids),
+  ]);
   return planes.map((plane) => {
     const { grounded, maintenance } = alerts.get(plane.id)!;
-    return { ...plane, grounded, maintenance };
+    return {
+      ...plane,
+      grounded,
+      maintenance,
+      checkedOutTo: out.get(plane.id)?.pilotName,
+    };
   });
 }
 

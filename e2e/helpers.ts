@@ -108,6 +108,12 @@ export async function deleteAircraft(id: string) {
   await db.begin(async (tx) => {
     await tx`
       delete from audit_log where entity_id in (
+        select id from dispatch where aircraft_id = ${id}
+      )
+    `;
+    await tx`delete from dispatch where aircraft_id = ${id}`;
+    await tx`
+      delete from audit_log where entity_id in (
         select id from flight where aircraft_id = ${id}
       )
     `;
@@ -141,4 +147,63 @@ export async function createSquawk(
     returning id
   `;
   return id as string;
+}
+
+type Plane = { id: string; tailNumber: string };
+
+export async function openCheckOut(page: Page, plane: Plane) {
+  await page.goto(`/check-out?aircraft=${plane.id}`);
+  await expect(
+    page.getByRole("button", { name: `Check out ${plane.tailNumber}` }),
+  ).toBeVisible();
+}
+
+// Check an aircraft out, entering any readings that differ from what the
+// app shows (by meter label) and acknowledging every open squawk.
+export async function checkOut(
+  page: Page,
+  plane: Plane,
+  readings: Record<string, string> = {},
+) {
+  await openCheckOut(page, plane);
+  for (const [label, value] of Object.entries(readings)) {
+    await page.getByLabel(`${label} reads`).fill(value);
+  }
+  for (const box of await page
+    .getByRole("checkbox", { name: /I've read this/ })
+    .all()) {
+    await box.check();
+  }
+  await page
+    .getByRole("button", { name: `Check out ${plane.tailNumber}` })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: `You have ${plane.tailNumber}` }),
+  ).toBeVisible();
+}
+
+// On the check-in page: fill the in readings (by meter label) and submit.
+export async function checkIn(
+  page: Page,
+  plane: Plane,
+  ins: Record<string, string>,
+) {
+  for (const [label, value] of Object.entries(ins)) {
+    await page.getByLabel(`${label} in`).fill(value);
+  }
+  await page
+    .getByRole("button", { name: `Check in ${plane.tailNumber}` })
+    .click();
+}
+
+// A whole flight: check out, check in, and return the flight's page.
+export async function logFlight(
+  page: Page,
+  plane: Plane,
+  ins: Record<string, string>,
+) {
+  await checkOut(page, plane);
+  await checkIn(page, plane, ins);
+  await expect(page.getByText("Flight logged.")).toBeVisible();
+  return page.url().split("?")[0];
 }

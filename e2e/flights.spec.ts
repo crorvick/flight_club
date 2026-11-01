@@ -1,9 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  checkIn,
+  checkOut,
   closeSql,
   createAircraft,
+  createSquawk,
   deleteAircraft,
+  logFlight,
+  openCheckOut,
   signUpPilot,
   sql,
 } from "./helpers";
@@ -27,67 +32,196 @@ test.afterAll(async () => {
   await closeSql();
 });
 
-async function openLogForm(page: Page) {
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await expect(
-    page.getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` }),
-  ).toBeVisible();
-}
+const checkInButton = (page: Page) =>
+  page.getByRole("button", { name: `Check in ${aircraft.tailNumber}` });
 
-async function logFlight(page: Page, hobbs: string, tach: string) {
-  await openLogForm(page);
-  await page.getByLabel("Hobbs in").fill(hobbs);
-  await page.getByLabel("Tach in").fill(tach);
+test("checks out from the current readings and checks in a flight", async ({
+  page,
+}) => {
+  await openCheckOut(page, aircraft);
+  await expect(page.getByLabel("Hobbs reads")).toHaveValue("100.0");
+  await expect(page.getByLabel("Tach reads")).toHaveValue("80.0");
+  await checkOut(page, aircraft);
+
+  // Home now offers to check it back in.
+  await page.goto("/");
   await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
+    .getByRole("link", { name: `Check in ${aircraft.tailNumber}` })
     .click();
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-}
 
-test("logs a flight from the pre-filled out readings", async ({ page }) => {
-  await openLogForm(page);
   await expect(page.getByText("out 100.0")).toBeVisible();
-  await expect(page.getByText("out 80.0")).toBeVisible();
-
   await page.getByLabel("Hobbs in").fill("101.5");
   await expect(page.getByText("1.5 hours")).toBeVisible();
   await page.getByLabel("Tach in").fill("81.2");
-  await expect(page.getByText("1.2 hours")).toBeVisible();
-
-  await expect(page.getByLabel("Day landings", { exact: true })).toHaveValue(
-    "1",
-  );
   await page.getByRole("button", { name: "More day landings" }).click();
   await expect(page.getByLabel("Day landings", { exact: true })).toHaveValue(
     "2",
   );
+  await checkInButton(page).click();
 
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
   await expect(page.getByText("Flight logged.")).toBeVisible();
   await expect(page.getByText("1.5 hours (hobbs)")).toBeVisible();
   await expect(page.getByText("2 day, 0 night")).toBeVisible();
 
-  // The next flight starts where this one ended.
-  await openLogForm(page);
-  await expect(page.getByText("out 101.5")).toBeVisible();
-  await expect(page.getByText("out 81.2")).toBeVisible();
+  // The next check-out starts where this flight ended.
+  await openCheckOut(page, aircraft);
+  await expect(page.getByLabel("Hobbs reads")).toHaveValue("101.5");
+  await expect(page.getByLabel("Tach reads")).toHaveValue("81.2");
 });
 
-test("rejects an in reading below out and keeps what was typed", async ({
+test("cancelling records no flight and frees the aircraft", async ({
   page,
 }) => {
-  await openLogForm(page);
+  await checkOut(page, aircraft);
+  await page.getByRole("button", { name: "Cancel: didn't fly" }).click();
+  await expect(
+    page.getByText("Cancelled. No flight was recorded."),
+  ).toBeVisible();
+
+  const [{ flights }] = await sql()`
+    select count(*)::int as flights from flight where aircraft_id = ${aircraft.id}
+  `;
+  expect(flights).toBe(0);
+  await expect(
+    page.getByRole("button", { name: `Check out ${aircraft.tailNumber}` }),
+  ).toBeVisible();
+});
+
+test("a meter reading more than logged is accepted and flagged", async ({
+  page,
+  browser,
+}, testInfo) => {
+  await openCheckOut(page, aircraft);
+  await page.getByLabel("Hobbs reads").fill("99.0");
+  await expect(
+    page.getByText("Can't be less than the last logged reading, 100.0."),
+  ).toBeVisible();
+
+  await page.getByLabel("Hobbs reads").fill("101.2");
+  await expect(
+    page.getByText("1.2 hours more than last logged (100.0)."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText("Unlogged time found at check-out"),
+  ).toBeVisible();
+  // The flight starts from what the panel read.
+  await expect(page.getByText("out 101.2")).toBeVisible();
+
+  // An officer sees it to account for.
+  const context = await browser.newContext();
+  const officer = await context.newPage();
+  await signUpPilot(officer, testInfo, ["officer"]);
+  await officer.goto("/");
+  await officer
+    .getByRole("link", { name: new RegExp(aircraft.tailNumber) })
+    .click();
+  await officer.getByRole("button", { name: "Mark reviewed" }).click();
+  await expect(officer.getByText("Reviewed by an officer.")).toBeVisible();
+  await officer.goto("/");
+  await expect(
+    officer.getByRole("link", { name: new RegExp(aircraft.tailNumber) }),
+  ).toHaveCount(0);
+  await context.close();
+});
+
+test("every open squawk must be acknowledged", async ({ page }) => {
+  await createSquawk(aircraft.id, {
+    description: "Left fuel gauge reads low.",
+    grounds: false,
+  });
+  await openCheckOut(page, aircraft);
+  await expect(page.getByText("Left fuel gauge reads low.")).toBeVisible();
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText("Read and acknowledge every open squawk"),
+  ).toBeVisible();
+
+  // One reported while the pilot is on the page must be read too.
+  await page.getByRole("checkbox", { name: /Left fuel gauge/ }).check();
+  await createSquawk(aircraft.id, {
+    description: "Door seal torn.",
+    grounds: false,
+  });
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText("Read and acknowledge every open squawk"),
+  ).toBeVisible();
+
+  await checkOut(page, aircraft);
+  await expect(page.getByText("Squawks acknowledged")).toBeVisible();
+  await expect(
+    page.getByText("Door seal torn.", { exact: true }),
+  ).toBeVisible();
+});
+
+test("a grounded aircraft can't be checked out", async ({ page }) => {
+  await createSquawk(aircraft.id, {
+    description: "Flat nose tire.",
+    grounds: true,
+  });
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
+  await expect(
+    page.getByText(`${aircraft.tailNumber} is grounded`),
+  ).toBeVisible();
+  await expect(page.getByText("Flat nose tire.")).toBeVisible();
+  await expect(
+    page.getByText(/can't be checked out until an officer/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: `Check out ${aircraft.tailNumber}` }),
+  ).toHaveCount(0);
+});
+
+test("only one pilot can have an aircraft out", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext();
+  const other = await context.newPage();
+  const otherPilot = await signUpPilot(other, testInfo);
+
+  // Both open the form; the first to submit gets it.
+  await openCheckOut(page, aircraft);
+  await openCheckOut(other, aircraft);
+  await other
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    other.getByRole("heading", { name: `You have ${aircraft.tailNumber}` }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText(`Someone else just checked out ${aircraft.tailNumber}.`),
+  ).toBeVisible();
+
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
+  await expect(
+    page.getByText(
+      `${aircraft.tailNumber} is checked out to ${otherPilot.name}.`,
+    ),
+  ).toBeVisible();
+  await context.close();
+});
+
+test("check-in rejects an in reading below out and keeps what was typed", async ({
+  page,
+}) => {
+  await checkOut(page, aircraft);
   await page.getByLabel("Hobbs in").fill("99.0");
   await page.getByLabel("Tach in").fill("81.0");
   await expect(
     page.getByText("Must be more than the out reading."),
   ).toBeVisible();
-
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
+  await checkInButton(page).click();
   await expect(
     page.getByText("Must be more than the out reading."),
   ).toBeVisible();
@@ -95,56 +229,24 @@ test("rejects an in reading below out and keeps what was typed", async ({
   await expect(page.getByLabel("Tach in")).toHaveValue("81.0");
 });
 
-test("warns about a long flight but still logs it", async ({ page }) => {
-  await openLogForm(page);
+test("check-in warns about a long flight but still records it", async ({
+  page,
+}) => {
+  await checkOut(page, aircraft);
   // A dropped decimal point: 1015 instead of 101.5.
   await page.getByLabel("Hobbs in").fill("1015");
   await expect(page.getByText("Did you mean to log that much?")).toBeVisible();
-  await page.getByLabel("Tach in").fill("81.0");
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
+  await checkIn(page, aircraft, { Tach: "81.0" });
   await expect(page.getByText("Flight logged.")).toBeVisible();
 });
 
-test("rejects a form whose out readings someone else just used", async ({
+test("a flight is editable until the next one is checked in", async ({
   page,
-  context,
 }) => {
-  const other = await context.newPage();
-  await openLogForm(page);
-  await openLogForm(other);
-
-  await page.getByLabel("Hobbs in").fill("101.5");
-  await page.getByLabel("Tach in").fill("81.2");
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-
-  // The second form still shows the old out readings.
-  await other.getByLabel("Hobbs in").fill("102.0");
-  await other.getByLabel("Tach in").fill("81.6");
-  await other
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
-  await expect(
-    other.getByText("This aircraft was just updated."),
-  ).toBeVisible();
-  await expect(other.getByText("out 101.5")).toBeVisible();
-  await expect(other.getByLabel("Hobbs in")).toHaveValue("102.0");
-
-  // Submitting again against the new readings works.
-  await other
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
-  await expect(other.getByText("Flight logged.")).toBeVisible();
-  await expect(other.getByText("0.5 hours (hobbs)")).toBeVisible();
-});
-
-test("a flight is editable until the next one is logged", async ({ page }) => {
-  await logFlight(page, "101.5", "81.2");
-  const firstFlight = page.url().split("?")[0];
+  const first = await logFlight(page, aircraft, {
+    Hobbs: "101.5",
+    Tach: "81.2",
+  });
 
   await page.getByRole("link", { name: "Edit flight" }).click();
   await expect(page.getByLabel("Hobbs in")).toHaveValue("101.5");
@@ -153,33 +255,14 @@ test("a flight is editable until the next one is logged", async ({ page }) => {
   await expect(page.getByText("Flight updated.")).toBeVisible();
   await expect(page.getByText("1.8 hours (hobbs)")).toBeVisible();
 
-  // The edit moved the meter, so the next flight starts from it.
-  await logFlight(page, "102.5", "81.8");
+  // The edit moved the meter, so the next check-out starts from it.
+  await openCheckOut(page, aircraft);
+  await expect(page.getByLabel("Hobbs reads")).toHaveValue("101.8");
+  await logFlight(page, aircraft, { Hobbs: "102.5", Tach: "81.8" });
 
-  await page.goto(firstFlight);
+  await page.goto(first);
   await expect(page.getByText("Locked:")).toBeVisible();
   await expect(page.getByRole("link", { name: "Edit flight" })).toHaveCount(0);
-
-  await page.goto(`${firstFlight}/edit`);
+  await page.goto(`${first}/edit`);
   await expect(page.getByText("This flight was locked")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(
-    0,
-  );
-});
-
-test("warns before logging a grounded aircraft", async ({ page }) => {
-  const [{ id: pilotId }] = await sql()`select id from member limit 1`;
-  await sql()`
-    insert into squawk (aircraft_id, reported_by_id, description, grounds)
-    values (${aircraft.id}, ${pilotId}, 'Flat nose tire.', true)
-  `;
-
-  await openLogForm(page);
-  await expect(
-    page.getByText(`${aircraft.tailNumber} is grounded`),
-  ).toBeVisible();
-  await expect(page.getByText("Flat nose tire.")).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: new RegExp(aircraft.tailNumber) }),
-  ).toContainText("Grounded");
 });

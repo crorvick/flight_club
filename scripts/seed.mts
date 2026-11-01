@@ -183,7 +183,7 @@ try {
             `;
           }
 
-          // Logging a flight locks the one before it.
+          // Checking in a flight locks the one before it.
           if (previous) {
             await tx`
               update flight set locked_at = ${createdAt}

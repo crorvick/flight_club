@@ -36,7 +36,7 @@ test("an officer approves a new member as a pilot", async ({
 
   await theirPage.reload();
   await expect(
-    theirPage.getByRole("link", { name: "Log a flight" }),
+    theirPage.getByRole("link", { name: "Check out an aircraft" }),
   ).toBeVisible();
   await theirs.close();
 
@@ -85,7 +85,7 @@ test("an officer changes a member's roles and deactivates them", async ({
       return row.active;
     })
     .toBe(false);
-  await theirPage.goto("/flights/new");
+  await theirPage.goto("/check-out");
   await expect(theirPage.getByRole("status")).toContainText(
     "Your account has been deactivated.",
   );

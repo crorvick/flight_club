@@ -250,7 +250,7 @@ export async function updateAircraft(
 
 // Rename a meter or correct its reading.  A correction moves where the
 // next flight's out reading starts, so it needs a reason, and it locks
-// the meter like logging a flight does: a pilot mid-way through logging
+// the meter like checking out and in do: a pilot part-way through either
 // on this aircraft is told it changed rather than billed from the old
 // reading.
 export async function updateMeter(

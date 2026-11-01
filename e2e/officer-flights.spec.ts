@@ -4,6 +4,8 @@ import {
   closeSql,
   createAircraft,
   deleteAircraft,
+  logFlight,
+  openCheckOut,
   signUpPilot,
   sql,
 } from "./helpers";
@@ -26,16 +28,8 @@ test.afterAll(async () => {
   await closeSql();
 });
 
-async function logFlight(page: Page, hobbs: string, tach: string) {
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await page.getByLabel("Hobbs in").fill(hobbs);
-  await page.getByLabel("Tach in").fill(tach);
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-  return page.url().split("?")[0];
-}
+const fly = (page: Page, hobbs: string, tach: string) =>
+  logFlight(page, aircraft, { Hobbs: hobbs, Tach: tach });
 
 async function officerPage(
   browser: Browser,
@@ -52,8 +46,8 @@ test("an officer corrects a locked flight, with a reason, audited", async ({
   browser,
 }, testInfo) => {
   await signUpPilot(page, testInfo);
-  const first = await logFlight(page, "101.5", "81.2");
-  await logFlight(page, "102.5", "82.0");
+  const first = await fly(page, "101.5", "81.2");
+  await fly(page, "102.5", "82.0");
 
   const officer = await officerPage(browser, testInfo);
   await officer.page.goto(first);
@@ -95,8 +89,8 @@ test("an officer corrects a locked flight, with a reason, audited", async ({
 
   // A locked flight isn't the latest, so the meters stay where the last
   // flight left them.
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await expect(page.getByText("out 102.5")).toBeVisible();
+  await openCheckOut(page, aircraft);
+  await expect(page.getByLabel("Hobbs reads")).toHaveValue("102.5");
   await officer.close();
 });
 
@@ -105,7 +99,7 @@ test("correcting the latest flight moves the meters", async ({
   browser,
 }, testInfo) => {
   await signUpPilot(page, testInfo);
-  const flight = await logFlight(page, "101.5", "81.2");
+  const flight = await fly(page, "101.5", "81.2");
 
   const officer = await officerPage(browser, testInfo);
   await officer.page.goto(`${flight}/edit`);
@@ -116,8 +110,8 @@ test("correcting the latest flight moves the meters", async ({
   await officer.page.getByRole("button", { name: "Save correction" }).click();
   await expect(officer.page.getByText("Flight corrected.")).toBeVisible();
 
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await expect(page.getByText("out 81.4")).toBeVisible();
+  await openCheckOut(page, aircraft);
+  await expect(page.getByLabel("Tach reads")).toHaveValue("81.4");
   await officer.close();
 });
 
@@ -126,7 +120,7 @@ test("an officer can reassign a flight to another pilot", async ({
   browser,
 }, testInfo) => {
   const pilot = await signUpPilot(page, testInfo);
-  const flight = await logFlight(page, "101.5", "81.2");
+  const flight = await fly(page, "101.5", "81.2");
 
   const officer = await officerPage(browser, testInfo);
   const other = await browser.newContext();
@@ -150,7 +144,7 @@ test("pilots can't correct each other's flights", async ({
   browser,
 }, testInfo) => {
   await signUpPilot(page, testInfo);
-  const flight = await logFlight(page, "101.5", "81.2");
+  const flight = await fly(page, "101.5", "81.2");
 
   const other = await browser.newContext();
   const otherPage = await other.newPage();

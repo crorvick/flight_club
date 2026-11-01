@@ -155,7 +155,7 @@ export function ItemForm({
   );
 }
 
-// Today in the officer's own time zone, as on the flight log.
+// Today in the officer's own time zone, as on the flight form.
 function localToday() {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");

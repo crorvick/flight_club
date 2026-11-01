@@ -78,7 +78,6 @@ async function EditFlight({
           out: r.out,
           billing: r.kind === flight.billingMeterKind,
         }))}
-        sendOuts={false}
         initial={{
           date: flight.date,
           dayLandings: flight.dayLandings,

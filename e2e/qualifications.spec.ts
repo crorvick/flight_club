@@ -1,9 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  checkIn,
+  checkOut,
   closeSql,
   createAircraft,
   deleteAircraft,
+  openCheckOut,
   signUpPilot,
   sql,
 } from "./helpers";
@@ -35,12 +38,7 @@ function isoFromToday(days: number) {
 const warnings = (page: Page) =>
   page.locator("div", { hasText: /^Before you fly/ });
 
-async function openLog(page: Page) {
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await expect(
-    page.getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` }),
-  ).toBeVisible();
-}
+const openLog = (page: Page) => openCheckOut(page, aircraft);
 
 test("a new pilot is told what's missing, and keeps it up to date", async ({
   page,
@@ -125,14 +123,10 @@ test("logged landings count toward passenger currency", async ({
   page,
 }, testInfo) => {
   await signUpPilot(page, testInfo);
-  await openLog(page);
-  await page.getByLabel("Hobbs in").fill("101.5");
-  await page.getByLabel("Tach in").fill("81.2");
+  await checkOut(page, aircraft);
   await page.getByRole("button", { name: "More day landings" }).click();
   await page.getByRole("button", { name: "More day landings" }).click();
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
+  await checkIn(page, aircraft, { Hobbs: "101.5", Tach: "81.2" });
   await expect(page.getByText("Flight logged.")).toBeVisible();
 
   await openLog(page);

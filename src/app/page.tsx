@@ -1,11 +1,16 @@
 import { cn } from "cn";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Suspense } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
-import { member as memberTable } from "@/db/schema";
+import {
+  aircraft,
+  dispatch,
+  dispatchMeterReading,
+  member as memberTable,
+} from "@/db/schema";
 import { hasRole } from "@/lib/access";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
@@ -68,12 +73,7 @@ async function MemberStatus() {
           {hasRole(member, "pilot") && (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Link
-                  href="/flights/new"
-                  className={cn(buttonVariants(), "h-12 text-base")}
-                >
-                  Log a flight
-                </Link>
+                <FlyButton member={member} />
                 <Link
                   href="/squawks/new"
                   className={cn(
@@ -156,6 +156,74 @@ async function RecentFlights({ member }: { member: Member }) {
   );
 }
 
+// Check in the aircraft the pilot has out, or check one out.
+async function FlyButton({ member }: { member: Member }) {
+  const [out] = await db()
+    .select({ id: dispatch.id, tailNumber: aircraft.tailNumber })
+    .from(dispatch)
+    .innerJoin(aircraft, eq(aircraft.id, dispatch.aircraftId))
+    .where(and(eq(dispatch.pilotId, member.id), eq(dispatch.status, "out")));
+  return out ? (
+    <Link
+      href={`/dispatches/${out.id}`}
+      className={cn(buttonVariants(), "h-12 text-base")}
+    >
+      Check in {out.tailNumber}
+    </Link>
+  ) : (
+    <Link href="/check-out" className={cn(buttonVariants(), "h-12 text-base")}>
+      Check out an aircraft
+    </Link>
+  );
+}
+
+// Dispatches whose meters read more than the app expected, not yet
+// accounted for by an officer.
+async function GapsToReview() {
+  const gaps = await db()
+    .selectDistinct({
+      id: dispatch.id,
+      tailNumber: aircraft.tailNumber,
+      pilot: memberTable.name,
+      at: dispatch.checkedOutAt,
+    })
+    .from(dispatch)
+    .innerJoin(
+      dispatchMeterReading,
+      eq(dispatchMeterReading.dispatchId, dispatch.id),
+    )
+    .innerJoin(aircraft, eq(aircraft.id, dispatch.aircraftId))
+    .innerJoin(memberTable, eq(memberTable.id, dispatch.pilotId))
+    .where(
+      and(
+        isNull(dispatch.gapReviewedAt),
+        ne(dispatchMeterReading.out, dispatchMeterReading.expected),
+      ),
+    )
+    .orderBy(desc(dispatch.checkedOutAt));
+  if (gaps.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="font-medium">Unlogged time to account for</h3>
+      <ul className="divide-y rounded-lg border border-amber-600/40">
+        {gaps.map((g) => (
+          <li key={g.id}>
+            <Link
+              href={`/dispatches/${g.id}`}
+              className="flex min-h-12 items-center justify-between gap-3 px-3 py-2 hover:bg-muted"
+            >
+              <span className="font-medium">{g.tailNumber}</span>
+              <span className="text-sm text-muted-foreground">
+                found by {g.pilot}, {g.at.toISOString().slice(0, 10)}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 async function OfficerLinks() {
   // Same test as isPending, as a query: inactive and never given a role.
   const [{ pending }] = await db()
@@ -185,6 +253,7 @@ async function OfficerLinks() {
           </span>
         )}
       </Link>
+      <GapsToReview />
     </section>
   );
 }

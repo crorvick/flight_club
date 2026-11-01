@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { aircraft, flight } from "@/db/schema";
+import { aircraft, flight, squawk } from "@/db/schema";
 import { aircraftAlerts } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder } from "@/lib/meters";
@@ -18,11 +18,19 @@ export async function lastFlownAircraftId(pilotId: string) {
   return row?.aircraftId;
 }
 
-// Everything the log form needs for one aircraft.
-export async function getAircraftForLog(id: string) {
+// Everything checking an aircraft out needs: its meters, what grounds it
+// or is due, and the unresolved squawks to acknowledge.
+export async function getAircraftForCheckOut(id: string) {
   const plane = await db().query.aircraft.findFirst({
     where: and(eq(aircraft.id, id), eq(aircraft.active, true)),
-    with: { meters: true },
+    with: {
+      meters: true,
+      squawks: {
+        where: ne(squawk.status, "resolved"),
+        orderBy: asc(squawk.reportedAt),
+        columns: { id: true, description: true, status: true },
+      },
+    },
   });
   if (!plane) return undefined;
   const alerts = (await aircraftAlerts([plane.id])).get(plane.id)!;
@@ -38,13 +46,14 @@ export async function getAircraftForLog(id: string) {
         billing: m.id === plane.billingMeterId,
       }))
       .sort(byMeterOrder),
+    squawks: plane.squawks.map((s) => ({
+      id: s.id,
+      description: s.description,
+      deferred: s.status === "deferred",
+    })),
     alerts,
   };
 }
-
-export type AircraftForLog = NonNullable<
-  Awaited<ReturnType<typeof getAircraftForLog>>
->;
 
 export async function getFlight(id: string) {
   if (!isUuid(id)) return undefined;

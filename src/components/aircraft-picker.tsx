@@ -14,7 +14,7 @@ export function AircraftPicker({
   fleet: AircraftCard[];
   selectedId: string;
   // The page the cards link back to, with ?aircraft= appended.
-  path: "/flights/new" | "/squawks/new";
+  path: "/check-out" | "/squawks/new";
 }) {
   return (
     <nav aria-label="Aircraft">
@@ -43,10 +43,16 @@ export function AircraftPicker({
                     "text-sm",
                     plane.grounded
                       ? "font-medium text-destructive"
-                      : "text-muted-foreground",
+                      : plane.checkedOutTo
+                        ? "font-medium text-amber-700 dark:text-amber-400"
+                        : "text-muted-foreground",
                   )}
                 >
-                  {plane.grounded ? "Grounded" : "Airworthy"}
+                  {plane.grounded
+                    ? "Grounded"
+                    : plane.checkedOutTo
+                      ? `Out: ${plane.checkedOutTo}`
+                      : "Airworthy"}
                 </span>
               </Link>
             </li>

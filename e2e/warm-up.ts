@@ -12,7 +12,7 @@ export default async function warmUp(config: FullConfig) {
     "/",
     "/sign-in",
     "/sign-up",
-    "/flights/new",
+    "/check-out",
     "/squawks/new",
     "/fleet",
     "/members",

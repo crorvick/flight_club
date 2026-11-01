@@ -11,7 +11,7 @@ import { checkReading } from "@/lib/flight-rules";
 import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
-import { inField, outField } from "./fields";
+import { inField } from "./fields";
 
 export type FormMeter = {
   id: string;
@@ -24,10 +24,6 @@ export type FormMeter = {
 type FlightFormProps = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   meters: FormMeter[];
-  // Logging sends the out readings the pilot saw, so the server can tell
-  // if someone else logged a flight in the meantime.  Editing doesn't:
-  // a logged flight's out readings never change.
-  sendOuts: boolean;
   initial?: {
     date: string;
     dayLandings: number;
@@ -51,7 +47,6 @@ function localToday() {
 export function FlightForm({
   action,
   meters,
-  sendOuts,
   initial,
   submitLabel,
   pendingLabel,
@@ -108,7 +103,6 @@ export function FlightForm({
           <MeterInput
             key={m.id}
             meter={m}
-            sendOut={sendOuts}
             value={ins[m.id] ?? ""}
             defaultValue={values?.[inField(m.id)] ?? initial?.ins[m.id]}
             onChange={(v) => setIns((prev) => ({ ...prev, [m.id]: v }))}
@@ -183,7 +177,6 @@ export function FlightForm({
 
 function MeterInput({
   meter,
-  sendOut,
   value,
   defaultValue,
   onChange,
@@ -192,7 +185,6 @@ function MeterInput({
   serverError,
 }: {
   meter: FormMeter;
-  sendOut: boolean;
   value: string;
   defaultValue?: string;
   onChange: (value: string) => void;
@@ -209,9 +201,6 @@ function MeterInput({
 
   return (
     <div className="flex flex-col gap-2">
-      {sendOut && (
-        <input type="hidden" name={outField(meter.id)} value={meter.out} />
-      )}
       <div className="flex items-baseline justify-between gap-2">
         <Label htmlFor={id} className="text-base">
           {meter.label} in

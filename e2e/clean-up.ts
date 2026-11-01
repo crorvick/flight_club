@@ -3,7 +3,7 @@ import postgres from "postgres";
 // Remove the members the tests signed up, so a local database doesn't
 // collect thousands of them over many runs (pages listing members slow
 // to a crawl).  Their emails come from uniqueId() in helpers.ts; seeded
-// members' don't match.  Anyone still referenced by a flight or squawk is
+// members' don't match.  Anyone still referenced by a flight, squawk or dispatch is
 // left alone rather than failing the run; the tests delete their own
 // aircraft, and with them those rows, as they go.
 export default async function cleanUp() {
@@ -24,6 +24,10 @@ export default async function cleanUp() {
         and not exists (
           select 1 from squawk s
           where s.reported_by_id = m.id or s.resolved_by_id = m.id
+        )
+        and not exists (
+          select 1 from dispatch d
+          where m.id in (d.pilot_id, d.closed_by_id, d.gap_reviewed_by_id)
         )
     `;
   } finally {

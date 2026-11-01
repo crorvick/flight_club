@@ -72,7 +72,9 @@ src/
   app/                  Routes: each folder is a URL, page.tsx renders it
     (auth)/             Sign in and sign up
     (member)/           Everything behind sign-in, sharing one layout
-      flights/          Log, view, edit and correct flights
+      check-out/        Check an aircraft out before flying
+      dispatches/       Check it back in (recording the flight) or cancel
+      flights/          View, edit and correct flights
       squawks/          Report and resolve squawks; photos/ serves images
       fleet/            Every aircraft's status, squawks and what's due
       aircraft/         Officers: aircraft, meters, maintenance items
@@ -120,20 +122,32 @@ Every officer change (resolving squawks, editing members, aircraft,
 meters and maintenance, correcting flights) writes to the `audit_log`
 table in the same transaction, with only the fields that changed.
 
-### Flights and meters
+### Checking out, checking in, and meters
 
 Each aircraft has one or more meters (Hobbs, tach, air time) with a
-current reading. Logging a flight records every meter's out and in,
-moves the meters to the in readings, snapshots which meter it was
-billed by, and locks the aircraft's previous flight. Readings are
-handled as integer hundredths of an hour (`src/lib/hours.ts`), never
-floats.
+current reading. Readings are handled as integer hundredths of an hour
+(`src/lib/hours.ts`), never floats.
 
-Two pilots logging the same aircraft at once is caught by the
-transaction locking the aircraft's meter rows and checking the out
-readings the pilot saw are still current. A pilot can edit their own
-flight until it's locked; after that only an officer can correct it,
-with a reason that's audited.
+A flight starts with a check-out (a `dispatch` in the code, so it isn't
+confused with a pilot's checkout in an aircraft, a qualification). The
+pilot confirms each meter against the panel and acknowledges every
+unresolved squawk. A grounded aircraft can't be checked out, and only
+one pilot can have an aircraft out at a time (a unique index makes
+sure). If a meter reads more than the app expects, someone flew without
+logging it: the meter moves to what the panel reads and the gap is
+listed for officers, on the home page, to account for and mark
+reviewed.
+
+A checked-out aircraft is either cancelled, which records nothing, or
+checked in with the in readings and landings, which records the flight:
+every meter's out and in, which meter it was billed by, and the meters
+moved to the in readings. Checking in also locks the aircraft's
+previous flight. A pilot can edit their own flight until then; after
+that only an officer can correct it, with a reason that's audited.
+Pilots can't delete flights.
+
+Every write that touches an aircraft's meters locks their rows first,
+in the same order, so two of them can't interleave or deadlock.
 
 ### Status is derived, never stored
 
@@ -144,10 +158,10 @@ disagree with the records they come from. An aircraft is grounded while
 it has an open grounding squawk or an overdue maintenance item set to
 ground it. Only an officer can resolve a grounding squawk, with a note.
 
-The flight log shows pre-flight warnings for all of it: grounded, due
+Checking out shows pre-flight warnings for all of it: grounded, due
 or overdue maintenance, an expired medical or flight review, no
-checkout in the aircraft, and passenger currency. They warn but don't
-block.
+checkout in the aircraft, and passenger currency. Only grounding
+blocks checking out; the rest are warnings.
 
 ### Photos
 

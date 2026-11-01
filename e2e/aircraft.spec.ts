@@ -4,6 +4,8 @@ import {
   closeSql,
   createAircraft,
   deleteAircraft,
+  logFlight,
+  openCheckOut,
   signUpPilot,
   sql,
 } from "./helpers";
@@ -52,10 +54,11 @@ test("an officer adds an aircraft that pilots can then log", async ({
   await addAircraft(page, tail);
   await expect(page.getByRole("heading", { name: tail })).toBeVisible();
 
-  await page.goto(`/flights/new?aircraft=${created[0]}`);
-  await expect(page.getByText("out 2000.0")).toBeVisible();
-  await expect(page.getByText("out 1800.5")).toBeVisible();
-  await expect(page.getByLabel("Hobbs in")).toHaveAccessibleName(/billed/);
+  const plane = { id: created[0], tailNumber: tail };
+  await openCheckOut(page, plane);
+  await expect(page.getByLabel("Hobbs reads")).toHaveValue("2000.0");
+  await expect(page.getByLabel("Tach reads")).toHaveValue("1800.5");
+  await expect(page.getByLabel("Hobbs reads")).toHaveAccessibleName(/billed/);
 });
 
 test("a duplicate tail number is rejected and the form kept", async ({
@@ -110,8 +113,8 @@ test("correcting a meter needs a reason and moves the next out reading", async (
     reason: "Last pilot forgot to log a flight.",
   });
 
-  await page.goto(`/flights/new?aircraft=${plane.id}`);
-  await expect(page.getByText("out 401.5")).toBeVisible();
+  await openCheckOut(page, plane);
+  await expect(page.getByLabel("Tach reads")).toHaveValue("401.5");
 });
 
 test("changing the billing meter bills new flights by it", async ({
@@ -132,12 +135,7 @@ test("changing the billing meter bills new flights by it", async ({
   await page.getByRole("button", { name: "Save details" }).click();
   await expect(page.getByText("Details saved.")).toBeVisible();
 
-  await page.goto(`/flights/new?aircraft=${plane.id}`);
-  await page.getByLabel("Hobbs in").fill("501.5");
-  await page.getByLabel("Tach in").fill("401.2");
-  await page
-    .getByRole("button", { name: `Log flight in ${plane.tailNumber}` })
-    .click();
+  await logFlight(page, plane, { Hobbs: "501.5", Tach: "401.2" });
   await expect(page.getByText("1.2 hours (tach)")).toBeVisible();
 });
 
@@ -166,13 +164,7 @@ test("meters can be added, and removed until a flight records them", async ({
   await expect(page.getByLabel("Hobbs reading")).toBeVisible();
 
   // Once a flight has recorded it, it stays.
-  await page.goto(`/flights/new?aircraft=${plane.id}`);
-  await page.getByLabel("Hobbs in").fill("451.0");
-  await page.getByLabel("Tach in").fill("400.8");
-  await page
-    .getByRole("button", { name: `Log flight in ${plane.tailNumber}` })
-    .click();
-  await expect(page.getByText("Flight logged.")).toBeVisible();
+  await logFlight(page, plane, { Hobbs: "451.0", Tach: "400.8" });
   await page.goto(`/aircraft/${plane.id}`);
   await expect(page.getByLabel("Hobbs reading")).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove Hobbs" })).toHaveCount(
@@ -189,7 +181,7 @@ test("an inactive aircraft can't be picked", async ({ page }, testInfo) => {
   await page.getByRole("button", { name: "Save details" }).click();
   await expect(page.getByText("Details saved.")).toBeVisible();
 
-  await page.goto("/flights/new");
+  await page.goto("/check-out");
   await expect(
     page.getByRole("link", { name: new RegExp(plane.tailNumber) }),
   ).toHaveCount(0);

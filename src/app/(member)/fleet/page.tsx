@@ -45,6 +45,7 @@ async function Fleet() {
                   <h2 className="text-lg font-semibold">{plane.tailNumber}</h2>
                   <p className="text-sm text-muted-foreground">
                     {plane.makeModel}
+                    {plane.checkedOutTo && ` · out with ${plane.checkedOutTo}`}
                   </p>
                 </div>
                 <span

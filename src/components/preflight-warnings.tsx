@@ -4,7 +4,7 @@ import type { AircraftAlerts } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
 import type { PilotWarning } from "@/lib/qualifications";
 
-// Shown on the flight log before the pilot enters anything (docs/spec.md,
+// Shown when checking an aircraft out, before anything is entered (docs/spec.md,
 // section 6): what grounds the aircraft, what's due, then anything about
 // the pilot.  Warnings, not blocks; whether to fly is the pilot's call.
 export function PreflightWarnings({

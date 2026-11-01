@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  checkIn,
+  checkOut,
   closeSql,
   createAircraft,
   deleteAircraft,
@@ -82,8 +84,8 @@ test("a grounding squawk with a photo grounds the aircraft", async ({
   expect(response.status()).toBe(401);
   await stranger.close();
 
-  // The flight log now warns about it.
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
+  // Checking out now shows it, and refuses.
+  await page.goto(`/check-out?aircraft=${aircraft.id}`);
   await expect(
     page.getByText(`${aircraft.tailNumber} is grounded`),
   ).toBeVisible();
@@ -124,14 +126,10 @@ test("a rejected report keeps the photos and description", async ({ page }) => {
   await expect(page.getByAltText("Photo 1 of the squawk")).toBeVisible();
 });
 
-test("logging a flight can continue into a squawk", async ({ page }) => {
-  await page.goto(`/flights/new?aircraft=${aircraft.id}`);
-  await page.getByLabel("Hobbs in").fill("101.0");
-  await page.getByLabel("Tach in").fill("80.8");
+test("checking in can continue into a squawk", async ({ page }) => {
+  await checkOut(page, aircraft);
   await page.getByLabel("Report a squawk after logging").check();
-  await page
-    .getByRole("button", { name: `Log flight in ${aircraft.tailNumber}` })
-    .click();
+  await checkIn(page, aircraft, { Hobbs: "101.0", Tach: "80.8" });
 
   await expect(page.getByText("Flight logged.")).toBeVisible();
   // The aircraft is already chosen.
