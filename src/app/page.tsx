@@ -1,11 +1,15 @@
 import { cn } from "cn";
+import { and, count, eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { Suspense } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { db } from "@/db";
+import { member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
+import { isPending } from "@/lib/member-rules";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { signOut } from "./(auth)/actions";
@@ -92,11 +96,17 @@ async function MemberStatus() {
           >
             Fleet status and squawks
           </Link>
+          {hasRole(member, "officer") && <OfficerLinks />}
         </>
-      ) : (
+      ) : isPending(member) ? (
         <p role="status">
           Thanks, {member.name}. Your account is waiting for an officer to
           approve it.
+        </p>
+      ) : (
+        <p role="status">
+          Your account has been deactivated. If that&apos;s a mistake, ask an
+          officer.
         </p>
       )}
       <form action={signOut}>
@@ -133,6 +143,36 @@ async function RecentFlights({ member }: { member: Member }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+async function OfficerLinks() {
+  // Same test as isPending, as a query: inactive and never given a role.
+  const [{ pending }] = await db()
+    .select({ pending: count() })
+    .from(memberTable)
+    .where(
+      and(
+        eq(memberTable.active, false),
+        sql`cardinality(${memberTable.roles}) = 0`,
+      ),
+    );
+  const linkClass = cn(
+    buttonVariants({ variant: "outline" }),
+    "h-11 justify-between text-base",
+  );
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-lg font-semibold">Officer</h2>
+      <Link href="/members" className={linkClass}>
+        Members
+        {pending > 0 && (
+          <span className="rounded-full bg-primary px-2 text-sm text-primary-foreground">
+            {pending} waiting
+          </span>
+        )}
+      </Link>
     </section>
   );
 }

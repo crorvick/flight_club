@@ -147,16 +147,19 @@ Locally and in CI the bucket is a RustFS container instead (see
 ## Approving members
 
 Anyone can create an account, but it starts inactive and without roles.
-Until officers have a page for it, approve members with the script in
-the image, from the service's Shell tab in Render:
+Officers approve new members, change role tags and deactivate members
+on the Members page (linked from the home page, with a count of who's
+waiting).  Every change is recorded in the audit log.
+
+The first officer has to be made with the script in the image instead,
+from the service's Shell tab in Render: sign up in the app, then run
 
 ```sh
-node scripts/approve-member.mts member@example.com pilot
+node scripts/approve-member.mts member@example.com officer pilot
 ```
 
 The roles given replace the member's current ones (`pilot`, `officer`);
-with none, their roles are left as they are.  For the first officer,
-sign up in the app, then run it with `officer pilot`.  Locally, it's
+with none, their roles are left as they are.  Locally, it's
 `pnpm member:approve <email> [role...]`.
 
 ## Promoting to production
