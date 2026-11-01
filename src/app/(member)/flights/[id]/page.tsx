@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
+import { METER_LABELS } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
 import { getFlight } from "../data";
@@ -89,10 +90,7 @@ async function FlightDetails({
         <dt className="text-muted-foreground">Billed</dt>
         <dd className="tabular-nums">
           {formatHours(parseHours(flight.billedHours)!)} hours (
-          {flight.billingMeterKind === "air_time"
-            ? "air time"
-            : flight.billingMeterKind}
-          )
+          {METER_LABELS[flight.billingMeterKind].toLowerCase()})
         </dd>
         <dt className="text-muted-foreground">Landings</dt>
         <dd>

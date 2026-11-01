@@ -10,14 +10,16 @@ type FieldProps = ComponentProps<typeof Input> & {
 };
 
 // A labelled input sized for thumbs: 44px tall, and 16px text so iOS
-// doesn't zoom in on focus.
-export function Field({ name, label, errors, ...props }: FieldProps) {
-  const errorId = `${name}-error`;
+// doesn't zoom in on focus.  The id defaults to the name; pass one when a
+// page has several forms with the same field names.
+export function Field({ id, name, label, errors, ...props }: FieldProps) {
+  const inputId = id ?? name;
+  const errorId = `${inputId}-error`;
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={name}>{label}</Label>
+      <Label htmlFor={inputId}>{label}</Label>
       <Input
-        id={name}
+        id={inputId}
         name={name}
         className="h-11 text-base md:text-base"
         aria-invalid={errors ? true : undefined}

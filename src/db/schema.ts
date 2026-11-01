@@ -21,6 +21,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { METER_KINDS } from "@/lib/meters";
 import { ROLE_TAGS } from "@/lib/roles";
 import { SQUAWK_CATEGORIES } from "@/lib/squawk-rules";
 
@@ -129,7 +130,7 @@ export const verification = pgTable(
 // flights or squawks can't be deleted (deactivate them instead), and
 // deleting a flight takes its meter readings with it.
 
-export const meterKind = pgEnum("meter_kind", ["tach", "hobbs", "air_time"]);
+export const meterKind = pgEnum("meter_kind", METER_KINDS);
 
 export const squawkCategory = pgEnum("squawk_category", SQUAWK_CATEGORIES);
 

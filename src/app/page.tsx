@@ -165,6 +165,9 @@ async function OfficerLinks() {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold">Officer</h2>
+      <Link href="/aircraft" className={linkClass}>
+        Aircraft and meters
+      </Link>
       <Link href="/members" className={linkClass}>
         Members
         {pending > 0 && (

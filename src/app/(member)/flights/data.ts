@@ -6,15 +6,7 @@ import { db } from "@/db";
 import { aircraft, flight } from "@/db/schema";
 import { groundingSquawks } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
-
-// Display order for meters: the order pilots read them off the panel.
-const METER_ORDER = { hobbs: 0, tach: 1, air_time: 2 } as const;
-
-export type MeterKind = keyof typeof METER_ORDER;
-
-export function byMeterOrder<T extends { kind: MeterKind }>(a: T, b: T) {
-  return METER_ORDER[a.kind] - METER_ORDER[b.kind];
-}
+import { byMeterOrder } from "@/lib/meters";
 
 export async function lastFlownAircraftId(pilotId: string) {
   const [row] = await db()
