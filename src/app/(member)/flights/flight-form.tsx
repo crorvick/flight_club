@@ -26,8 +26,6 @@ type FlightFormProps = {
   meters: FormMeter[];
   initial?: {
     date: string;
-    dayLandings: number;
-    nightLandings: number;
     notes: string;
     ins: Record<string, string>;
   };
@@ -62,10 +60,6 @@ export function FlightForm({
     () => initial?.ins ?? {},
   );
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [dayLandings, setDayLandings] = useState(initial?.dayLandings ?? 1);
-  const [nightLandings, setNightLandings] = useState(
-    initial?.nightLandings ?? 0,
-  );
 
   // Filled in after hydration: rendering today's date on the server would
   // use the server's time zone and mismatch on the client.
@@ -112,23 +106,6 @@ export function FlightForm({
           />
         ))}
       </fieldset>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Stepper
-          name="dayLandings"
-          label="Day landings"
-          value={dayLandings}
-          onChange={setDayLandings}
-          error={state.fieldErrors?.dayLandings?.[0]}
-        />
-        <Stepper
-          name="nightLandings"
-          label="Night landings"
-          value={nightLandings}
-          onChange={setNightLandings}
-          error={state.fieldErrors?.nightLandings?.[0]}
-        />
-      </div>
 
       <Field
         ref={dateRef}
@@ -243,57 +220,6 @@ function MeterInput({
           (check.status === "ok" &&
             `${formatHours(check.duration)} hours${check.warning ? `. ${check.warning}` : ""}`)}
       </p>
-    </div>
-  );
-}
-
-function Stepper({
-  name,
-  label,
-  value,
-  onChange,
-  error,
-}: {
-  name: string;
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  error?: string;
-}) {
-  const lower = label.toLowerCase();
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={name}>{label}</Label>
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="outline"
-          className="size-11 text-xl"
-          aria-label={`Fewer ${lower}`}
-          disabled={value <= 0}
-          onClick={() => onChange(Math.max(0, value - 1))}
-        >
-          −
-        </Button>
-        <input
-          id={name}
-          name={name}
-          value={value}
-          readOnly
-          className="h-11 w-full min-w-0 bg-transparent text-center text-lg tabular-nums outline-none"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="size-11 text-xl"
-          aria-label={`More ${lower}`}
-          disabled={value >= 99}
-          onClick={() => onChange(Math.min(99, value + 1))}
-        >
-          +
-        </Button>
-      </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

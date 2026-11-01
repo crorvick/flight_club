@@ -113,10 +113,6 @@ async function FlightDetails({
           {formatHours(parseHours(flight.billedHours)!)} hours (
           {METER_LABELS[flight.billingMeterKind].toLowerCase()})
         </dd>
-        <dt className="text-muted-foreground">Landings</dt>
-        <dd>
-          {flight.dayLandings} day, {flight.nightLandings} night
-        </dd>
         {flight.notes && (
           <>
             <dt className="text-muted-foreground">Notes</dt>

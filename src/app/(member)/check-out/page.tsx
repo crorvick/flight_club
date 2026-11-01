@@ -63,7 +63,7 @@ async function CheckOut({
   const plane = (await getAircraftForCheckOut(selectedId))!;
   const date = today();
   const [warnings, out] = await Promise.all([
-    pilotStatus(member.id, plane.id, date).then((s) => pilotWarnings(s, date)),
+    pilotStatus(member.id, plane.id).then((s) => pilotWarnings(s, date)),
     activeDispatches([plane.id]).then((d) => d.get(plane.id)),
   ]);
 

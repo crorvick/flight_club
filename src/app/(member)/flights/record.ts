@@ -23,8 +23,6 @@ export async function recordFlight(
     ins: Map<string, number>;
     details: {
       date: string;
-      dayLandings: number;
-      nightLandings: number;
       notes: string | null;
     };
   },

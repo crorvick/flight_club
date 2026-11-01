@@ -160,14 +160,12 @@ try {
 
           const [flight] = await tx`
             insert into flight (
-              aircraft_id, pilot_id, date, day_landings, night_landings,
-              notes, billing_meter_kind, billed_hours, created_at, updated_at
+              aircraft_id, pilot_id, date, notes, billing_meter_kind,
+              billed_hours, created_at, updated_at
             )
             values (
               ${aircraftId}, ${pick(memberIds)},
               ${createdAt.toISOString().slice(0, 10)},
-              ${night ? between(0, 1) : between(1, 4)},
-              ${night ? between(1, 3) : 0},
               ${pick(notes)}, ${plane.billing},
               ${toHours(delta[plane.billing])}, ${createdAt}, ${createdAt}
             )

@@ -209,6 +209,9 @@ export const flight = pgTable(
       .notNull()
       .references(() => member.id),
     date: date("date").notNull(),
+    // No longer recorded: pilots track their own currency.  Left in place,
+    // filled by the default, until a release that no longer reads them is
+    // in production; then a migration drops them.
     dayLandings: integer("day_landings").default(0).notNull(),
     nightLandings: integer("night_landings").default(0).notNull(),
     notes: text("notes"),

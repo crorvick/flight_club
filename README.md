@@ -80,7 +80,7 @@ src/
       aircraft/         Officers: aircraft, meters, maintenance items
       maintenance/      Officers: one maintenance item and its history
       members/          Officers: approvals, roles, qualifications
-      qualifications/   A pilot's own medical, flight review, currency
+      qualifications/   A pilot's own medical, flight review, checkouts
     api/                Better Auth's endpoints and the health check
   components/           UI shared between pages
   db/                   Table definitions, connection, audit log helper
@@ -91,7 +91,7 @@ e2e/                    Playwright tests
 ```
 
 The rules that matter (meter readings, edit locks, maintenance due
-dates, pilot currency, who may do what) live in `src/lib` as plain
+dates, qualification expiry, who may do what) live in `src/lib` as plain
 functions with no database or React, so they're unit tested directly
 and shared by the forms' live feedback and the server's enforcement.
 Pages and actions do the database work and call them.
@@ -139,7 +139,7 @@ listed for officers, on the home page, to account for and mark
 reviewed.
 
 A checked-out aircraft is either cancelled, which records nothing, or
-checked in with the in readings and landings, which records the flight:
+checked in with the in readings, which records the flight:
 every meter's out and in, which meter it was billed by, and the meters
 moved to the in readings. Checking in also locks the aircraft's
 previous flight. A pilot can edit their own flight until then; after
@@ -152,7 +152,8 @@ in the same order, so two of them can't interleave or deadlock.
 ### Status is derived, never stored
 
 Whether an aircraft is grounded, what maintenance is due, and whether a
-pilot is current are computed whenever they're shown (`src/lib/fleet.ts`,
+pilot's medical and flight review are in date are computed whenever
+they're shown (`src/lib/fleet.ts`,
 `src/lib/maintenance.ts`, `src/lib/qualifications.ts`), so they can't
 disagree with the records they come from. An aircraft is grounded while
 it has an open grounding squawk or an overdue maintenance item set to
@@ -160,8 +161,9 @@ ground it. Only an officer can resolve a grounding squawk, with a note.
 
 Checking out shows pre-flight warnings for all of it: grounded, due
 or overdue maintenance, an expired medical or flight review, no
-checkout in the aircraft, and passenger currency. Only grounding
-blocks checking out; the rest are warnings.
+checkout in the aircraft. Only grounding blocks checking out; the rest
+are warnings. Passenger currency isn't tracked: landings aren't
+recorded, and staying current is the pilot's responsibility.
 
 ### Photos
 

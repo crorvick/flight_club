@@ -2,13 +2,8 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aircraft } from "@/db/schema";
-import { today } from "@/lib/fleet";
-import { getCheckouts, getQualifications, recentLandings } from "@/lib/pilots";
-import {
-  CURRENCY_DAYS,
-  CURRENCY_LANDINGS,
-  flightReviewExpires,
-} from "@/lib/qualifications";
+import { getCheckouts, getQualifications } from "@/lib/pilots";
+import { flightReviewExpires } from "@/lib/qualifications";
 
 import { addCheckout, removeCheckout, updateQualifications } from "./actions";
 import {
@@ -17,8 +12,8 @@ import {
   RemoveCheckout,
 } from "./qualifications-forms";
 
-// A member's medical, flight review, checkouts and currency, shown on
-// their own qualifications page and, for officers, on the member's page.
+// A member's medical, flight review and checkouts, shown on their own
+// qualifications page and, for officers, on the member's page.
 // Only officers can record or remove checkouts.
 export async function QualificationsPanel({
   memberId,
@@ -27,11 +22,9 @@ export async function QualificationsPanel({
   memberId: string;
   canManageCheckouts: boolean;
 }) {
-  const date = today();
-  const [qualifications, checkouts, landings, fleet] = await Promise.all([
+  const [qualifications, checkouts, fleet] = await Promise.all([
     getQualifications(memberId),
     getCheckouts(memberId),
-    recentLandings(memberId, date),
     canManageCheckouts
       ? db()
           .select({ id: aircraft.id, tailNumber: aircraft.tailNumber })
@@ -56,18 +49,6 @@ export async function QualificationsPanel({
           action={updateQualifications.bind(null, memberId)}
           initial={qualifications}
         />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Passenger currency</h2>
-        <p>
-          {landings.landings} landings, {landings.nightLandings} at night, in
-          the last {CURRENCY_DAYS} days.{" "}
-          <span className="text-muted-foreground">
-            {CURRENCY_LANDINGS} of each are needed to carry passengers by day
-            and by night. Only flights logged here are counted.
-          </span>
-        </p>
       </section>
 
       <section className="flex flex-col gap-2">

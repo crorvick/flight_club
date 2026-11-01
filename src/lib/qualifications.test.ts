@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  currencySince,
   flightReviewExpires,
   type PilotStatus,
   pilotWarnings,
@@ -12,20 +11,12 @@ const current: PilotStatus = {
   medicalExpiresOn: "2027-06-30",
   flightReviewOn: "2026-02-10",
   checkedOut: true,
-  landings: 5,
-  nightLandings: 3,
 };
 
 describe("flightReviewExpires", () => {
   it("runs to the end of the 24th calendar month", () => {
     expect(flightReviewExpires("2026-02-10")).toBe("2028-02-29");
     expect(flightReviewExpires("2024-11-30")).toBe("2026-11-30");
-  });
-});
-
-describe("currencySince", () => {
-  it("covers today and the 89 days before it", () => {
-    expect(currencySince("2026-11-01")).toBe("2026-08-04");
   });
 });
 
@@ -84,15 +75,5 @@ describe("pilotWarnings", () => {
         message: "You're not checked out in this aircraft.",
       },
     ]);
-  });
-
-  it("notes passenger currency, day before night", () => {
-    expect(
-      pilotWarnings({ ...current, landings: 2, nightLandings: 0 }, today)[0]
-        .message,
-    ).toMatch(/^Not current to carry passengers: 2 of 3 landings/);
-    expect(
-      pilotWarnings({ ...current, nightLandings: 1 }, today)[0].message,
-    ).toMatch(/^Not current to carry passengers at night: 1 of 3/);
   });
 });

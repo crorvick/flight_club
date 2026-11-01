@@ -9,12 +9,6 @@ import { inField } from "./fields";
 // Parsing a flight form, shared by checking in (which records a flight),
 // a pilot's edit and an officer's correction.
 
-const landings = z.coerce
-  .number<string>("Enter a number.")
-  .int("Enter a whole number.")
-  .min(0, "Can't be negative.")
-  .max(99, "That's a lot of landings.");
-
 // Allows tomorrow's date: the server runs on UTC, which is already
 // tomorrow for an evening flight in the Americas.
 function notInFuture(isoDate: string) {
@@ -26,8 +20,6 @@ const detailsSchema = z.object({
   date: z.iso
     .date("Enter the date of the flight.")
     .refine(notInFuture, "The date can't be in the future."),
-  dayLandings: landings,
-  nightLandings: landings,
   notes: z
     .string()
     .trim()
@@ -35,13 +27,7 @@ const detailsSchema = z.object({
     .transform((notes) => notes || null),
 });
 
-export const DETAIL_FIELDS = [
-  "date",
-  "dayLandings",
-  "nightLandings",
-  "notes",
-  "reportSquawk",
-];
+export const DETAIL_FIELDS = ["date", "notes", "reportSquawk"];
 
 export type MeterOut = { id: string; out: number };
 
@@ -52,8 +38,6 @@ export function parseFlightForm(formData: FormData, meters: MeterOut[]) {
   const fieldErrors: Record<string, string[]> = {};
   const details = detailsSchema.safeParse({
     date: formData.get("date") ?? "",
-    dayLandings: formData.get("dayLandings") ?? "",
-    nightLandings: formData.get("nightLandings") ?? "",
     notes: formData.get("notes") ?? "",
   });
   if (!details.success) {

@@ -1,11 +1,10 @@
 // Pilot qualifications and the warnings shown before a flight (docs/spec.md,
-// sections 5 and 6).
+// sections 5 and 6).  Passenger currency isn't tracked: landings aren't
+// recorded, and staying current is the pilot's responsibility.
 
 import { dueDate } from "./maintenance";
 
 export const EXPIRING_SOON_DAYS = 30;
-export const CURRENCY_DAYS = 90;
-export const CURRENCY_LANDINGS = 3;
 
 export const MEDICAL_CLASSES = [
   "first",
@@ -28,14 +27,6 @@ export function flightReviewExpires(reviewedOn: string) {
   return dueDate(reviewedOn, 24);
 }
 
-// The first day that counts toward 90-day currency: flights on or after
-// it are within the preceding 90 days.
-export function currencySince(today: string) {
-  const date = new Date(`${today}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - (CURRENCY_DAYS - 1));
-  return date.toISOString().slice(0, 10);
-}
-
 function daysUntil(today: string, date: string) {
   return Math.round(
     (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) /
@@ -54,9 +45,6 @@ export type PilotStatus = {
   medicalExpiresOn: string | null;
   flightReviewOn: string | null;
   checkedOut: boolean;
-  // Landings in the last 90 days, from flights logged here.
-  landings: number;
-  nightLandings: number;
 };
 
 function expiry(
@@ -99,20 +87,6 @@ export function pilotWarnings(status: PilotStatus, today: string) {
     warnings.push({
       severity: "expired",
       message: "You're not checked out in this aircraft.",
-    });
-  }
-  // Only flights logged here count, so say so: a pilot who flies
-  // elsewhere may well be current.
-  const counted = "counting only flights logged here";
-  if (status.landings < CURRENCY_LANDINGS) {
-    warnings.push({
-      severity: "notice",
-      message: `Not current to carry passengers: ${status.landings} of ${CURRENCY_LANDINGS} landings in the last ${CURRENCY_DAYS} days (${counted}).`,
-    });
-  } else if (status.nightLandings < CURRENCY_LANDINGS) {
-    warnings.push({
-      severity: "notice",
-      message: `Not current to carry passengers at night: ${status.nightLandings} of ${CURRENCY_LANDINGS} night landings in the last ${CURRENCY_DAYS} days (${counted}).`,
     });
   }
   return warnings;

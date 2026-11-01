@@ -53,15 +53,10 @@ test("checks out from the current readings and checks in a flight", async ({
   await page.getByLabel("Hobbs in").fill("101.5");
   await expect(page.getByText("1.5 hours")).toBeVisible();
   await page.getByLabel("Tach in").fill("81.2");
-  await page.getByRole("button", { name: "More day landings" }).click();
-  await expect(page.getByLabel("Day landings", { exact: true })).toHaveValue(
-    "2",
-  );
   await checkInButton(page).click();
 
   await expect(page.getByText("Flight logged.")).toBeVisible();
   await expect(page.getByText("1.5 hours (hobbs)")).toBeVisible();
-  await expect(page.getByText("2 day, 0 night")).toBeVisible();
 
   // The next check-out starts where this flight ended.
   await openCheckOut(page, aircraft);

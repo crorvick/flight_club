@@ -7,7 +7,7 @@ A website for a small flight club to **record flights**, **track maintenance and
 ## 1. Goals
 
 - Phone-first task pages for the two most common actions: **logging a flight** and **reporting a squawk**.
-- A single source of truth for aircraft status, maintenance due items, and pilot currency, with cross-checks between them (e.g., warn when flying a grounded or overdue aircraft).
+- A single source of truth for aircraft status, maintenance due items, and pilot qualifications, with cross-checks between them (e.g., warn when flying a grounded or overdue aircraft).
 - A git-driven deployment pipeline: push → automated tests → **staging** → explicit promotion → **production**.
 - Code that is easy for a single part-time maintainer to understand and keep running for years.
 
@@ -24,7 +24,7 @@ A website for a small flight club to **record flights**, **track maintenance and
 | Validation | **Zod** | One schema per form → both runtime validation and TS types. |
 | Auth | **Better Auth** | Email/password sessions; long-lived sessions so members rarely re-login on the ramp. |
 | UI | **Tailwind CSS** + **shadcn/ui** | Mobile-first utility classes; accessible components. |
-| Unit tests | **Vitest** | Currency rules, due-date math, meter logic. |
+| Unit tests | **Vitest** | Qualification expiry, due-date math, meter logic. |
 | E2E tests | **Playwright** | Run at phone and tablet viewports as well as desktop. |
 | Packaging | **Docker** | One image per commit. |
 | CI/CD | **GitHub Actions** | See §3. |
@@ -79,7 +79,8 @@ Meter definitions:
 Most aircraft have tach + Hobbs; one club aircraft has all three; some may have only tach.
 
 ### Flight
-- id, aircraftId, pilotId, date, day landings, night landings, notes
+- id, aircraftId, pilotId, date, notes
+- Landings aren't recorded (see PilotQualification).
 - Snapshot at time of logging: `billingMeterKind`, `billedHours` (so changing an aircraft's billing meter later never re-bills past flights)
 - createdAt, updatedAt, lockedAt (see rules)
 
@@ -100,7 +101,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### PilotQualification
 - Medical (class, expiration), flight review (date → expiration), per-aircraft checkouts
-- 90-day passenger currency is **computed** from logged landings (day/night), not entered.
+- 90-day passenger currency is **not tracked**: landings aren't recorded, and staying current is each pilot's responsibility.
 
 ### AuditLog
 - Who changed what, when, before/after. Required for officer edits to locked flights and for squawk resolution.
@@ -134,7 +135,6 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Aircraft has maintenance overdue or due soon.
 - Pilot's medical / flight review is expired or expiring soon.
 - Pilot is not checked out in this aircraft.
-- Pilot lacks 90-day currency (relevant for carrying passengers).
 
 ---
 
@@ -145,9 +145,8 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 2. Pre-flight warnings displayed up front.
 3. Meter inputs: `out` pre-filled, pilot enters only `in` values (number pad). Only the meters this aircraft has are shown.
 4. Live computed duration per meter, so typos stand out.
-5. Day/night landings via +/− steppers (default 1 day landing).
-6. Optional toggle: "Report a squawk" → continues into the squawk flow with aircraft pre-selected.
-7. Clear confirmation on submit.
+5. Optional toggle: "Report a squawk" → continues into the squawk flow with aircraft pre-selected.
+6. Clear confirmation on submit.
 
 ### Report a squawk (one-thumb usable)
 1. Aircraft pre-selected when coming from a flight; otherwise a picker.
@@ -193,7 +192,7 @@ Build these by hand as needed; no generic admin framework for now. Drizzle Studi
 6. **Report a squawk** page with grounding and photos.
 7. Officer pages: resolve squawks / unground, manage aircraft & meters, manage members.
 8. MaintenanceItem tracking and due-soon warnings.
-9. PilotQualification tracking, computed currency, pre-flight warnings.
+9. PilotQualification tracking and pre-flight warnings.
 10. README documenting how each piece works, how to run locally, how to deploy and promote, and how to restore a backup.
 
 ---

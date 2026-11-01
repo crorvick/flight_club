@@ -1,8 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
-  checkIn,
-  checkOut,
   closeSql,
   createAircraft,
   deleteAircraft,
@@ -49,7 +47,6 @@ test("a new pilot is told what's missing, and keeps it up to date", async ({
   await expect(box).toContainText("No medical on file.");
   await expect(box).toContainText("No flight review on file.");
   await expect(box).toContainText("You're not checked out in this aircraft.");
-  await expect(box).toContainText("Not current to carry passengers: 0 of 3");
 
   await page.goto("/qualifications");
   await page.getByLabel("Medical", { exact: true }).selectOption("Third class");
@@ -117,22 +114,4 @@ test("an officer records a checkout, which clears the warning", async ({
   await openLog(page);
   await expect(warnings(page)).toContainText("not checked out");
   await context.close();
-});
-
-test("logged landings count toward passenger currency", async ({
-  page,
-}, testInfo) => {
-  await signUpPilot(page, testInfo);
-  await checkOut(page, aircraft);
-  await page.getByRole("button", { name: "More day landings" }).click();
-  await page.getByRole("button", { name: "More day landings" }).click();
-  await checkIn(page, aircraft, { Hobbs: "101.5", Tach: "81.2" });
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-
-  await openLog(page);
-  await expect(warnings(page)).toContainText(
-    "Not current to carry passengers at night: 0 of 3 night landings",
-  );
-  await page.goto("/qualifications");
-  await expect(page.getByText("3 landings, 0 at night")).toBeVisible();
 });

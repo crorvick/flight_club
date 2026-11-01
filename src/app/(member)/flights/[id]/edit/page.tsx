@@ -80,8 +80,6 @@ async function EditFlight({
         }))}
         initial={{
           date: flight.date,
-          dayLandings: flight.dayLandings,
-          nightLandings: flight.nightLandings,
           notes: flight.notes ?? "",
           ins: Object.fromEntries(
             flight.readings.map((r) => [
@@ -134,8 +132,6 @@ async function OfficerCorrection({
         flight={{
           pilotId: flight.pilotId,
           date: flight.date,
-          dayLandings: flight.dayLandings,
-          nightLandings: flight.nightLandings,
           notes: flight.notes ?? "",
         }}
         readings={flight.readings}

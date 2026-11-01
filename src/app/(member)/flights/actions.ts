@@ -260,8 +260,6 @@ export async function officerUpdateFlight(
       const diff = changedFields(
         {
           date: row.date,
-          dayLandings: row.dayLandings,
-          nightLandings: row.nightLandings,
           notes: row.notes,
           pilotId: row.pilotId,
           billedHours: row.billedHours,

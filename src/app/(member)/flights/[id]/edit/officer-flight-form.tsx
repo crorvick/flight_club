@@ -24,8 +24,6 @@ export function OfficerFlightForm({
   flight: {
     pilotId: string;
     date: string;
-    dayLandings: number;
-    nightLandings: number;
     notes: string;
   };
   readings: Reading[];
@@ -114,19 +112,6 @@ export function OfficerFlightForm({
           );
         })}
       </fieldset>
-
-      <div className="grid grid-cols-2 gap-4">
-        {(["dayLandings", "nightLandings"] as const).map((name) => (
-          <Field
-            key={name}
-            name={name}
-            label={name === "dayLandings" ? "Day landings" : "Night landings"}
-            inputMode="numeric"
-            defaultValue={values?.[name] ?? String(flight[name])}
-            errors={errors[name]}
-          />
-        ))}
-      </div>
 
       <Field
         name="date"
