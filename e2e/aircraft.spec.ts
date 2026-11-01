@@ -267,3 +267,19 @@ test("changing the logbook meter moves hours maintenance to it", async ({
     page.getByText("due at 1300.0 on the hobbs (50.0 hours left)"),
   ).toBeVisible();
 });
+
+test("an officer marks an aircraft as a twin", async ({ page }, testInfo) => {
+  const plane = await createAircraft(testInfo, { tach: "400.00" }, "tach");
+  created.push(plane.id);
+
+  await page.goto(`/aircraft/${plane.id}`);
+  await page.getByRole("group", { name: "Engines" }).getByLabel("Twin").check();
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Details saved.")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Engines" }).getByLabel("Twin"),
+  ).toBeChecked();
+
+  await checkOut(page, plane);
+  await expect(page.getByLabel("Oil added, right (qt)")).toBeVisible();
+});

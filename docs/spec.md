@@ -64,7 +64,7 @@ Environment rules:
 - id, name, email, role tags, active flag, auth fields (managed by Better Auth)
 
 ### Aircraft
-- id, tail number, make/model, active flag, whether it has a fuel totalizer
+- id, tail number, make/model, active flag, whether it has a fuel totalizer, number of engines (single or twin; a twin's oil is recorded per engine, left and right)
 - `billingMeterId` → references one of this aircraft's meters
 - `logbookMeterId` → the meter that is its time in the maintenance logs (usually tach); hours intervals count on it
 - Plane captains: the members assigned to look after it (an AircraftCaptain row per member)
@@ -104,6 +104,11 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days)
 - Last completed date/reading, interval, computed next due
 - When overdue: grounds the aircraft, grounds it for IFR only, or only warns (chosen per item)
+- A **kind**, which sets what logging a completion records besides the date, reading and note:
+  - **General**: nothing more.
+  - **VOR check** (14 CFR 91.171): how it was checked (VOT, ground checkpoint, airborne checkpoint, or dual VOR), where, and the bearing error of each receiver (or the difference between them on a dual check). A check outside the limit for its method (±4°, or ±6° airborne) is refused: it doesn't count. The member logging it is recorded, standing in for the signature.
+  - **Oil change**: quarts put in each engine, the oil used (suggested from the aircraft's last oil change), whether the filter was replaced and an oil sample sent.
+- Each completion keeps its kind's details, so the item's history reads like the logbook entry.
 
 ### PilotQualification
 - Medical (class, expiration), flight review (date → expiration), per-aircraft checkouts

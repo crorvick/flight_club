@@ -8,6 +8,8 @@ import { aircraftAlerts } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder } from "@/lib/meters";
 
+import type { FluidSetup } from "./fluid-fields";
+
 export async function lastFlownAircraftId(pilotId: string) {
   const [row] = await db()
     .select({ aircraftId: flight.aircraftId })
@@ -61,7 +63,12 @@ export async function getFlight(id: string) {
     where: eq(flight.id, id),
     with: {
       aircraft: {
-        columns: { id: true, tailNumber: true, hasFuelTotalizer: true },
+        columns: {
+          id: true,
+          tailNumber: true,
+          hasFuelTotalizer: true,
+          engineCount: true,
+        },
       },
       pilot: { columns: { id: true, name: true } },
       readings: { with: { meter: true } },
@@ -102,6 +109,7 @@ export async function recentFlights(pilotId: string, limit = 5) {
 type StoredFluids = {
   fuelAdded: string | null;
   oilAdded: string | null;
+  oilAdded2: string | null;
   totalizerFuel: string | null;
 };
 
@@ -112,17 +120,22 @@ export function fluidValues(flight: StoredFluids) {
   return {
     fuelAdded: show(flight.fuelAdded),
     oilAdded: show(flight.oilAdded),
+    oilAdded2: show(flight.oilAdded2),
     totalizerFuel: show(flight.totalizerFuel),
   };
 }
 
-// Show the totalizer field when the aircraft has one, or the flight
-// recorded it before the aircraft's setting changed.
-export const hasTotalizer = (
+// The fuel and oil fields for editing a flight: the aircraft's, plus any
+// the flight recorded before the aircraft's settings changed (a totalizer
+// since removed, a twin's second engine).
+export const fluidSetup = (
   flight: StoredFluids & {
-    aircraft: { hasFuelTotalizer: boolean };
+    aircraft: { hasFuelTotalizer: boolean; engineCount: number };
   },
-) => flight.aircraft.hasFuelTotalizer || flight.totalizerFuel !== null;
+): FluidSetup => ({
+  totalizer: flight.aircraft.hasFuelTotalizer || flight.totalizerFuel !== null,
+  engines: flight.oilAdded2 !== null ? 2 : flight.aircraft.engineCount,
+});
 
 // The pilots a flight can be logged to: active pilots, plus whoever it's
 // logged to now, even if they've since lost the tag.

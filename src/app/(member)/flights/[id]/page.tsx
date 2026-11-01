@@ -140,9 +140,21 @@ async function FlightDetails({
             )}
             {flight.oilAdded !== null && (
               <div>
-                <dt className="text-sm text-muted-foreground">Oil added</dt>
+                <dt className="text-sm text-muted-foreground">
+                  {flight.oilAdded2 === null ? "Oil added" : "Oil added, left"}
+                </dt>
                 <dd className="font-medium tabular-nums">
                   {formatAmount(flight.oilAdded, "qt")}
+                </dd>
+              </div>
+            )}
+            {flight.oilAdded2 !== null && (
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Oil added, right
+                </dt>
+                <dd className="font-medium tabular-nums">
+                  {formatAmount(flight.oilAdded2, "qt")}
                 </dd>
               </div>
             )}

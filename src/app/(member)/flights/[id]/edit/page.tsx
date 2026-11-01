@@ -12,7 +12,7 @@ import { formatHours, parseHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
 import { officerUpdateFlight, updateFlight } from "../../actions";
-import { fluidValues, getFlight, hasTotalizer, pilotChoices } from "../../data";
+import { fluidSetup, fluidValues, getFlight, pilotChoices } from "../../data";
 import { FlightForm } from "../../flight-form";
 import { OfficerFlightForm } from "./officer-flight-form";
 
@@ -93,7 +93,7 @@ async function EditFlight({
           ),
           ...fluidValues(flight),
         }}
-        totalizer={hasTotalizer(flight)}
+        fluids={fluidSetup(flight)}
         submitLabel="Save changes"
         pendingLabel="Saving…"
       />
@@ -133,7 +133,7 @@ async function OfficerCorrection({
           notes: flight.notes ?? "",
           ...fluidValues(flight),
         }}
-        totalizer={hasTotalizer(flight)}
+        fluids={fluidSetup(flight)}
         readings={flight.readings}
         meterNote="The flights before and after this one aren't changed. If a reading was carried into the next flight, correct that one too."
         reasonLabel="Reason for the correction"

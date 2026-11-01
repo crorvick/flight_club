@@ -21,7 +21,7 @@ import { isUuid } from "@/lib/ids";
 import { parseHours, toHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
-import { hasTotalizer } from "./data";
+import { fluidSetup } from "./data";
 import { inField, outField } from "./fields";
 import {
   DETAIL_FIELDS,
@@ -60,7 +60,7 @@ export async function updateFlight(
     where: eq(flight.id, flightId),
     with: {
       readings: { with: { meter: true } },
-      aircraft: { columns: { hasFuelTotalizer: true } },
+      aircraft: { columns: { hasFuelTotalizer: true, engineCount: true } },
     },
   });
   if (!existing) notFound();
@@ -77,7 +77,7 @@ export async function updateFlight(
     out: parseHours(r.out)!,
   }));
   const parsed = parseFlightForm(formData, outs, {
-    totalizer: hasTotalizer(existing),
+    ...fluidSetup(existing),
   });
   if (parsed.fieldErrors) return { fieldErrors: parsed.fieldErrors, values };
   const { details, ins } = parsed;
@@ -163,7 +163,7 @@ export async function officerUpdateFlight(
     where: eq(flight.id, flightId),
     with: {
       readings: { with: { meter: true } },
-      aircraft: { columns: { hasFuelTotalizer: true } },
+      aircraft: { columns: { hasFuelTotalizer: true, engineCount: true } },
     },
   });
   if (!existing) notFound();
@@ -191,7 +191,7 @@ export async function officerUpdateFlight(
     }
   }
   const parsed = parseFlightForm(formData, outs, {
-    totalizer: hasTotalizer(existing),
+    ...fluidSetup(existing),
   });
   if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);
   const reason = values.reason.trim();
@@ -286,6 +286,7 @@ export async function officerUpdateFlight(
           notes: row.notes,
           fuelAdded: row.fuelAdded,
           oilAdded: row.oilAdded,
+          oilAdded2: row.oilAdded2,
           totalizerFuel: row.totalizerFuel,
           pilotId: row.pilotId,
           billedHours: row.billedHours,
@@ -356,6 +357,7 @@ export async function addPastFlight(
   }
   const parsed = parseFlightForm(formData, outs, {
     totalizer: plane.hasFuelTotalizer,
+    engines: plane.engineCount,
   });
   if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);
   const reason = values.reason.trim();

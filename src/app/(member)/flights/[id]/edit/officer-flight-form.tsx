@@ -10,7 +10,11 @@ import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
 import { inField, outField } from "../../fields";
-import { FluidFields, type FluidValues } from "../../fluid-fields";
+import {
+  FluidFields,
+  type FluidSetup,
+  type FluidValues,
+} from "../../fluid-fields";
 
 // Readings as stored, or blank for a flight being added.
 type Reading = { meterId: string; label: string; out: string; in: string };
@@ -24,7 +28,7 @@ export function OfficerFlightForm({
   action,
   pilots,
   flight,
-  totalizer,
+  fluids,
   readings,
   meterNote,
   reasonLabel,
@@ -38,7 +42,7 @@ export function OfficerFlightForm({
     date: string;
     notes: string;
   } & FluidValues;
-  totalizer: boolean;
+  fluids: FluidSetup;
   readings: Reading[];
   meterNote: string;
   reasonLabel: string;
@@ -135,7 +139,7 @@ export function OfficerFlightForm({
       </fieldset>
 
       <FluidFields
-        totalizer={totalizer}
+        fluids={fluids}
         values={values}
         initial={flight}
         errors={errors}

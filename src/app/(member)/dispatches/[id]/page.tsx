@@ -51,6 +51,7 @@ async function Dispatch({
           tailNumber: true,
           billingMeterId: true,
           hasFuelTotalizer: true,
+          engineCount: true,
         },
       },
       pilot: { columns: { name: true } },
@@ -148,7 +149,10 @@ async function Dispatch({
               out: r.out,
               billing: r.meterId === row.aircraft.billingMeterId,
             }))}
-            totalizer={row.aircraft.hasFuelTotalizer}
+            fluids={{
+              totalizer: row.aircraft.hasFuelTotalizer,
+              engines: row.aircraft.engineCount,
+            }}
             submitLabel={`Check in ${tail}`}
             pendingLabel="Checking in…"
             offerSquawk

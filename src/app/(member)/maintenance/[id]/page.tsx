@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -16,6 +16,7 @@ import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
+import { describeDetails, KIND_LABELS } from "@/lib/maintenance-kinds";
 import { requireMember } from "@/lib/session";
 
 import { completeItem, deleteItem, updateItem } from "../actions";
@@ -53,7 +54,7 @@ async function ItemDetails({
     where: eq(maintenanceItem.id, id),
     with: {
       aircraft: {
-        columns: { id: true, tailNumber: true },
+        columns: { id: true, tailNumber: true, engineCount: true },
         // Hours intervals count on it.
         with: {
           logbookMeter: { columns: { label: true, currentReading: true } },
@@ -76,12 +77,20 @@ async function ItemDetails({
     today(),
   );
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
+  const lastOilType =
+    item.kind === "oil_change"
+      ? await lastOilTypeOn(item.aircraft.id)
+      : undefined;
 
   return (
     <>
       <Flash message={confirmation} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{item.name}</h1>
+        {/* The kind, unless the name already says it. */}
+        {item.kind !== "general" && KIND_LABELS[item.kind] !== item.name && (
+          <p className="text-muted-foreground">{KIND_LABELS[item.kind]}</p>
+        )}
         <Link
           href={`/aircraft/${item.aircraft.id}/maintenance`}
           className="text-sm underline"
@@ -116,6 +125,9 @@ async function ItemDetails({
       <CompletionForm
         key={`${item.lastCompletedOn}-${item.lastCompletedReading}`}
         action={completeItem.bind(null, item.id)}
+        kind={item.kind}
+        engines={item.aircraft.engineCount}
+        lastOilType={lastOilType}
         meterLabel={hours ? logbook?.label : undefined}
         currentReading={hours ? logbook?.currentReading : undefined}
       />
@@ -133,6 +145,9 @@ async function ItemDetails({
                   {" "}
                   · {c.recordedBy?.name ?? "unknown"}
                 </span>
+                {c.details && (
+                  <p className="mt-1">{describeDetails(c.details)}</p>
+                )}
                 {c.note && <p className="mt-1 whitespace-pre-wrap">{c.note}</p>}
               </li>
             ))}
@@ -152,4 +167,29 @@ async function ItemDetails({
       </SectionCard>
     </>
   );
+}
+
+// The oil the aircraft's last oil change used, whichever item logged it.
+async function lastOilTypeOn(aircraftId: string) {
+  const [last] = await db()
+    .select({ details: maintenanceCompletion.details })
+    .from(maintenanceCompletion)
+    .innerJoin(
+      maintenanceItem,
+      eq(maintenanceItem.id, maintenanceCompletion.itemId),
+    )
+    .where(
+      and(
+        eq(maintenanceItem.aircraftId, aircraftId),
+        sql`${maintenanceCompletion.details}->>'kind' = 'oil_change'`,
+      ),
+    )
+    .orderBy(
+      desc(maintenanceCompletion.completedOn),
+      desc(maintenanceCompletion.createdAt),
+    )
+    .limit(1);
+  return last?.details?.kind === "oil_change"
+    ? last.details.oilType
+    : undefined;
 }

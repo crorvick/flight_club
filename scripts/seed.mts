@@ -263,12 +263,14 @@ try {
         for (const item of items) {
           await tx`
             insert into maintenance_item (
-              aircraft_id, name, interval_months, interval_days,
+              aircraft_id, name, kind, interval_months, interval_days,
               interval_hours, last_completed_on,
               last_completed_reading, grounding
             )
             values (
-              ${aircraftId}, ${item.name}, ${item.months ?? null},
+              ${aircraftId}, ${item.name},
+              ${{ "VOR check": "vor_check", "Oil change": "oil_change" }[item.name] ?? "general"},
+              ${item.months ?? null},
               ${item.days ?? null},
               ${item.hours === undefined ? null : toHours(item.hours)},
               ${isoDaysAgo(item.lastDaysAgo)},

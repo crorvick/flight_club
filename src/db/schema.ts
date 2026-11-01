@@ -5,6 +5,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  type CheckBuilder,
   date,
   foreignKey,
   type ForeignKeyBuilder,
@@ -22,7 +23,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { MAX_ENGINES } from "@/lib/engines";
 import { GROUNDING_LEVELS } from "@/lib/grounding";
+import {
+  type CompletionDetails,
+  MAINTENANCE_KINDS,
+} from "@/lib/maintenance-kinds";
 import { METER_KINDS } from "@/lib/meters";
 import { MEDICAL_CLASSES } from "@/lib/qualifications";
 import { ROLE_TAGS } from "@/lib/roles";
@@ -140,6 +146,8 @@ export const squawkCategory = pgEnum("squawk_category", SQUAWK_CATEGORIES);
 // How much flying a squawk or overdue maintenance item rules out.
 export const grounding = pgEnum("grounding", GROUNDING_LEVELS);
 
+export const maintenanceKind = pgEnum("maintenance_kind", MAINTENANCE_KINDS);
+
 export const squawkStatus = pgEnum("squawk_status", [
   "open",
   "deferred",
@@ -162,6 +170,8 @@ export const aircraft = pgTable(
     active: boolean("active").default(true).notNull(),
     // Pilots record its fuel remaining at the end of each flight.
     hasFuelTotalizer: boolean("has_fuel_totalizer").default(false).notNull(),
+    // 1, or 2 for a twin, whose oil is recorded per engine.
+    engineCount: integer("engine_count").default(1).notNull(),
     // Which meter flights are billed by.  Nullable only because an
     // aircraft has to exist before its meters can.
     billingMeterId: uuid("billing_meter_id"),
@@ -172,7 +182,7 @@ export const aircraft = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (table): ForeignKeyBuilder[] => [
+  (table): (ForeignKeyBuilder | CheckBuilder)[] => [
     // Pairing the meter with this aircraft's id means the billing meter
     // can only be one of the aircraft's own meters.
     foreignKey({
@@ -185,6 +195,10 @@ export const aircraft = pgTable(
       columns: [table.logbookMeterId, table.id],
       foreignColumns: [meter.id, meter.aircraftId],
     }),
+    check(
+      "aircraft_engine_count",
+      sql`${table.engineCount} between 1 and ${sql.raw(String(MAX_ENGINES))}`,
+    ),
   ],
 );
 
@@ -225,11 +239,14 @@ export const flight = pgTable(
       .references(() => member.id),
     date: date("date").notNull(),
     notes: text("notes"),
-    // All optional, to a tenth: fuel (gallons) and oil (quarts) added for
-    // the flight, and the fuel remaining the totalizer showed at the end,
-    // for aircraft that have one.
+    // To a tenth: fuel (gallons) and oil (quarts) added for the flight,
+    // and the fuel remaining the totalizer showed at the end, for aircraft
+    // that have one.  Required when logging; null on flights from before
+    // they were recorded.  Oil is per engine: oilAdded is a single's one
+    // engine or a twin's left, oilAdded2 a twin's right.
     fuelAdded: numeric("fuel_added", { precision: 4, scale: 1 }),
     oilAdded: numeric("oil_added", { precision: 3, scale: 1 }),
+    oilAdded2: numeric("oil_added_2", { precision: 3, scale: 1 }),
     totalizerFuel: numeric("totalizer_fuel", { precision: 4, scale: 1 }),
     // Copied from the aircraft when the flight is logged, so changing an
     // aircraft's billing meter later never re-bills past flights.
@@ -249,6 +266,7 @@ export const flight = pgTable(
       "flight_fluids_nonnegative",
       sql`coalesce(${table.fuelAdded}, 0) >= 0
         and coalesce(${table.oilAdded}, 0) >= 0
+        and coalesce(${table.oilAdded2}, 0) >= 0
         and coalesce(${table.totalizerFuel}, 0) >= 0`,
     ),
   ],
@@ -493,6 +511,8 @@ export const maintenanceItem = pgTable(
       .notNull()
       .references(() => aircraft.id),
     name: text("name").notNull(),
+    // What logging a completion asks for (lib/maintenance-kinds.ts).
+    kind: maintenanceKind("kind").default("general").notNull(),
     intervalMonths: integer("interval_months"),
     intervalDays: integer("interval_days"),
     // Months run to the end of the month (annuals, ELTs) unless this is
@@ -557,6 +577,9 @@ export const maintenanceCompletion = pgTable(
     completedOn: date("completed_on").notNull(),
     reading: hours("reading"),
     note: text("note"),
+    // What the item's kind records beyond the date and reading, such as a
+    // VOR check's bearing errors.  Null for general items.
+    details: jsonb("details").$type<CompletionDetails>(),
     recordedById: uuid("recorded_by_id").references(() => member.id, {
       onDelete: "set null",
     }),

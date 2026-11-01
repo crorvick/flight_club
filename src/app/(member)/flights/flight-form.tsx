@@ -13,7 +13,7 @@ import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
 import { inField } from "./fields";
-import { FluidFields, type FluidValues } from "./fluid-fields";
+import { FluidFields, type FluidSetup, type FluidValues } from "./fluid-fields";
 
 export type FormMeter = {
   id: string;
@@ -26,8 +26,8 @@ export type FormMeter = {
 type FlightFormProps = {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   meters: FormMeter[];
-  // Whether the aircraft has a fuel totalizer to record.
-  totalizer: boolean;
+  // The aircraft's fuel and oil fields.
+  fluids: FluidSetup;
   initial?: {
     date: string;
     notes: string;
@@ -49,7 +49,7 @@ function localToday() {
 export function FlightForm({
   action,
   meters,
-  totalizer,
+  fluids,
   initial,
   submitLabel,
   pendingLabel,
@@ -117,7 +117,7 @@ export function FlightForm({
 
       <FluidFields
         step={2}
-        totalizer={totalizer}
+        fluids={fluids}
         values={values}
         initial={initial}
         errors={state.fieldErrors ?? {}}

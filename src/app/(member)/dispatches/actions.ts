@@ -259,11 +259,15 @@ export async function checkIn(
     out: parseHours(r.out)!,
   }));
   const [plane] = await db()
-    .select({ hasFuelTotalizer: aircraft.hasFuelTotalizer })
+    .select({
+      hasFuelTotalizer: aircraft.hasFuelTotalizer,
+      engineCount: aircraft.engineCount,
+    })
     .from(aircraft)
     .where(eq(aircraft.id, row.aircraftId));
   const parsed = parseFlightForm(formData, outs, {
     totalizer: plane.hasFuelTotalizer,
+    engines: plane.engineCount,
   });
   if (parsed.fieldErrors) return { fieldErrors: parsed.fieldErrors, values };
   const { details, ins } = parsed;

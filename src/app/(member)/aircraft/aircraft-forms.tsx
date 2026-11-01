@@ -39,6 +39,37 @@ function Saving({
   );
 }
 
+// Single or twin: a twin's oil is recorded per engine.
+function EnginesField({ defaultValue }: { defaultValue: number }) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 font-medium">Engines</legend>
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            [1, "Single"],
+            [2, "Twin"],
+          ] as const
+        ).map(([count, label]) => (
+          <label
+            key={count}
+            className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border px-3"
+          >
+            <input
+              type="radio"
+              name="engineCount"
+              value={count}
+              defaultChecked={defaultValue === count}
+              className="size-5 accent-primary"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function ErrorText({ errors }: { errors?: string[] }) {
   if (!errors) return null;
   return <p className="text-sm text-destructive">{errors[0]}</p>;
@@ -122,6 +153,8 @@ export function NewAircraftForm({
         <ErrorText errors={errors.logbook} />
       </fieldset>
 
+      <EnginesField defaultValue={values?.engineCount === "2" ? 2 : 1} />
+
       <label className="flex min-h-11 cursor-pointer items-center gap-3">
         <input
           type="checkbox"
@@ -153,6 +186,7 @@ export function DetailsForm({
     makeModel: string;
     active: boolean;
     hasFuelTotalizer: boolean;
+    engineCount: number;
     billingMeterId: string | null;
     logbookMeterId: string | null;
   };
@@ -244,6 +278,7 @@ export function DetailsForm({
           </span>
         </span>
       </label>
+      <EnginesField defaultValue={aircraft.engineCount} />
       <label className="flex min-h-11 cursor-pointer items-center gap-3">
         <input
           type="checkbox"

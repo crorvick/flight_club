@@ -66,6 +66,11 @@ const meterLabel = z
   .min(1, "Give the meter a label.")
   .max(30, "Keep it under 30 characters.");
 
+// A single unless the form says it's a twin.
+function engineCount(formData: FormData) {
+  return formData.get("engineCount") === "2" ? 2 : 1;
+}
+
 function reading(typed: string) {
   const hundredths = parseHours(typed);
   return hundredths === null ? null : toHours(hundredths);
@@ -82,6 +87,7 @@ export async function createAircraft(
     "billing",
     "logbook",
     "hasFuelTotalizer",
+    "engineCount",
     ...METER_KINDS.map(readingField),
   ]);
 
@@ -137,6 +143,7 @@ export async function createAircraft(
         .values({
           ...details.data,
           hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+          engineCount: engineCount(formData),
         })
         .returning({ id: aircraft.id });
       const rows = await tx
@@ -167,6 +174,7 @@ export async function createAircraft(
         after: {
           ...details.data,
           hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+          engineCount: engineCount(formData),
           meters: Object.fromEntries(meters.map((m) => [m.kind, m.reading])),
           billing: values.billing,
           logbook,
@@ -232,6 +240,7 @@ export async function updateAircraft(
     ...parsed.data,
     active: formData.get("active") === "on",
     hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+    engineCount: engineCount(formData),
   };
 
   try {
@@ -244,6 +253,7 @@ export async function updateAircraft(
           logbookMeterId: aircraft.logbookMeterId,
           active: aircraft.active,
           hasFuelTotalizer: aircraft.hasFuelTotalizer,
+          engineCount: aircraft.engineCount,
         })
         .from(aircraft)
         .where(eq(aircraft.id, aircraftId))

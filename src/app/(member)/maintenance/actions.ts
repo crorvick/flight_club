@@ -13,6 +13,11 @@ import { type FormState, formValues } from "@/lib/form-state";
 import { GROUNDING_LEVELS } from "@/lib/grounding";
 import { parseHours, toHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
+import {
+  FIELDS,
+  MAINTENANCE_KINDS,
+  parseCompletionDetails,
+} from "@/lib/maintenance-kinds";
 import { requireMember } from "@/lib/session";
 
 const ITEM_FIELDS = [
@@ -21,12 +26,19 @@ const ITEM_FIELDS = [
   "calendarUnit",
   "calendarDeadline",
   "intervalHours",
+  "kind",
   "lastCompletedOn",
   "lastCompletedReading",
   "grounding",
 ];
 
 const isoDate = z.iso.date("Enter a date.");
+
+// Every field a kind of item's completion form can send, to echo back
+// after a rejected save.
+const DETAIL_FIELDS = Object.values(FIELDS).flatMap((field) =>
+  typeof field === "string" ? [field] : [field(0), field(1)],
+);
 const optionalHours = (message: string) =>
   z
     .string()
@@ -64,6 +76,7 @@ const itemSchema = z
         }
         return count;
       }),
+    kind: z.enum(MAINTENANCE_KINDS, "Choose what kind of item it is."),
     calendarUnit: z.enum(["months", "days"]),
     calendarDeadline: z.enum(["end-of-month", "exact"]),
     intervalHours: optionalHours("Enter hours like 100 or 50.5."),
@@ -106,6 +119,7 @@ function parseItem(formData: FormData) {
   return itemSchema.safeParse({
     name: formData.get("name") ?? "",
     calendarInterval: formData.get("calendarInterval") ?? "",
+    kind: formData.get("kind") ?? "general",
     calendarUnit: formData.get("calendarUnit") ?? "months",
     calendarDeadline: formData.get("calendarDeadline") ?? "end-of-month",
     intervalHours: formData.get("intervalHours") ?? "",
@@ -249,16 +263,40 @@ export async function completeItem(
 ): Promise<FormState> {
   const actor = await requireItemMaintainer(itemId);
   if (!actor) return { error: "No such item." };
-  const values = formValues(formData, ["completedOn", "reading", "note"]);
+  const values = formValues(formData, [
+    "completedOn",
+    "reading",
+    "note",
+    ...DETAIL_FIELDS,
+  ]);
   const parsed = completionSchema.safeParse({
     completedOn: formData.get("completedOn") ?? "",
     reading: formData.get("reading") ?? "",
     note: formData.get("note") ?? "",
   });
-  if (!parsed.success) {
-    return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
+
+  // What the item's kind records, on top of the date and reading.
+  const [target] = await db()
+    .select({ kind: maintenanceItem.kind, engines: aircraft.engineCount })
+    .from(maintenanceItem)
+    .innerJoin(aircraft, eq(aircraft.id, maintenanceItem.aircraftId))
+    .where(eq(maintenanceItem.id, itemId));
+  if (!target) return { error: "No such item.", values };
+  const extra = parseCompletionDetails(
+    target.kind,
+    (name) => String(formData.get(name) ?? ""),
+    { engines: target.engines },
+  );
+  if (!parsed.success || "fieldErrors" in extra) {
+    return {
+      fieldErrors: {
+        ...(parsed.success ? {} : z.flattenError(parsed.error).fieldErrors),
+        ...("fieldErrors" in extra ? extra.fieldErrors : {}),
+      },
+      values,
+    };
   }
-  const completion = parsed.data;
+  const completion = { ...parsed.data, details: extra.details };
 
   const error = await db().transaction(async (tx) => {
     const [item] = await tx
@@ -294,7 +332,11 @@ export async function completeItem(
         lastCompletedOn: item.lastCompletedOn,
         lastCompletedReading: item.lastCompletedReading,
       },
-      after: { ...next, note: completion.note },
+      after: {
+        ...next,
+        note: completion.note,
+        ...(completion.details && { details: completion.details }),
+      },
     });
     return undefined;
   });

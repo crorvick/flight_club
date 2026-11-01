@@ -28,6 +28,7 @@ export async function recordFlight(
       notes: string | null;
       fuelAdded: string | null;
       oilAdded: string | null;
+      oilAdded2: string | null;
       totalizerFuel: string | null;
     };
     latest?: boolean;

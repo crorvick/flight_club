@@ -39,7 +39,12 @@ async function NewPastFlight({
 
   const plane = await db().query.aircraft.findFirst({
     where: eq(aircraft.id, id),
-    columns: { id: true, tailNumber: true, hasFuelTotalizer: true },
+    columns: {
+      id: true,
+      tailNumber: true,
+      hasFuelTotalizer: true,
+      engineCount: true,
+    },
     with: { meters: true },
   });
   if (!plane) notFound();
@@ -68,9 +73,13 @@ async function NewPastFlight({
           notes: "",
           fuelAdded: "",
           oilAdded: "",
+          oilAdded2: "",
           totalizerFuel: "",
         }}
-        totalizer={plane.hasFuelTotalizer}
+        fluids={{
+          totalizer: plane.hasFuelTotalizer,
+          engines: plane.engineCount,
+        }}
         readings={meters.map((m) => ({
           meterId: m.id,
           label: m.label,

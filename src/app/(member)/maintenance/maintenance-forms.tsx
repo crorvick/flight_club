@@ -1,13 +1,24 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { FormState } from "@/lib/form-state";
 import type { Grounding } from "@/lib/grounding";
+import { engineLabels } from "@/lib/engines";
 import { formatHours, parseHours } from "@/lib/hours";
+import {
+  FIELDS,
+  KIND_LABELS,
+  MAINTENANCE_KINDS,
+  type MaintenanceKind,
+  VOR_LIMITS,
+  VOR_METHOD_LABELS,
+  VOR_METHODS,
+  type VorMethod,
+} from "@/lib/maintenance-kinds";
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
@@ -21,6 +32,7 @@ function ErrorText({ errors }: { errors?: string[] }) {
 
 export type ItemValues = {
   name: string;
+  kind: MaintenanceKind;
   intervalMonths: number | null;
   intervalDays: number | null;
   dueEndOfMonth: boolean;
@@ -56,6 +68,26 @@ export function ItemForm({
         defaultValue={values?.name ?? item?.name}
         errors={errors.name}
       />
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="kind">Kind</Label>
+        <select
+          id="kind"
+          name="kind"
+          defaultValue={values?.kind ?? item?.kind ?? "general"}
+          className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
+        >
+          {MAINTENANCE_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {KIND_LABELS[kind]}
+            </option>
+          ))}
+        </select>
+        <p className="text-sm text-muted-foreground">
+          What logging it asks for: a VOR check its bearing errors, an oil
+          change the oil put in. General is a date and a note.
+        </p>
+        <ErrorText errors={errors.kind} />
+      </div>
 
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 font-medium">
@@ -210,10 +242,18 @@ function localToday() {
 
 export function CompletionForm({
   action,
+  kind,
+  engines,
+  lastOilType,
   meterLabel,
   currentReading,
 }: {
   action: Action;
+  kind: MaintenanceKind;
+  // The aircraft's, for an oil change's per-engine amounts.
+  engines: number;
+  // What the last oil change on the aircraft used, to suggest.
+  lastOilType?: string;
   // Set when the item has an hours interval.
   meterLabel?: string;
   currentReading?: string;
@@ -257,6 +297,17 @@ export function CompletionForm({
           />
         )}
       </div>
+      {kind === "vor_check" && (
+        <VorCheckFields values={values} errors={errors} />
+      )}
+      {kind === "oil_change" && (
+        <OilChangeFields
+          engines={engines}
+          lastOilType={lastOilType}
+          values={values}
+          errors={errors}
+        />
+      )}
       <div className="flex flex-col gap-2">
         <Label htmlFor="completionNote">Note (optional)</Label>
         <textarea
@@ -290,5 +341,143 @@ export function DeleteItemForm({ action }: { action: Action }) {
         Remove this item
       </Button>
     </form>
+  );
+}
+
+type KindFieldsProps = {
+  values?: Record<string, string>;
+  errors: Partial<Record<string, string[]>>;
+};
+
+// What 14 CFR 91.171 asks to be recorded: how and where it was checked,
+// and the bearing error found, within the limit for the method.
+function VorCheckFields({ values, errors }: KindFieldsProps) {
+  const [method, setMethod] = useState<VorMethod>(
+    (values?.[FIELDS.vorMethod] as VorMethod) || "vot",
+  );
+  const limit = VOR_LIMITS[method];
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 font-medium">VOR check</legend>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={FIELDS.vorMethod}>Checked against</Label>
+        <select
+          id={FIELDS.vorMethod}
+          name={FIELDS.vorMethod}
+          value={method}
+          onChange={(e) => setMethod(e.target.value as VorMethod)}
+          className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
+        >
+          {VOR_METHODS.map((m) => (
+            <option key={m} value={m}>
+              {VOR_METHOD_LABELS[m]} (±{VOR_LIMITS[m]}°)
+            </option>
+          ))}
+        </select>
+        <ErrorText errors={errors[FIELDS.vorMethod]} />
+      </div>
+      <Field
+        name={FIELDS.vorPlace}
+        label="Where"
+        placeholder={
+          method === "vot"
+            ? "KMSP VOT"
+            : method === "dual"
+              ? "Over the GEP VOR"
+              : "FCM checkpoint, runway 28R run-up"
+        }
+        defaultValue={values?.[FIELDS.vorPlace]}
+        errors={errors[FIELDS.vorPlace]}
+      />
+      {method === "dual" ? (
+        <Field
+          name={FIELDS.vorBetween}
+          label="Difference between receivers (°)"
+          inputMode="decimal"
+          defaultValue={values?.[FIELDS.vorBetween]}
+          errors={errors[FIELDS.vorBetween]}
+        />
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            name={FIELDS.vorNav1}
+            label="NAV 1 error (°)"
+            inputMode="decimal"
+            placeholder="+2"
+            defaultValue={values?.[FIELDS.vorNav1]}
+            errors={errors[FIELDS.vorNav1]}
+          />
+          <Field
+            name={FIELDS.vorNav2}
+            label="NAV 2 error (°)"
+            inputMode="decimal"
+            placeholder="Blank if none"
+            defaultValue={values?.[FIELDS.vorNav2]}
+            errors={errors[FIELDS.vorNav2]}
+          />
+        </div>
+      )}
+      <p className="text-sm text-muted-foreground">
+        Within ±{limit}° for this check. Logging it records you as the person
+        who made it.
+      </p>
+    </fieldset>
+  );
+}
+
+// The oil put in each engine and what it was, suggesting last time's.
+function OilChangeFields({
+  engines,
+  lastOilType,
+  values,
+  errors,
+}: KindFieldsProps & { engines: number; lastOilType?: string }) {
+  const labels = engineLabels(engines);
+  const check = "flex min-h-11 cursor-pointer items-center gap-3";
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 font-medium">Oil change</legend>
+      <div className="grid grid-cols-2 gap-3">
+        {labels.map((label, engine) => (
+          <Field
+            key={engine}
+            name={FIELDS.oilQuarts(engine)}
+            label={
+              label
+                ? `Oil put in, ${label.toLowerCase()} (qt)`
+                : "Oil put in (qt)"
+            }
+            inputMode="decimal"
+            defaultValue={values?.[FIELDS.oilQuarts(engine)]}
+            errors={errors[FIELDS.oilQuarts(engine)]}
+          />
+        ))}
+      </div>
+      <Field
+        name={FIELDS.oilType}
+        label="Oil used"
+        placeholder="AeroShell W100"
+        defaultValue={values?.[FIELDS.oilType] ?? lastOilType}
+        errors={errors[FIELDS.oilType]}
+      />
+      <label className={check}>
+        <input
+          type="checkbox"
+          name={FIELDS.oilFilter}
+          defaultChecked={(values?.[FIELDS.oilFilter] ?? "on") === "on"}
+          className="size-5 accent-primary"
+        />
+        Filter replaced
+      </label>
+      <label className={check}>
+        <input
+          type="checkbox"
+          name={FIELDS.oilSample}
+          defaultChecked={values?.[FIELDS.oilSample] === "on"}
+          className="size-5 accent-primary"
+        />
+        Oil sample sent for analysis
+      </label>
+    </fieldset>
   );
 }

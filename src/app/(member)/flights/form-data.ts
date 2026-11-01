@@ -6,6 +6,7 @@ import { formValues } from "@/lib/form-state";
 import { parseHours } from "@/lib/hours";
 
 import { inField } from "./fields";
+import type { FluidSetup } from "./fluid-fields";
 
 // Parsing a flight form, shared by checking in (which records a flight),
 // a pilot's edit and an officer's correction.
@@ -46,6 +47,12 @@ const detailsSchema = z.object({
     "quarts",
     "Enter the oil added, or 0 if none.",
   ),
+  // A twin's right engine; only asked for on twins.
+  oilAdded2: amount(
+    MAX_OIL_QUARTS,
+    "quarts",
+    "Enter the oil added, or 0 if none.",
+  ).nullable(),
   // Only asked for, and so only required, on aircraft with a totalizer.
   totalizerFuel: amount(
     MAX_FUEL_GALLONS,
@@ -59,6 +66,7 @@ export const DETAIL_FIELDS = [
   "notes",
   "fuelAdded",
   "oilAdded",
+  "oilAdded2",
   "totalizerFuel",
   "reportSquawk",
 ];
@@ -71,7 +79,7 @@ export type MeterOut = { id: string; out: number };
 export function parseFlightForm(
   formData: FormData,
   meters: MeterOut[],
-  { totalizer }: { totalizer: boolean },
+  { totalizer, engines }: FluidSetup,
 ) {
   const fieldErrors: Record<string, string[]> = {};
   const details = detailsSchema.safeParse({
@@ -79,6 +87,7 @@ export function parseFlightForm(
     notes: formData.get("notes") ?? "",
     fuelAdded: formData.get("fuelAdded") ?? "",
     oilAdded: formData.get("oilAdded") ?? "",
+    oilAdded2: engines === 2 ? (formData.get("oilAdded2") ?? "") : null,
     totalizerFuel: totalizer ? (formData.get("totalizerFuel") ?? "") : null,
   });
   if (!details.success) {
