@@ -14,7 +14,12 @@ const serverEnvSchema = z.object({
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export function parseServerEnv(source: Record<string, string | undefined>) {
-  const result = serverEnvSchema.safeParse(source);
+  const result = serverEnvSchema.safeParse({
+    ...source,
+    // Render sets RENDER_EXTERNAL_URL on web services, so BETTER_AUTH_URL
+    // is only needed elsewhere or to serve from a custom domain.
+    BETTER_AUTH_URL: source.BETTER_AUTH_URL ?? source.RENDER_EXTERNAL_URL,
+  });
   if (!result.success) {
     throw new Error(
       `Invalid server environment:\n${z.prettifyError(result.error)}`,

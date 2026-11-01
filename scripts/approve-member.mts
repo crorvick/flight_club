@@ -6,8 +6,8 @@
 // left alone.  This is how the first officer is created (sign up, then
 // run this with `officer pilot`), and how members are approved until
 // officers have a page for it.  Like migrate.mts it needs only postgres,
-// so it also runs inside the production image, e.g. from
-// `doctl apps console <app-id> web`.
+// so it also runs inside the production image, from the service's shell
+// in Render.
 import postgres from "postgres";
 
 const [rawEmail, ...roles] = process.argv.slice(2);

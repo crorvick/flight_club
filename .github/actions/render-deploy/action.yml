@@ -1,0 +1,77 @@
+name: Deploy image to Render
+description: >
+  Point an environment's tag at an already-built image, trigger the Render
+  deploy hook for that exact image, and wait until /api/health reports the
+  new commit.
+
+inputs:
+  image:
+    description: Image name without tag, e.g. ghcr.io/owner/repo
+    required: true
+  sha:
+    description: Full commit SHA; the image tag to deploy
+    required: true
+  environment:
+    description: staging or production; also used as a moving image tag
+    required: true
+  deploy-hook-url:
+    description: The Render service's deploy hook URL (a secret)
+    required: true
+  app-url:
+    description: Public base URL of the environment, e.g. https://staging.example.com
+    required: true
+  registry-token:
+    description: Token with packages:write for GHCR
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.registry-token }}
+
+    - name: Tag image for ${{ inputs.environment }}
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        SHA: ${{ inputs.sha }}
+        ENVIRONMENT: ${{ inputs.environment }}
+      # Fails if no image was built for this commit. The moving tag is what
+      # the Render service points at, so a manual redeploy from the Render
+      # dashboard also gets this image.
+      run: docker buildx imagetools create --tag "$IMAGE:$ENVIRONMENT" "$IMAGE:$SHA"
+
+    - name: Trigger Render deploy
+      shell: bash
+      env:
+        HOOK_URL: ${{ inputs.deploy-hook-url }}
+        IMAGE: ${{ inputs.image }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        if [ -z "$HOOK_URL" ]; then
+          echo "::error::RENDER_DEPLOY_HOOK_URL is not set for this environment"
+          exit 1
+        fi
+        curl --fail-with-body --silent --show-error \
+          --get --data-urlencode "imgURL=$IMAGE:$SHA" "$HOOK_URL"
+
+    - name: Wait for ${{ inputs.sha }} to be live
+      shell: bash
+      env:
+        APP_URL: ${{ inputs.app-url }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        for i in $(seq 1 60); do
+          live=$(curl --silent --max-time 10 "$APP_URL/api/health" | jq -r '.sha // empty' || true)
+          if [ "$live" = "$SHA" ]; then
+            echo "Live: $SHA"
+            exit 0
+          fi
+          echo "Waiting (live: ${live:-unreachable})..."
+          sleep 10
+        done
+        echo "::error::$SHA was not live after 10 minutes; check the service's events in Render"
+        exit 1

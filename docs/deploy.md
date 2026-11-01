@@ -1,19 +1,18 @@
 # Deployment
 
 Every commit merged to `master` is built into one Docker image, tagged with
-its SHA, and pushed to the DigitalOcean Container Registry (DOCR).  That
-image is deployed to staging automatically and promoted to production by
-hand.  Production never runs anything that wasn't built and tested by CI
-and run on staging first.
+its SHA, and pushed to GHCR.  That image is deployed to staging
+automatically and promoted to production by hand.  Production never runs
+anything that wasn't built and tested by CI and run on staging first.
 
 ```
 pull request ────► checks (typecheck, lint, format, unit, E2E) + image build
-merge to master ─► checks ─► build & push …/flight-club:<sha> ─► staging
-promote.yml ─────► deploy the same <sha> ──────────────────────► production
+merge to master ─► checks ─► build & push ghcr.io/…:<sha> ─► staging
+promote.yml ─────► deploy the same <sha> ──────────────────► production
 ```
 
-Each environment is a DigitalOcean App Platform app with a web service, a
-pre-deploy `migrate` job, and its own database.
+Each environment is a Render web service with its own Postgres database,
+both defined in `render.yaml`.
 
 The workflows live in `.github/workflows/`:
 
@@ -26,156 +25,82 @@ The workflows live in `.github/workflows/`:
 - `promote.yml`: run by hand with a commit SHA; deploys that commit's
   existing image to production.
 
-Deploys go through `.github/actions/do-deploy`, which fetches the app's
-live spec, sets the image tag on the web service and the migrate job to
-the SHA, applies it, and waits until `/api/health` reports the new SHA.
-App Platform runs the migrate job (`node scripts/migrate.mts`) before
-switching traffic, so a failed migration aborts the deploy with the old
-version still running.  Likewise, if the new version fails its health
+Deploys go through `.github/actions/render-deploy`, which points the
+environment's moving tag (`:staging` or `:production`) at the SHA image,
+calls the Render deploy hook with that exact image, and waits until
+`/api/health` reports the new SHA.  Render runs `node scripts/migrate.mts`
+as the pre-deploy command, so migrations are applied before the new
+version takes traffic, and a failed migration aborts the deploy with the
+old version still running.  Likewise, if the new version fails its health
 check, the old one keeps serving.
-
-The specs in `.do/` are only used to create the apps.  Deploys change
-nothing but the image tags, so settings made later in the dashboard,
-secrets in particular, aren't overwritten.  If you change a spec in
-`.do/`, apply the same change to the app by hand (dashboard, or
-`doctl apps update`).
 
 ## One-time setup
 
-You'll need [`doctl`](https://docs.digitalocean.com/reference/doctl/)
-authenticated with a **full-access** personal token, separate from the
-scoped token GitHub Actions uses (step 2).  The CI token can update apps
-but not create them or databases, so using it here fails with a 403.
-Give the full-access token a short expiry, and remove it once both apps
-exist:
+1. **Publish the first image.**  Merge to `master` (or re-run the "Deploy
+   to staging" workflow).  The image job pushes
+   `ghcr.io/crorvick/flight_club:<sha>`; the staging job will fail because
+   Render isn't set up yet.  That's expected.
 
-```sh
-doctl auth init --context admin      # paste the full-access token
-doctl auth switch --context admin
-# ... steps 5–7 ...
-doctl auth remove --context admin
-```
-
-1. **Create a container registry.**  In the DigitalOcean control panel,
-   Container Registry → Create.  Note its name; the image will be
-   `registry.digitalocean.com/<registry>/flight-club`.
-
-2. **Create an API token.**  API → Tokens → Generate New Token, with
-   custom scopes: `registry` (read, update), `app` (read, update) and
-   `database` (read).  Deploys don't touch the databases, but updating an
-   app validates its spec, which lists the database clusters.  This is
-   what GitHub Actions uses; don't use it for `doctl` here.
-
-3. **Configure the GitHub repository.**  In Settings → Secrets and
-   variables → Actions:
-
-   - Repository secret `DIGITALOCEAN_ACCESS_TOKEN`: the token from step 2.
-   - Repository variable `DO_REGISTRY`: the registry name from step 1.
-
-   In Settings → Environments, create `staging` and `production`.  Their
-   variables are filled in at step 7.  On `production`, add yourself (and
-   any other officers trusted to release) as required reviewers, and
-   restrict deployment branches to `master`.  Promotion then pauses for
-   approval.
-
-4. **Publish the first image.**  Merge to `master` (or re-run the "Deploy
-   to staging" workflow).  The image job pushes `flight-club:<sha>`; the
-   staging job will fail because the app doesn't exist yet.  That's
-   expected.
-
-5. **Create the database cluster.**  Databases → Create, PostgreSQL,
-   named `flight-club-production-db`, in the same region as the apps
-   (`nyc` in the specs).  Both environments use it, each with its own
-   database and user:
+   Create the `:staging` and `:production` tags once so Render has
+   something to pull when the services are first created:
 
    ```sh
-   doctl databases list                 # note the cluster's ID
-   for name in flightclub flightclub_staging; do
-     doctl databases db create <cluster-id> $name
-     doctl databases user create <cluster-id> $name
-   done
+   image=ghcr.io/crorvick/flight_club
+   docker buildx imagetools create --tag $image:staging $image:<sha>
+   docker buildx imagetools create --tag $image:production $image:<sha>
    ```
 
-   Then make each user the owner of its database.  On Postgres 15 and
-   later, a newly created user can't create schemas or tables in a
-   database it doesn't own, so migrations would fail with "permission
-   denied".  Only the cluster's admin user, `doadmin`, can change
-   ownership, and the cluster only accepts connections from trusted
-   sources, so let your own IP address in for the duration:
+   This needs `docker login ghcr.io` with a token that has
+   `write:packages`.
 
-   ```sh
-   doctl databases firewalls append <cluster-id> --rule ip_addr:$(curl -s https://ifconfig.me)
-   host=$(doctl databases connection <cluster-id> --format Host --no-header)
-   docker run --rm -it postgres:18-alpine \
-     psql "host=$host port=25060 dbname=defaultdb user=doadmin sslmode=require"
-   ```
+2. **Give Render access to GHCR.**  Create a GitHub personal access token
+   (classic) with only the `read:packages` scope.  In Render, under
+   Workspace Settings → Container Registry Credentials, add it as a GitHub
+   credential named `ghcr`.
 
-   `doctl` masks the password, so psql prompts for it.  Copy it from the
-   control panel: the cluster → Overview → Connection details, user
-   `doadmin`, "show".
+3. **Create the Blueprint.**  In Render: New → Blueprint, select the
+   repository.  This creates both web services and both databases, and
+   generates each service's `BETTER_AUTH_SECRET`.
 
-   ```sql
-   ALTER DATABASE flightclub OWNER TO flightclub;
-   ALTER DATABASE flightclub_staging OWNER TO flightclub_staging;
-   ```
+4. **Create the GitHub Environments.**  In the repository's Settings →
+   Environments, create `staging` and `production`.  For each:
 
-   Afterwards, remove your IP again: `doctl databases firewalls list
-   <cluster-id>` shows the rule's UUID, and `doctl databases firewalls
-   remove <cluster-id> --uuid <uuid>` deletes it.
+   - Secret `RENDER_DEPLOY_HOOK_URL`: the service's deploy hook, from
+     its Settings page in Render.
+   - Variable `APP_URL`: the service's public URL with no trailing
+     slash, e.g. `https://flight-club-staging.onrender.com`.
 
-   Don't use App Platform dev databases, even for staging.  Their user
-   can't create schemas, and there's no admin access to grant it, so
-   migrations can't run on them.
+   On `production`, add yourself (and any other officers trusted to
+   release) as required reviewers, and restrict deployment branches to
+   `master`.  Promotion then pauses for approval.
 
-6. **Create the apps** from the specs, using the SHA from step 4.  Each
-   app gets its own freshly generated auth secret:
+5. **Turn off Render's own auto-deploy** on both services if it's on.
+   Deploys should only come from the workflows.
 
-   ```sh
-   for env in staging production; do
-     sed -e 's/REPLACE_WITH_SHA/<sha>/' \
-         -e "s|REPLACE_WITH_SECRET|$(openssl rand -base64 32)|" \
-         .do/$env.yaml | doctl apps create --spec - --wait
-   done
-   ```
+6. **Re-run the "Deploy to staging" workflow** and confirm it goes green.
 
-   When creating the production app, App Platform adds it to the
-   cluster's trusted sources.
-
-7. **Point the GitHub Environments at the apps.**  `doctl apps list`
-   shows each app's ID and default URL.  For both `staging` and
-   `production`, set:
-
-   - Variable `DO_APP_ID`: the app's ID.
-   - Variable `APP_URL`: its public URL with no trailing slash, e.g.
-     `https://flight-club-staging-abc12.ondigitalocean.app`.
-
-8. **Re-run the "Deploy to staging" workflow** and confirm it goes green.
-
-9. **Make yourself an officer** on each environment, as described under
+7. **Make yourself an officer** on each environment, as described under
    [Approving members](#approving-members).
 
-10. **Seed staging** with sample aircraft, flights and squawks, from a
-    console on the staging app (never production):
+8. **Seed staging** with sample aircraft, flights and squawks, from the
+   staging service's Shell tab in Render (never production's):
 
-    ```sh
-    doctl apps console <staging-app-id> web
-    node scripts/seed.mts
-    ```
+   ```sh
+   node scripts/seed.mts
+   ```
 
-    It refuses to run if any aircraft already exist.
+   It refuses to run if any aircraft already exist.
 
 ## Environment variables
 
-The web service needs these at runtime.  The specs in `.do/` set them
-when an app is created; on an existing app, add or change them in the
-control panel (the app → Settings → the `web` component → Environment
-Variables), since deploys don't apply the specs.
+The web service needs these at runtime.  `render.yaml` sets them when the
+Blueprint is created; change them under the service's Environment page.
 
-| Variable             | Value                                                  |
-| -------------------- | ------------------------------------------------------ |
-| `DATABASE_URL`       | `${db.DATABASE_URL}`, bound to the app's database      |
-| `BETTER_AUTH_URL`    | `${APP_URL}`, the app's public URL                     |
-| `BETTER_AUTH_SECRET` | `openssl rand -base64 32`, encrypted, unique per app   |
+| Variable             | Value                                                      |
+| -------------------- | ---------------------------------------------------------- |
+| `DATABASE_URL`       | The service's database, linked by the Blueprint            |
+| `BETTER_AUTH_SECRET` | Generated by Render, unique per service                    |
+| `BETTER_AUTH_URL`    | Only for a custom domain; defaults to the onrender.com URL |
 
 Changing `BETTER_AUTH_SECRET` signs everyone out.  If any of them is
 missing or invalid, the new version fails its health check and the
@@ -186,10 +111,9 @@ needs them.
 
 Anyone can create an account, but it starts inactive and without roles.
 Until officers have a page for it, approve members with the script in
-the image, from a console on the running app:
+the image, from the service's Shell tab in Render:
 
 ```sh
-doctl apps console <app-id> web
 node scripts/approve-member.mts member@example.com pilot
 ```
 
@@ -217,24 +141,8 @@ Migrations aren't reversed, which is why they should be backward
 compatible: add columns and tables in one release, and remove old ones only
 in a later release once nothing reads them.
 
-## Registry cleanup
-
-Every merge adds an image, and registry storage is limited by plan.  Delete
-old tags now and then and run garbage collection:
-
-```sh
-doctl registry repository list-tags flight-club
-doctl registry repository delete-tag flight-club <sha> ...
-doctl registry garbage-collection start --include-untagged-manifests
-```
-
-Keep the SHAs currently on staging and production, and a few earlier
-ones to roll back to.
-
 ## Backups
 
-The production cluster has daily backups and point-in-time recovery,
-included with managed databases.  Restore a backup into a new cluster once
-to confirm the procedure works, before there's real member data to lose.
-Staging's database lives on the same cluster, so it's backed up too,
-though it only ever holds seed data.
+Render's paid Postgres plans include daily backups with point-in-time
+recovery.  Restore a backup into a new database once to confirm the
+procedure works, before there's real member data to lose.

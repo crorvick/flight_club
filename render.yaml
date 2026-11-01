@@ -1,0 +1,68 @@
+# Render Blueprint: staging and production, each a web service running the
+# image CI built plus its own Postgres database.  See docs/deploy.md for the
+# one-time setup.
+
+services:
+  - type: web
+    name: flight-club-staging
+    runtime: image
+    image:
+      # The deploy workflow moves this tag and then deploys the exact SHA
+      # through the deploy hook; the tag is what a manual redeploy pulls.
+      url: ghcr.io/crorvick/flight_club:staging
+      creds:
+        fromRegistryCreds:
+          name: ghcr
+    # Pre-deploy commands and the shell need a paid instance type.
+    plan: starter
+    region: oregon
+    preDeployCommand: node scripts/migrate.mts
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flight-club-staging-db
+          property: connectionString
+      # BETTER_AUTH_URL defaults to the service's onrender.com URL; set it
+      # only when serving from a custom domain.
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+
+  - type: web
+    name: flight-club-production
+    runtime: image
+    image:
+      url: ghcr.io/crorvick/flight_club:production
+      creds:
+        fromRegistryCreds:
+          name: ghcr
+    plan: starter
+    region: oregon
+    preDeployCommand: node scripts/migrate.mts
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flight-club-production-db
+          property: connectionString
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+
+databases:
+  # Paid plans: free databases expire, and only paid ones get backups.
+  - name: flight-club-staging-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "18"
+    databaseName: flightclub
+    user: flightclub
+    # Reachable only from Render services in the same region.
+    ipAllowList: []
+
+  - name: flight-club-production-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "18"
+    databaseName: flightclub
+    user: flightclub
+    ipAllowList: []

@@ -26,6 +26,9 @@ jobs:
     environment:
       name: production
       url: ${{ vars.APP_URL }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -41,19 +44,13 @@ jobs:
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-      - uses: docker/login-action@v4
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      # Retagging fails if no image was built for this commit.
+      - uses: ./.github/actions/render-deploy
         with:
-          registry: registry.digitalocean.com
-          username: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          password: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-      - name: Verify an image was built for this commit
-        env:
-          IMAGE: registry.digitalocean.com/${{ vars.DO_REGISTRY }}/flight-club
-          SHA: ${{ steps.resolve.outputs.sha }}
-        run: docker buildx imagetools inspect "$IMAGE:$SHA" > /dev/null
-      - uses: ./.github/actions/do-deploy
-        with:
-          app-id: ${{ vars.DO_APP_ID }}
+          image: ${{ steps.resolve.outputs.image }}
           sha: ${{ steps.resolve.outputs.sha }}
+          environment: production
+          deploy-hook-url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
           app-url: ${{ vars.APP_URL }}
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          registry-token: ${{ secrets.GITHUB_TOKEN }}

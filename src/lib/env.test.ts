@@ -37,6 +37,23 @@ describe("parseServerEnv", () => {
     ).toThrow(/BETTER_AUTH_SECRET/);
   });
 
+  it("falls back to Render's external URL for the auth URL", () => {
+    const env = parseServerEnv({
+      ...valid,
+      BETTER_AUTH_URL: undefined,
+      RENDER_EXTERNAL_URL: "https://flight-club.onrender.com",
+    });
+    expect(env.BETTER_AUTH_URL).toBe("https://flight-club.onrender.com");
+  });
+
+  it("prefers an explicit auth URL over Render's", () => {
+    const env = parseServerEnv({
+      ...valid,
+      RENDER_EXTERNAL_URL: "https://flight-club.onrender.com",
+    });
+    expect(env.BETTER_AUTH_URL).toBe("http://localhost:3000");
+  });
+
   it("rejects a non-http auth URL", () => {
     expect(() =>
       parseServerEnv({ ...valid, BETTER_AUTH_URL: "ftp://example.com" }),

@@ -9,7 +9,7 @@ production.
 
 Next.js (App Router) and TypeScript, Postgres through Drizzle ORM, Zod
 for validation, Tailwind CSS and shadcn/ui, Vitest and Playwright for
-tests. It ships as a Docker image to DigitalOcean App Platform.
+tests. It ships as a Docker image to Render.
 
 ## Local development
 

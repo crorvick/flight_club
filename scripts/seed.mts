@@ -5,8 +5,8 @@
 //
 // Refuses to run if any aircraft exist, so it can't be pointed at a
 // database with real records by mistake.  Like the other scripts it needs
-// only postgres, so it also runs inside the image, e.g. from
-// `doctl apps console <app-id> web` on staging.
+// only postgres, so it also runs inside the image, from the staging
+// service's shell in Render.
 //
 // Seeded members have no passwords; they exist to fly the sample flights.
 // To sign in, create your own account and approve it with
