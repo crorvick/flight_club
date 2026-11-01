@@ -7,19 +7,16 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { MAX_PHOTOS, SQUAWK_CATEGORIES } from "@/lib/squawk-rules";
+import {
+  CATEGORY_LABELS,
+  MAX_PHOTOS,
+  SQUAWK_CATEGORIES,
+} from "@/lib/squawk-rules";
 
 import type { ReportResult } from "./actions";
 import { shrinkPhoto } from "./shrink-photo";
 
 type Photo = { id: string; file: File; url: string };
-
-const CATEGORY_LABELS = {
-  engine: "Engine",
-  avionics: "Avionics",
-  airframe: "Airframe",
-  other: "Other",
-};
 
 // A radio styled as a big tappable card.  The input stays in the DOM (and
 // the accessibility tree) but is visually hidden; the label is the target.

@@ -3,16 +3,21 @@
 import { randomUUID } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
+import { writeAudit } from "@/db/audit";
 import { aircraft, squawk, squawkPhoto } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
+import type { FormState } from "@/lib/form-state";
 import {
+  allowedChanges,
   checkPhotos,
   PHOTO_TYPES,
   SQUAWK_CATEGORIES,
+  type SquawkChange,
 } from "@/lib/squawk-rules";
 import { putObject } from "@/lib/storage";
 
@@ -120,4 +125,82 @@ export async function reportSquawk(
   });
 
   return { squawkId };
+}
+
+const changeSchema = z.discriminatedUnion("intent", [
+  z.object({
+    intent: z.literal("resolve"),
+    note: z
+      .string()
+      .trim()
+      .min(1, "Say what was done about it.")
+      .max(2000, "Keep the note under 2000 characters."),
+  }),
+  z.object({ intent: z.literal("defer") }),
+  z.object({ intent: z.literal("reopen") }),
+]);
+
+const NEXT_STATUS = {
+  resolve: "resolved",
+  defer: "deferred",
+  reopen: "open",
+} as const satisfies Record<SquawkChange, string>;
+
+// Resolve, defer or reopen a squawk.  Only officers can, and resolving a
+// grounding squawk is the only way to unground an aircraft, so every
+// change is audited.
+export async function changeSquawk(
+  squawkId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const officer = await requireMember("officer");
+  if (!isUuid(squawkId)) return { error: "No such squawk." };
+
+  const values = { note: String(formData.get("note") ?? "") };
+  const parsed = changeSchema.safeParse({
+    intent: formData.get("intent"),
+    note: formData.get("note") ?? "",
+  });
+  if (!parsed.success) {
+    return { fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
+  }
+  const change = parsed.data;
+
+  const error = await db().transaction(async (tx) => {
+    // Locked so two officers acting at once can't both apply a change
+    // to the same starting state.
+    const [current] = await tx
+      .select()
+      .from(squawk)
+      .where(eq(squawk.id, squawkId))
+      .for("update");
+    if (!current) return "No such squawk.";
+    if (!allowedChanges(current).includes(change.intent)) {
+      return "Someone else changed this squawk. Review it and try again.";
+    }
+
+    const resolution =
+      change.intent === "resolve"
+        ? {
+            resolvedById: officer.id,
+            resolvedAt: new Date(),
+            resolutionNote: change.note,
+          }
+        : {};
+    const after = { status: NEXT_STATUS[change.intent], ...resolution };
+    await tx.update(squawk).set(after).where(eq(squawk.id, squawkId));
+    await writeAudit(tx, {
+      actorId: officer.id,
+      action: `squawk.${change.intent}`,
+      entityType: "squawk",
+      entityId: squawkId,
+      before: { status: current.status },
+      after,
+    });
+    return undefined;
+  });
+  if (error) return { error, values };
+
+  redirect(`/squawks/${squawkId}?changed=${change.intent}`);
 }

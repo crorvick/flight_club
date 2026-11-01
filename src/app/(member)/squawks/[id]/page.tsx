@@ -9,22 +9,24 @@ import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { squawk } from "@/db/schema";
 import { groundingSquawks } from "@/lib/fleet";
+import { hasRole } from "@/lib/access";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
+import {
+  allowedChanges,
+  CATEGORY_LABELS,
+  STATUS_LABELS,
+} from "@/lib/squawk-rules";
+
+import { changeSquawk } from "../actions";
+import { OfficerControls } from "./officer-controls";
 
 export const metadata: Metadata = { title: "Squawk · Flight Club" };
 
-const CATEGORY_LABELS = {
-  engine: "Engine",
-  avionics: "Avionics",
-  airframe: "Airframe",
-  other: "Other",
-};
-
-const STATUS_LABELS = {
-  open: "Open",
-  deferred: "Deferred",
-  resolved: "Resolved",
+const CHANGE_CONFIRMATIONS: Record<string, string> = {
+  resolve: "Squawk resolved.",
+  defer: "Squawk deferred.",
+  reopen: "Squawk reopened.",
 };
 
 export default function SquawkPage({
@@ -42,9 +44,9 @@ async function SquawkDetails({
   params,
   searchParams,
 }: Pick<PageProps<"/squawks/[id]">, "params" | "searchParams">) {
-  await requireMember();
+  const member = await requireMember();
   const { id } = await params;
-  const { reported } = await searchParams;
+  const { reported, changed } = await searchParams;
   if (!isUuid(id)) notFound();
 
   const row = await db().query.squawk.findFirst({
@@ -52,6 +54,7 @@ async function SquawkDetails({
     with: {
       aircraft: { columns: { id: true, tailNumber: true } },
       reportedBy: { columns: { name: true } },
+      resolvedBy: { columns: { name: true } },
       photos: {
         columns: { id: true },
         orderBy: (p, { asc }) => asc(p.createdAt),
@@ -61,10 +64,12 @@ async function SquawkDetails({
   if (!row) notFound();
   const grounded = (await groundingSquawks([row.aircraft.id])).length > 0;
   const tail = row.aircraft.tailNumber;
+  const changeConfirmation =
+    typeof changed === "string" && CHANGE_CONFIRMATIONS[changed];
 
   return (
     <>
-      {reported && (
+      {(reported || changeConfirmation) && (
         <div
           role="status"
           className={cn(
@@ -74,7 +79,9 @@ async function SquawkDetails({
               : "border-green-600/40 bg-green-600/10",
           )}
         >
-          <p className="font-semibold">Squawk reported.</p>
+          <p className="font-semibold">
+            {changeConfirmation || "Squawk reported."}
+          </p>
           <p
             className={cn(
               "text-lg font-semibold",
@@ -83,7 +90,9 @@ async function SquawkDetails({
                 : "text-green-800 dark:text-green-300",
             )}
           >
-            {tail} is {grounded ? "grounded" : "still airworthy"}.
+            {tail} is{" "}
+            {grounded ? "grounded" : reported ? "still airworthy" : "airworthy"}
+            .
           </p>
         </div>
       )}
@@ -107,6 +116,24 @@ async function SquawkDetails({
         <dt className="text-muted-foreground">Status</dt>
         <dd>{STATUS_LABELS[row.status]}</dd>
       </dl>
+
+      {row.status === "resolved" && (
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-sm text-muted-foreground">
+            Resolved by {row.resolvedBy?.name},{" "}
+            {row.resolvedAt?.toISOString().slice(0, 10)}
+          </p>
+          <p className="whitespace-pre-wrap">{row.resolutionNote}</p>
+        </div>
+      )}
+
+      {hasRole(member, "officer") && (
+        <OfficerControls
+          action={changeSquawk.bind(null, row.id)}
+          allowed={allowedChanges(row)}
+          grounds={row.grounds}
+        />
+      )}
 
       {row.photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aircraft, squawk } from "@/db/schema";
@@ -46,4 +46,41 @@ export async function listActiveAircraft(): Promise<AircraftCard[]> {
     (await groundingSquawks(rows.map((r) => r.id))).map((s) => s.aircraftId),
   );
   return rows.map((r) => ({ ...r, grounded: grounded.has(r.id) }));
+}
+
+// Every active aircraft with its unresolved squawks, for the fleet page.
+export async function fleetStatus() {
+  const planes = await db().query.aircraft.findMany({
+    where: eq(aircraft.active, true),
+    orderBy: asc(aircraft.tailNumber),
+    columns: { id: true, tailNumber: true, makeModel: true },
+    with: {
+      squawks: {
+        where: ne(squawk.status, "resolved"),
+        orderBy: [desc(squawk.grounds), asc(squawk.reportedAt)],
+        columns: {
+          id: true,
+          description: true,
+          grounds: true,
+          status: true,
+          reportedAt: true,
+        },
+      },
+    },
+  });
+  return planes.map((plane) => ({
+    ...plane,
+    // Same rule as groundingSquawks: only an open grounding squawk counts.
+    grounded: plane.squawks.some((s) => s.status === "open" && s.grounds),
+  }));
+}
+
+export async function recentlyResolved(limit = 5) {
+  return db().query.squawk.findMany({
+    where: eq(squawk.status, "resolved"),
+    orderBy: desc(squawk.resolvedAt),
+    limit,
+    columns: { id: true, description: true, resolvedAt: true },
+    with: { aircraft: { columns: { tailNumber: true } } },
+  });
 }

@@ -10,6 +10,13 @@ export const SQUAWK_CATEGORIES = [
 
 export type SquawkCategory = (typeof SQUAWK_CATEGORIES)[number];
 
+export const CATEGORY_LABELS: Record<SquawkCategory, string> = {
+  engine: "Engine",
+  avionics: "Avionics",
+  airframe: "Airframe",
+  other: "Other",
+};
+
 // The browser shrinks photos to about 1600px JPEGs (a few hundred KB)
 // before upload, so these only bite when that fails and the original is
 // sent instead.
@@ -32,4 +39,30 @@ export function checkPhotos(photos: { type: string; size: number }[]) {
     return "A photo is too large. Try taking it again.";
   }
   return undefined;
+}
+
+export type SquawkStatus = "open" | "deferred" | "resolved";
+export type SquawkChange = "resolve" | "defer" | "reopen";
+
+export const STATUS_LABELS: Record<SquawkStatus, string> = {
+  open: "Open",
+  deferred: "Deferred",
+  resolved: "Resolved",
+};
+
+// What an officer can do with a squawk.  Deferring a grounding squawk
+// would unground the aircraft without anyone saying what was done about
+// it, so a grounding squawk can only be resolved, with a note.
+export function allowedChanges(squawk: {
+  status: SquawkStatus;
+  grounds: boolean;
+}): SquawkChange[] {
+  switch (squawk.status) {
+    case "open":
+      return squawk.grounds ? ["resolve"] : ["resolve", "defer"];
+    case "deferred":
+      return ["resolve", "reopen"];
+    case "resolved":
+      return [];
+  }
 }

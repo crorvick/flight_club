@@ -41,12 +41,17 @@ export function approve(email: string, ...roles: string[]) {
   });
 }
 
-// A signed-in, approved pilot of the test's own.
-export async function signUpPilot(page: Page, testInfo: TestInfo) {
+// A signed-in, approved member of the test's own, a pilot unless other
+// roles are given.
+export async function signUpPilot(
+  page: Page,
+  testInfo: TestInfo,
+  roles: string[] = ["pilot"],
+) {
   const pilot = newMember(testInfo);
   await signUp(page, pilot);
   await expect(page.getByRole("status")).toBeVisible();
-  approve(pilot.email, "pilot");
+  approve(pilot.email, ...roles);
   return pilot;
 }
 
@@ -102,9 +107,28 @@ export async function deleteAircraft(id: string) {
   const db = sql();
   await db.begin(async (tx) => {
     await tx`delete from flight where aircraft_id = ${id}`;
+    await tx`
+      delete from audit_log where entity_id in (
+        select id from squawk where aircraft_id = ${id}
+      )
+    `;
     await tx`delete from squawk where aircraft_id = ${id}`;
     await tx`update aircraft set billing_meter_id = null where id = ${id}`;
     await tx`delete from meter where aircraft_id = ${id}`;
     await tx`delete from aircraft where id = ${id}`;
   });
+}
+
+export async function createSquawk(
+  aircraftId: string,
+  squawk: { description: string; grounds: boolean },
+) {
+  const db = sql();
+  const [{ id: reporterId }] = await db`select id from member limit 1`;
+  const [{ id }] = await db`
+    insert into squawk (aircraft_id, reported_by_id, description, grounds)
+    values (${aircraftId}, ${reporterId}, ${squawk.description}, ${squawk.grounds})
+    returning id
+  `;
+  return id as string;
 }

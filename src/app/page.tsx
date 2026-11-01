@@ -83,6 +83,15 @@ async function MemberStatus() {
               <RecentFlights member={member} />
             </>
           )}
+          <Link
+            href="/fleet"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-11 text-base",
+            )}
+          >
+            Fleet status and squawks
+          </Link>
         </>
       ) : (
         <p role="status">
