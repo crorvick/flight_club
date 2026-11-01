@@ -15,11 +15,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Flight Club",
   description: "Flight log, squawks and maintenance for the club fleet",
+  // Opened from the home screen on iOS, run full screen with the status
+  // bar over the page's own background.
+  appleWebApp: {
+    capable: true,
+    title: "Flight Club",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // The browser's toolbar matches the page in light and dark mode.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
