@@ -24,6 +24,9 @@ export async function recordFlight(
     details: {
       date: string;
       notes: string | null;
+      fuelAdded: string | null;
+      oilAdded: string | null;
+      totalizerFuel: string | null;
     };
   },
 ) {

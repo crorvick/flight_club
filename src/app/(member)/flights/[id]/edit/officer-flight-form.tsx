@@ -10,6 +10,7 @@ import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
 import { inField, outField } from "../../fields";
+import { FluidFields, type FluidValues } from "../../fluid-fields";
 
 type Reading = { meterId: string; label: string; out: string; in: string };
 
@@ -17,6 +18,7 @@ export function OfficerFlightForm({
   action,
   pilots,
   flight,
+  totalizer,
   readings,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
@@ -25,7 +27,8 @@ export function OfficerFlightForm({
     pilotId: string;
     date: string;
     notes: string;
-  };
+  } & FluidValues;
+  totalizer: boolean;
   readings: Reading[];
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
@@ -112,6 +115,13 @@ export function OfficerFlightForm({
           );
         })}
       </fieldset>
+
+      <FluidFields
+        totalizer={totalizer}
+        values={values}
+        initial={flight}
+        errors={errors}
+      />
 
       <Field
         name="date"

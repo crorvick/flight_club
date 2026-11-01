@@ -94,6 +94,21 @@ export function NewAircraftForm({
         <ErrorText errors={errors.billing} />
       </fieldset>
 
+      <label className="flex min-h-11 cursor-pointer items-center gap-3">
+        <input
+          type="checkbox"
+          name="hasFuelTotalizer"
+          defaultChecked={values?.hasFuelTotalizer === "on"}
+          className="size-5 accent-primary"
+        />
+        <span>
+          Has a fuel totalizer{" "}
+          <span className="text-sm text-muted-foreground">
+            (pilots record its fuel remaining at check-in)
+          </span>
+        </span>
+      </label>
+
       <Saving pending={pending} label="Add aircraft" />
     </form>
   );
@@ -109,6 +124,7 @@ export function DetailsForm({
     tailNumber: string;
     makeModel: string;
     active: boolean;
+    hasFuelTotalizer: boolean;
     billingMeterId: string | null;
   };
   meters: { id: string; label: string }[];
@@ -170,6 +186,20 @@ export function DetailsForm({
           Active{" "}
           <span className="text-sm text-muted-foreground">
             (inactive aircraft can&apos;t be picked for flights or squawks)
+          </span>
+        </span>
+      </label>
+      <label className="flex min-h-11 cursor-pointer items-center gap-3">
+        <input
+          type="checkbox"
+          name="hasFuelTotalizer"
+          defaultChecked={aircraft.hasFuelTotalizer}
+          className="size-5 accent-primary"
+        />
+        <span>
+          Has a fuel totalizer{" "}
+          <span className="text-sm text-muted-foreground">
+            (pilots record its fuel remaining at check-in)
           </span>
         </span>
       </label>

@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   closeSql,
   createAircraft,
+  checkOut,
   deleteAircraft,
   logFlight,
   openCheckOut,
@@ -170,6 +171,22 @@ test("meters can be added, and removed until a flight records them", async ({
   await expect(page.getByRole("button", { name: "Remove Hobbs" })).toHaveCount(
     0,
   );
+});
+
+test("an officer marks an aircraft as having a fuel totalizer", async ({
+  page,
+}, testInfo) => {
+  const plane = await createAircraft(testInfo, { tach: "400.00" }, "tach");
+  created.push(plane.id);
+
+  await page.goto(`/aircraft/${plane.id}`);
+  await page.getByLabel(/Has a fuel totalizer/).check();
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Details saved.")).toBeVisible();
+  await expect(page.getByLabel(/Has a fuel totalizer/)).toBeChecked();
+
+  await checkOut(page, plane);
+  await expect(page.getByLabel("Totalizer fuel remaining (gal)")).toBeVisible();
 });
 
 test("an inactive aircraft can't be picked", async ({ page }, testInfo) => {

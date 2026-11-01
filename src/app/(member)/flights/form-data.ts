@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { checkReading } from "@/lib/flight-rules";
+import { MAX_FUEL_GALLONS, MAX_OIL_QUARTS, parseAmount } from "@/lib/fluids";
 import { formValues } from "@/lib/form-state";
 import { parseHours } from "@/lib/hours";
 
@@ -16,6 +17,16 @@ function notInFuture(isoDate: string) {
   return isoDate <= tomorrow.toISOString().slice(0, 10);
 }
 
+const amount = (max: number, unit: string, missing: string) =>
+  z.string().transform((typed, ctx) => {
+    const result = parseAmount(typed, { max, unit, missing });
+    if (result.status === "invalid") {
+      ctx.addIssue({ code: "custom", message: result.message });
+      return z.NEVER;
+    }
+    return result.value;
+  });
+
 const detailsSchema = z.object({
   date: z.iso
     .date("Enter the date of the flight.")
@@ -25,20 +36,50 @@ const detailsSchema = z.object({
     .trim()
     .max(2000, "Keep notes under 2000 characters.")
     .transform((notes) => notes || null),
+  fuelAdded: amount(
+    MAX_FUEL_GALLONS,
+    "gallons",
+    "Enter the fuel added, or 0 if none.",
+  ),
+  oilAdded: amount(
+    MAX_OIL_QUARTS,
+    "quarts",
+    "Enter the oil added, or 0 if none.",
+  ),
+  // Only asked for, and so only required, on aircraft with a totalizer.
+  totalizerFuel: amount(
+    MAX_FUEL_GALLONS,
+    "gallons",
+    "Enter the fuel remaining on the totalizer.",
+  ).nullable(),
 });
 
-export const DETAIL_FIELDS = ["date", "notes", "reportSquawk"];
+export const DETAIL_FIELDS = [
+  "date",
+  "notes",
+  "fuelAdded",
+  "oilAdded",
+  "totalizerFuel",
+  "reportSquawk",
+];
 
 export type MeterOut = { id: string; out: number };
 
 // Validate the details and each meter's `in` reading, with the same rules
 // the form shows live.  Returns the parsed values, or errors keyed by
 // field name.
-export function parseFlightForm(formData: FormData, meters: MeterOut[]) {
+export function parseFlightForm(
+  formData: FormData,
+  meters: MeterOut[],
+  { totalizer }: { totalizer: boolean },
+) {
   const fieldErrors: Record<string, string[]> = {};
   const details = detailsSchema.safeParse({
     date: formData.get("date") ?? "",
     notes: formData.get("notes") ?? "",
+    fuelAdded: formData.get("fuelAdded") ?? "",
+    oilAdded: formData.get("oilAdded") ?? "",
+    totalizerFuel: totalizer ? (formData.get("totalizerFuel") ?? "") : null,
   });
   if (!details.success) {
     Object.assign(fieldErrors, z.flattenError(details.error).fieldErrors);

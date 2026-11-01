@@ -120,8 +120,11 @@ try {
       const aircraftIds: Record<string, string> = {};
       for (const plane of fleet) {
         const [{ id: aircraftId }] = await tx`
-          insert into aircraft (tail_number, make_model)
-          values (${plane.tailNumber}, ${plane.makeModel})
+          insert into aircraft (tail_number, make_model, has_fuel_totalizer)
+          values (
+            ${plane.tailNumber}, ${plane.makeModel},
+            ${plane.tailNumber === "N182FC"}
+          )
           returning id
         `;
         aircraftIds[plane.tailNumber] = aircraftId;
@@ -161,13 +164,18 @@ try {
           const [flight] = await tx`
             insert into flight (
               aircraft_id, pilot_id, date, notes, billing_meter_kind,
-              billed_hours, created_at, updated_at
+              billed_hours, fuel_added, oil_added, totalizer_fuel,
+              created_at, updated_at
             )
             values (
               ${aircraftId}, ${pick(memberIds)},
               ${createdAt.toISOString().slice(0, 10)},
               ${pick(notes)}, ${plane.billing},
-              ${toHours(delta[plane.billing])}, ${createdAt}, ${createdAt}
+              ${toHours(delta[plane.billing])},
+              ${random() < 0.4 ? `${between(8, 30)}.0` : "0.0"},
+              ${random() < 0.1 ? "1.0" : "0.0"},
+              ${plane.tailNumber === "N182FC" ? `${between(25, 70)}.${between(0, 9)}` : null},
+              ${createdAt}, ${createdAt}
             )
             returning id
           `;

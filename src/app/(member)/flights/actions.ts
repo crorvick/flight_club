@@ -13,6 +13,7 @@ import { isUuid } from "@/lib/ids";
 import { parseHours, toHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
+import { hasTotalizer } from "./data";
 import { inField, outField } from "./fields";
 import {
   DETAIL_FIELDS,
@@ -48,7 +49,10 @@ export async function updateFlight(
 
   const existing = await db().query.flight.findFirst({
     where: eq(flight.id, flightId),
-    with: { readings: { with: { meter: true } } },
+    with: {
+      readings: { with: { meter: true } },
+      aircraft: { columns: { hasFuelTotalizer: true } },
+    },
   });
   if (!existing) notFound();
   if (existing.pilotId !== member.id) forbidden();
@@ -63,7 +67,9 @@ export async function updateFlight(
     id: r.meterId,
     out: parseHours(r.out)!,
   }));
-  const parsed = parseFlightForm(formData, outs);
+  const parsed = parseFlightForm(formData, outs, {
+    totalizer: hasTotalizer(existing),
+  });
   if (parsed.fieldErrors) return { fieldErrors: parsed.fieldErrors, values };
   const { details, ins } = parsed;
 
@@ -145,7 +151,10 @@ export async function officerUpdateFlight(
 
   const existing = await db().query.flight.findFirst({
     where: eq(flight.id, flightId),
-    with: { readings: { with: { meter: true } } },
+    with: {
+      readings: { with: { meter: true } },
+      aircraft: { columns: { hasFuelTotalizer: true } },
+    },
   });
   if (!existing) notFound();
   const meterIds = existing.readings.map((r) => r.meterId);
@@ -169,7 +178,9 @@ export async function officerUpdateFlight(
       outs.push({ id, out });
     }
   }
-  const parsed = parseFlightForm(formData, outs);
+  const parsed = parseFlightForm(formData, outs, {
+    totalizer: hasTotalizer(existing),
+  });
   if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);
   const reason = values.reason.trim();
   if (!reason) fieldErrors.reason = ["Say why the flight is being changed."];
@@ -261,6 +272,9 @@ export async function officerUpdateFlight(
         {
           date: row.date,
           notes: row.notes,
+          fuelAdded: row.fuelAdded,
+          oilAdded: row.oilAdded,
+          totalizerFuel: row.totalizerFuel,
           pilotId: row.pilotId,
           billedHours: row.billedHours,
           ...readingsBefore,

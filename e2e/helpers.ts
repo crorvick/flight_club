@@ -189,14 +189,23 @@ export async function checkOut(
   ).toBeVisible();
 }
 
-// On the check-in page: fill the in readings (by meter label) and submit.
+// On the check-in page: fill the in readings (by meter label), the fuel
+// and oil added (none unless given), the totalizer if given, and submit.
 export async function checkIn(
   page: Page,
   plane: Plane,
   ins: Record<string, string>,
+  fluids: { fuel?: string; oil?: string; totalizer?: string } = {},
 ) {
   for (const [label, value] of Object.entries(ins)) {
     await page.getByLabel(`${label} in`).fill(value);
+  }
+  await page.getByLabel("Fuel added (gal)").fill(fluids.fuel ?? "0");
+  await page.getByLabel("Oil added (qt)").fill(fluids.oil ?? "0");
+  if (fluids.totalizer !== undefined) {
+    await page
+      .getByLabel("Totalizer fuel remaining (gal)")
+      .fill(fluids.totalizer);
   }
   await page
     .getByRole("button", { name: `Check in ${plane.tailNumber}` })

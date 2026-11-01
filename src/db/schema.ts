@@ -160,6 +160,8 @@ export const aircraft = pgTable(
     tailNumber: text("tail_number").notNull().unique(),
     makeModel: text("make_model").notNull(),
     active: boolean("active").default(true).notNull(),
+    // Pilots record its fuel remaining at the end of each flight.
+    hasFuelTotalizer: boolean("has_fuel_totalizer").default(false).notNull(),
     // Which meter flights are billed by.  Nullable only because an
     // aircraft has to exist before its meters can.
     billingMeterId: uuid("billing_meter_id"),
@@ -214,6 +216,12 @@ export const flight = pgTable(
       .references(() => member.id),
     date: date("date").notNull(),
     notes: text("notes"),
+    // All optional, to a tenth: fuel (gallons) and oil (quarts) added for
+    // the flight, and the fuel remaining the totalizer showed at the end,
+    // for aircraft that have one.
+    fuelAdded: numeric("fuel_added", { precision: 4, scale: 1 }),
+    oilAdded: numeric("oil_added", { precision: 3, scale: 1 }),
+    totalizerFuel: numeric("totalizer_fuel", { precision: 4, scale: 1 }),
     // Copied from the aircraft when the flight is logged, so changing an
     // aircraft's billing meter later never re-bills past flights.
     billingMeterKind: meterKind("billing_meter_kind").notNull(),
@@ -228,6 +236,12 @@ export const flight = pgTable(
     index("flight_aircraft_date_idx").on(table.aircraftId, table.date),
     index("flight_pilot_date_idx").on(table.pilotId, table.date),
     check("flight_billed_hours_positive", sql`${table.billedHours} > 0`),
+    check(
+      "flight_fluids_nonnegative",
+      sql`coalesce(${table.fuelAdded}, 0) >= 0
+        and coalesce(${table.oilAdded}, 0) >= 0
+        and coalesce(${table.totalizerFuel}, 0) >= 0`,
+    ),
   ],
 );
 

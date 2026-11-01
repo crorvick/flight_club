@@ -64,6 +64,13 @@
       "when": 1793516659011,
       "tag": "0008_drop_superseded_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793518167915,
+      "tag": "0009_fuel_and_oil",
+      "breakpoints": true
     }
   ]
 }

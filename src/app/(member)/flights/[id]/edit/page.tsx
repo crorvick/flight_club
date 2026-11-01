@@ -13,7 +13,7 @@ import { formatHours, parseHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
 import { officerUpdateFlight, updateFlight } from "../../actions";
-import { getFlight } from "../../data";
+import { fluidValues, getFlight, hasTotalizer } from "../../data";
 import { FlightForm } from "../../flight-form";
 import { OfficerFlightForm } from "./officer-flight-form";
 
@@ -87,7 +87,9 @@ async function EditFlight({
               formatHours(parseHours(r.in)!),
             ]),
           ),
+          ...fluidValues(flight),
         }}
+        totalizer={hasTotalizer(flight)}
         submitLabel="Save changes"
         pendingLabel="Saving…"
       />
@@ -133,7 +135,9 @@ async function OfficerCorrection({
           pilotId: flight.pilotId,
           date: flight.date,
           notes: flight.notes ?? "",
+          ...fluidValues(flight),
         }}
+        totalizer={hasTotalizer(flight)}
         readings={flight.readings}
       />
     </>

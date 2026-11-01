@@ -60,7 +60,9 @@ export async function getFlight(id: string) {
   const row = await db().query.flight.findFirst({
     where: eq(flight.id, id),
     with: {
-      aircraft: { columns: { id: true, tailNumber: true } },
+      aircraft: {
+        columns: { id: true, tailNumber: true, hasFuelTotalizer: true },
+      },
       pilot: { columns: { id: true, name: true } },
       readings: { with: { meter: true } },
     },
@@ -96,3 +98,28 @@ export async function recentFlights(pilotId: string, limit = 5) {
     .orderBy(desc(flight.date), desc(flight.createdAt))
     .limit(limit);
 }
+
+type StoredFluids = {
+  fuelAdded: string | null;
+  oilAdded: string | null;
+  totalizerFuel: string | null;
+};
+
+// A flight's fuel and oil as a form shows them: a tenth, or blank.
+export function fluidValues(flight: StoredFluids) {
+  const show = (value: string | null) =>
+    value === null ? "" : Number(value).toFixed(1);
+  return {
+    fuelAdded: show(flight.fuelAdded),
+    oilAdded: show(flight.oilAdded),
+    totalizerFuel: show(flight.totalizerFuel),
+  };
+}
+
+// Show the totalizer field when the aircraft has one, or the flight
+// recorded it before the aircraft's setting changed.
+export const hasTotalizer = (
+  flight: StoredFluids & {
+    aircraft: { hasFuelTotalizer: boolean };
+  },
+) => flight.aircraft.hasFuelTotalizer || flight.totalizerFuel !== null;

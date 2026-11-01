@@ -63,7 +63,7 @@ Environment rules:
 - id, name, email, role tags, active flag, auth fields (managed by Better Auth)
 
 ### Aircraft
-- id, tail number, make/model, active flag
+- id, tail number, make/model, active flag, whether it has a fuel totalizer
 - `billingMeterId` → references one of this aircraft's meters
 - Status is **derived**: `grounded` if any open squawk or overdue maintenance item grounds it for all flying; otherwise `VFR only` if one grounds it for IFR; otherwise `airworthy`.
 
@@ -80,6 +80,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### Flight
 - id, aircraftId, pilotId, date, notes
+- Fuel added (gallons) and oil added (quarts), required (0 if none); for aircraft with a fuel totalizer, the fuel remaining it shows at the end of the flight, also required
 - Landings aren't recorded (see PilotQualification).
 - Snapshot at time of logging: `billingMeterKind`, `billedHours` (so changing an aircraft's billing meter later never re-bills past flights)
 - createdAt, updatedAt, lockedAt (see rules)
@@ -149,8 +150,9 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 2. Pre-flight warnings displayed up front.
 3. Meter inputs: `out` pre-filled, pilot enters only `in` values (number pad). Only the meters this aircraft has are shown.
 4. Live computed duration per meter, so typos stand out.
-5. Optional toggle: "Report a squawk" → continues into the squawk flow with aircraft pre-selected.
-6. Clear confirmation on submit.
+5. Fuel and oil added (0 if none), and the totalizer's fuel remaining if the aircraft has one.
+6. Optional toggle: "Report a squawk" → continues into the squawk flow with aircraft pre-selected.
+7. Clear confirmation on submit.
 
 ### Report a squawk (one-thumb usable)
 1. Aircraft pre-selected when coming from a flight; otherwise a picker.

@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { auditLog, member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
 import { canEditFlight } from "@/lib/flight-rules";
+import { formatAmount } from "@/lib/fluids";
 import { formatHours, parseHours } from "@/lib/hours";
 import { METER_LABELS } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
@@ -113,6 +114,30 @@ async function FlightDetails({
           {formatHours(parseHours(flight.billedHours)!)} hours (
           {METER_LABELS[flight.billingMeterKind].toLowerCase()})
         </dd>
+        {flight.fuelAdded !== null && (
+          <>
+            <dt className="text-muted-foreground">Fuel added</dt>
+            <dd className="tabular-nums">
+              {formatAmount(flight.fuelAdded, "gal")}
+            </dd>
+          </>
+        )}
+        {flight.oilAdded !== null && (
+          <>
+            <dt className="text-muted-foreground">Oil added</dt>
+            <dd className="tabular-nums">
+              {formatAmount(flight.oilAdded, "qt")}
+            </dd>
+          </>
+        )}
+        {flight.totalizerFuel !== null && (
+          <>
+            <dt className="text-muted-foreground">Totalizer at end</dt>
+            <dd className="tabular-nums">
+              {formatAmount(flight.totalizerFuel, "gal")} remaining
+            </dd>
+          </>
+        )}
         {flight.notes && (
           <>
             <dt className="text-muted-foreground">Notes</dt>

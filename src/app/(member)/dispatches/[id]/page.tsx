@@ -44,7 +44,13 @@ async function Dispatch({
   const row = await db().query.dispatch.findFirst({
     where: eq(dispatch.id, id),
     with: {
-      aircraft: { columns: { tailNumber: true, billingMeterId: true } },
+      aircraft: {
+        columns: {
+          tailNumber: true,
+          billingMeterId: true,
+          hasFuelTotalizer: true,
+        },
+      },
       pilot: { columns: { name: true } },
       readings: { with: { meter: { columns: { label: true, kind: true } } } },
       acks: { with: { squawk: { columns: { description: true } } } },
@@ -147,6 +153,7 @@ async function Dispatch({
               out: r.out,
               billing: r.meterId === row.aircraft.billingMeterId,
             }))}
+            totalizer={row.aircraft.hasFuelTotalizer}
             submitLabel={`Check in ${tail}`}
             pendingLabel="Checking in…"
             offerSquawk

@@ -77,6 +77,7 @@ export async function createAircraft(
     "tailNumber",
     "makeModel",
     "billing",
+    "hasFuelTotalizer",
     ...METER_KINDS.map(readingField),
   ]);
 
@@ -119,7 +120,10 @@ export async function createAircraft(
     id = await db().transaction(async (tx) => {
       const [created] = await tx
         .insert(aircraft)
-        .values(details.data)
+        .values({
+          ...details.data,
+          hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+        })
         .returning({ id: aircraft.id });
       const rows = await tx
         .insert(meter)
@@ -145,6 +149,7 @@ export async function createAircraft(
         before: null,
         after: {
           ...details.data,
+          hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
           meters: Object.fromEntries(meters.map((m) => [m.kind, m.reading])),
           billing: values.billing,
         },
@@ -193,7 +198,11 @@ export async function updateAircraft(
       values,
     };
   }
-  const next = { ...parsed.data, active: formData.get("active") === "on" };
+  const next = {
+    ...parsed.data,
+    active: formData.get("active") === "on",
+    hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+  };
 
   try {
     await db().transaction(async (tx) => {
@@ -203,6 +212,7 @@ export async function updateAircraft(
           makeModel: aircraft.makeModel,
           billingMeterId: aircraft.billingMeterId,
           active: aircraft.active,
+          hasFuelTotalizer: aircraft.hasFuelTotalizer,
         })
         .from(aircraft)
         .where(eq(aircraft.id, aircraftId))
