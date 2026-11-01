@@ -1,4 +1,5 @@
 import { cn } from "cn";
+import { Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -6,6 +7,7 @@ import { Suspense } from "react";
 import { AircraftStatusLabel } from "@/components/aircraft-status";
 import { LocalTime } from "@/components/local-time";
 import { ListSkeleton } from "@/components/page-skeleton";
+import { maintainedAircraft } from "@/lib/captains";
 import { fleetStatus, recentlyResolved } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
 import { requireMember } from "@/lib/session";
@@ -25,11 +27,14 @@ export default function FleetPage() {
 }
 
 async function Fleet() {
-  await requireMember();
-  const [fleet, resolved] = await Promise.all([
+  const member = await requireMember();
+  const [fleet, resolved, maintained] = await Promise.all([
     fleetStatus(),
     recentlyResolved(),
+    maintainedAircraft(member),
   ]);
+  const manages = (id: string) =>
+    maintained === "all" || maintained.includes(id);
 
   return (
     <>
@@ -112,6 +117,16 @@ async function Fleet() {
                     </li>
                   ))}
                 </ul>
+              )}
+              {/* Officers, and the aircraft's captains, manage it from here. */}
+              {manages(plane.id) && (
+                <Link
+                  href={`/aircraft/${plane.id}/maintenance`}
+                  className="flex items-center gap-2 border-t px-4 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                >
+                  <Wrench aria-hidden className="size-4" />
+                  Maintenance
+                </Link>
               )}
             </section>
           </li>

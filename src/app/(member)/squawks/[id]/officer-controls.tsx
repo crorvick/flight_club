@@ -8,14 +8,18 @@ import { Label } from "@/components/ui/label";
 import type { FormState } from "@/lib/form-state";
 import type { SquawkChange } from "@/lib/squawk-rules";
 
+// Resolving, deferring and reopening, for officers and the aircraft's
+// captains; titled for whichever is looking.
 export function OfficerControls({
   action,
   allowed,
   grounds,
+  title,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   allowed: SquawkChange[];
   grounds: boolean;
+  title: "Officer" | "Plane captain";
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   if (allowed.length === 0) return null;
@@ -26,7 +30,7 @@ export function OfficerControls({
       className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5"
       noValidate
     >
-      <h2 className="text-base font-semibold">Officer</h2>
+      <h2 className="text-base font-semibold">{title}</h2>
       <FormError message={state.error} />
 
       {allowed.includes("resolve") && (

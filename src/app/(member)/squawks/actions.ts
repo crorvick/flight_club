@@ -9,10 +9,11 @@ import { z } from "zod";
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
 import { aircraft, squawk, squawkPhoto } from "@/db/schema";
+import { requireMaintainer } from "@/lib/captains";
+import type { FormState } from "@/lib/form-state";
 import { GROUNDING_LEVELS } from "@/lib/grounding";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
-import type { FormState } from "@/lib/form-state";
 import {
   allowedChanges,
   checkPhotos,
@@ -148,16 +149,22 @@ const NEXT_STATUS = {
   reopen: "open",
 } as const satisfies Record<SquawkChange, string>;
 
-// Resolve, defer or reopen a squawk.  Only officers can, and resolving a
-// grounding squawk is the only way to unground an aircraft, so every
-// change is audited.
+// Resolve, defer or reopen a squawk.  Only officers and the aircraft's
+// captains can, and resolving a grounding squawk is the only way to
+// unground an aircraft, so every change is audited.
 export async function changeSquawk(
   squawkId: string,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const officer = await requireMember("officer");
+  await requireMember();
   if (!isUuid(squawkId)) return { error: "No such squawk." };
+  const [target] = await db()
+    .select({ aircraftId: squawk.aircraftId })
+    .from(squawk)
+    .where(eq(squawk.id, squawkId));
+  if (!target) return { error: "No such squawk." };
+  const actor = await requireMaintainer(target.aircraftId);
 
   const values = { note: String(formData.get("note") ?? "") };
   const parsed = changeSchema.safeParse({
@@ -170,7 +177,7 @@ export async function changeSquawk(
   const change = parsed.data;
 
   const error = await db().transaction(async (tx) => {
-    // Locked so two officers acting at once can't both apply a change
+    // Locked so two people acting at once can't both apply a change
     // to the same starting state.
     const [current] = await tx
       .select()
@@ -190,7 +197,7 @@ export async function changeSquawk(
     const resolution =
       change.intent === "resolve"
         ? {
-            resolvedById: officer.id,
+            resolvedById: actor.id,
             resolvedAt: new Date(),
             resolutionNote: change.note,
           }
@@ -198,7 +205,7 @@ export async function changeSquawk(
     const after = { status: NEXT_STATUS[change.intent], ...resolution };
     await tx.update(squawk).set(after).where(eq(squawk.id, squawkId));
     await writeAudit(tx, {
-      actorId: officer.id,
+      actorId: actor.id,
       action: `squawk.${change.intent}`,
       entityType: "squawk",
       entityId: squawkId,

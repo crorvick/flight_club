@@ -27,6 +27,7 @@ import {
   member as memberTable,
 } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { maintainedAircraft } from "@/lib/captains";
 import { formatDate } from "@/lib/dates";
 import { fleetStatus, today } from "@/lib/fleet";
 import { canEditFlight } from "@/lib/flight-rules";
@@ -78,7 +79,15 @@ async function Dashboard() {
 
   const pilot = hasRole(member, "pilot");
   const officer = hasRole(member, "officer");
-  const fleet = await fleetStatus();
+  const [fleet, maintained] = await Promise.all([
+    fleetStatus(),
+    maintainedAircraft(member),
+  ]);
+  // A captain sees what needs attention on their own aircraft.
+  const attention =
+    maintained === "all"
+      ? fleet
+      : fleet.filter((plane) => maintained.includes(plane.id));
   return (
     <div className="wide flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">
@@ -90,7 +99,9 @@ async function Dashboard() {
         <div className="flex min-w-0 flex-col gap-6">
           {pilot && <FlyCard member={member} />}
           {pilot && <Reminders member={member} />}
-          {officer && <NeedsAttention fleet={fleet} />}
+          {(officer || attention.length > 0) && (
+            <NeedsAttention fleet={attention} officer={officer} />
+          )}
         </div>
         <div className="flex min-w-0 flex-col gap-6">
           <FleetGlance fleet={fleet} />
@@ -318,21 +329,16 @@ function AttentionRow({
 }
 
 // Everything waiting on an officer, in one list: new members, meters that
-// read more than was logged, open squawks and maintenance coming due.
-async function NeedsAttention({ fleet }: { fleet: Fleet }) {
-  const [[{ pending }], gaps] = await Promise.all([
-    // Same test as isPending, as a query: inactive and never given a role.
-    db()
-      .select({ pending: count() })
-      .from(memberTable)
-      .where(
-        and(
-          eq(memberTable.active, false),
-          sql`cardinality(${memberTable.roles}) = 0`,
-        ),
-      ),
-    unreviewedGaps(),
-  ]);
+// read more than was logged, open squawks and maintenance coming due.  A
+// plane captain gets the squawks and maintenance of their own aircraft.
+async function NeedsAttention({
+  fleet,
+  officer,
+}: {
+  fleet: Fleet;
+  officer: boolean;
+}) {
+  const [pending, gaps] = officer ? await officerToDos() : [0, []];
   const squawks = fleet.flatMap((plane) =>
     plane.squawks
       .filter((s) => s.status === "open")
@@ -353,7 +359,9 @@ async function NeedsAttention({ fleet }: { fleet: Fleet }) {
       {empty ? (
         <p className="flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm text-muted-foreground">
           <CircleCheck aria-hidden className="size-4 text-green-600" />
-          Nothing needs an officer right now.
+          {officer
+            ? "Nothing needs an officer right now."
+            : "Nothing needs a plane captain right now."}
         </p>
       ) : (
         <ul className="divide-y overflow-hidden rounded-xl border bg-card">
@@ -415,6 +423,24 @@ async function NeedsAttention({ fleet }: { fleet: Fleet }) {
       )}
     </section>
   );
+}
+
+// Members waiting for approval, and meter gaps not yet accounted for.
+async function officerToDos() {
+  const [[{ pending }], gaps] = await Promise.all([
+    // Same test as isPending, as a query: inactive and never given a role.
+    db()
+      .select({ pending: count() })
+      .from(memberTable)
+      .where(
+        and(
+          eq(memberTable.active, false),
+          sql`cardinality(${memberTable.roles}) = 0`,
+        ),
+      ),
+    unreviewedGaps(),
+  ]);
+  return [pending, gaps] as const;
 }
 
 // Dispatches whose meters read more than the app expected, not yet

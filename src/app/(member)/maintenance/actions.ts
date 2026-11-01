@@ -8,9 +8,10 @@ import { db } from "@/db";
 import { type Transaction, writeAudit } from "@/db/audit";
 import { aircraft, maintenanceCompletion, maintenanceItem } from "@/db/schema";
 import { changedFields } from "@/lib/audit-diff";
+import { requireMaintainer } from "@/lib/captains";
 import { type FormState, formValues } from "@/lib/form-state";
-import { parseHours, toHours } from "@/lib/hours";
 import { GROUNDING_LEVELS } from "@/lib/grounding";
+import { parseHours, toHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 
@@ -40,7 +41,7 @@ const optionalHours = (message: string) =>
       return toHours(hundredths);
     });
 
-// What an officer enters for an item.  The last completion is asked for
+// What an officer or the plane's captain enters for an item.  The last completion is asked for
 // up front because the next due date and reading are counted from it.
 const itemSchema = z
   .object({
@@ -132,13 +133,25 @@ const NO_LOGBOOK_METER = {
   },
 };
 
+// For an existing item: an officer or a captain of its aircraft.
+// Undefined when there's no such item.
+async function requireItemMaintainer(itemId: string) {
+  await requireMember();
+  if (!isUuid(itemId)) return undefined;
+  const [item] = await db()
+    .select({ aircraftId: maintenanceItem.aircraftId })
+    .from(maintenanceItem)
+    .where(eq(maintenanceItem.id, itemId));
+  return item && requireMaintainer(item.aircraftId);
+}
+
 export async function createItem(
   aircraftId: string,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const officer = await requireMember("officer");
   if (!isUuid(aircraftId)) return { error: "No such aircraft." };
+  const actor = await requireMaintainer(aircraftId);
   const values = formValues(formData, ITEM_FIELDS);
   const parsed = parseItem(formData);
   if (!parsed.success) {
@@ -155,7 +168,7 @@ export async function createItem(
       .values({ aircraftId, ...parsed.data })
       .returning({ id: maintenanceItem.id });
     await writeAudit(tx, {
-      actorId: officer.id,
+      actorId: actor.id,
       action: "maintenance.create",
       entityType: "maintenance_item",
       entityId: created.id,
@@ -173,8 +186,8 @@ export async function updateItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const officer = await requireMember("officer");
-  if (!isUuid(itemId)) return { error: "No such item." };
+  const actor = await requireItemMaintainer(itemId);
+  if (!actor) return { error: "No such item." };
   const values = formValues(formData, ITEM_FIELDS);
   const parsed = parseItem(formData);
   if (!parsed.success) {
@@ -199,7 +212,7 @@ export async function updateItem(
       .set(next)
       .where(eq(maintenanceItem.id, itemId));
     await writeAudit(tx, {
-      actorId: officer.id,
+      actorId: actor.id,
       action: "maintenance.update",
       entityType: "maintenance_item",
       entityId: itemId,
@@ -234,8 +247,8 @@ export async function completeItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const officer = await requireMember("officer");
-  if (!isUuid(itemId)) return { error: "No such item." };
+  const actor = await requireItemMaintainer(itemId);
+  if (!actor) return { error: "No such item." };
   const values = formValues(formData, ["completedOn", "reading", "note"]);
   const parsed = completionSchema.safeParse({
     completedOn: formData.get("completedOn") ?? "",
@@ -261,7 +274,7 @@ export async function completeItem(
     await tx.insert(maintenanceCompletion).values({
       itemId,
       ...completion,
-      recordedById: officer.id,
+      recordedById: actor.id,
     });
     const next = {
       lastCompletedOn: completion.completedOn,
@@ -273,7 +286,7 @@ export async function completeItem(
       .set(next)
       .where(eq(maintenanceItem.id, itemId));
     await writeAudit(tx, {
-      actorId: officer.id,
+      actorId: actor.id,
       action: "maintenance.complete",
       entityType: "maintenance_item",
       entityId: itemId,
@@ -297,8 +310,8 @@ export async function completeItem(
 
 // For items that no longer apply, e.g. a one-time AD complied with.
 export async function deleteItem(itemId: string): Promise<FormState> {
-  const officer = await requireMember("officer");
-  if (!isUuid(itemId)) return { error: "No such item." };
+  const actor = await requireItemMaintainer(itemId);
+  if (!actor) return { error: "No such item." };
 
   const aircraftId = await db().transaction(async (tx) => {
     const [item] = await tx
@@ -309,7 +322,7 @@ export async function deleteItem(itemId: string): Promise<FormState> {
     if (!item) return undefined;
     await tx.delete(maintenanceItem).where(eq(maintenanceItem.id, itemId));
     await writeAudit(tx, {
-      actorId: officer.id,
+      actorId: actor.id,
       action: "maintenance.delete",
       entityType: "maintenance_item",
       entityId: itemId,

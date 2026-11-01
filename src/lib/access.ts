@@ -26,3 +26,15 @@ export function decideAccess(
 export function hasRole(member: MemberAccess | null, role: RoleTag) {
   return decideAccess(member, role) === "allow";
 }
+
+// Officers manage every aircraft's maintenance and squawks; a plane
+// captain manages those of the aircraft they look after, and no others.
+// Like everything else, only while their membership is active.
+export function canMaintain(
+  member: MemberAccess | null,
+  captainOf: readonly string[],
+  aircraftId: string,
+) {
+  if (decideAccess(member, "active") !== "allow") return false;
+  return hasRole(member, "officer") || captainOf.includes(aircraftId);
+}

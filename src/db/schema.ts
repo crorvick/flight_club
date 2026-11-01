@@ -459,6 +459,27 @@ export const aircraftCheckout = pgTable(
   (table) => [primaryKey({ columns: [table.memberId, table.aircraftId] })],
 );
 
+// A plane captain looks after one or more aircraft for the club: they can
+// manage those aircraft's maintenance and squawks as an officer would,
+// and nothing else an officer can.  Officers assign them.
+export const aircraftCaptain = pgTable(
+  "aircraft_captain",
+  {
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => member.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.aircraftId, table.memberId] }),
+    // "Which aircraft is this member captain of?" on every page they open.
+    index("aircraft_captain_member_idx").on(table.memberId),
+  ],
+);
+
 // Recurring maintenance: an annual, 100-hour, ELT check, VOR check, AD
 // and so on.  Due by calendar time (months, to the end of the month or to
 // the day, or days), by hours on the aircraft's logbook meter, or
@@ -611,7 +632,22 @@ export const aircraftRelations = relations(aircraft, ({ one, many }) => ({
   flights: many(flight),
   squawks: many(squawk),
   maintenanceItems: many(maintenanceItem),
+  captains: many(aircraftCaptain),
 }));
+
+export const aircraftCaptainRelations = relations(
+  aircraftCaptain,
+  ({ one }) => ({
+    aircraft: one(aircraft, {
+      fields: [aircraftCaptain.aircraftId],
+      references: [aircraft.id],
+    }),
+    member: one(member, {
+      fields: [aircraftCaptain.memberId],
+      references: [member.id],
+    }),
+  }),
+);
 
 export const meterRelations = relations(meter, ({ one }) => ({
   aircraft: one(aircraft, {

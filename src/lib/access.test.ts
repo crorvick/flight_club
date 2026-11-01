@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { decideAccess, hasRole, type MemberAccess } from "./access";
+import {
+  canMaintain,
+  decideAccess,
+  hasRole,
+  type MemberAccess,
+} from "./access";
 
 const officer: MemberAccess = { active: true, roles: ["pilot", "officer"] };
 const pilot: MemberAccess = { active: true, roles: ["pilot"] };
@@ -34,5 +39,25 @@ describe("hasRole", () => {
   it("is false for a deactivated member who still holds the tag", () => {
     expect(hasRole(deactivatedOfficer, "officer")).toBe(false);
     expect(hasRole(officer, "officer")).toBe(true);
+  });
+});
+
+describe("canMaintain", () => {
+  const plane = "plane-1";
+
+  it("lets officers maintain any aircraft", () => {
+    expect(canMaintain(officer, [], plane)).toBe(true);
+  });
+
+  it("lets a captain maintain only their own aircraft", () => {
+    expect(canMaintain(pilot, [plane], plane)).toBe(true);
+    expect(canMaintain(pilot, ["plane-2"], plane)).toBe(false);
+    expect(canMaintain(pilot, [], plane)).toBe(false);
+  });
+
+  it("stops a deactivated captain", () => {
+    expect(canMaintain(pending, [plane], plane)).toBe(false);
+    expect(canMaintain(deactivatedOfficer, [plane], plane)).toBe(false);
+    expect(canMaintain(null, [plane], plane)).toBe(false);
   });
 });

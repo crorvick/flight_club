@@ -5,14 +5,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { STATUS_CLASSES } from "@/components/aircraft-status";
 import { LocalTime } from "@/components/local-time";
 import { DetailSkeleton } from "@/components/page-skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { squawk } from "@/db/schema";
-import { STATUS_CLASSES } from "@/components/aircraft-status";
-import { aircraftAlerts } from "@/lib/fleet";
 import { hasRole } from "@/lib/access";
+import { canMaintainAircraft } from "@/lib/captains";
+import { aircraftAlerts } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 import {
@@ -65,6 +66,7 @@ async function SquawkDetails({
     },
   });
   if (!row) notFound();
+  const maintainer = await canMaintainAircraft(member, row.aircraft.id);
   const { status } = (await aircraftAlerts([row.aircraft.id])).get(
     row.aircraft.id,
   )!;
@@ -140,8 +142,9 @@ async function SquawkDetails({
         </div>
       )}
 
-      {hasRole(member, "officer") && (
+      {maintainer && (
         <OfficerControls
+          title={hasRole(member, "officer") ? "Officer" : "Plane captain"}
           action={changeSquawk.bind(null, row.id)}
           allowed={allowedChanges({
             status: row.status,

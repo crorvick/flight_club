@@ -52,6 +52,7 @@ Environment rules:
 ## 4. Users & roles
 
 - A **Member** can hold multiple **role tags**: `pilot`, `officer` (future: `instructor`, `mechanic`).
+- A **plane captain** looks after particular aircraft: officers assign any active member as captain of one or more aircraft, and a captain manages those aircraft's maintenance items and squawks as an officer would. Nothing else an officer can do (members, aircraft settings, meters, flights) comes with it.
 - All permission checks are enforced **on the server**, not just by hiding buttons in the UI.
 - Every member logs in with their own account.
 
@@ -66,6 +67,7 @@ Environment rules:
 - id, tail number, make/model, active flag, whether it has a fuel totalizer
 - `billingMeterId` → references one of this aircraft's meters
 - `logbookMeterId` → the meter that is its time in the maintenance logs (usually tach); hours intervals count on it
+- Plane captains: the members assigned to look after it (an AircraftCaptain row per member)
 - Status is **derived**: `grounded` if any open squawk or overdue maintenance item grounds it for all flying; otherwise `VFR only` if one grounds it for IFR; otherwise `airworthy`.
 
 ### Meter (configurable per aircraft)
@@ -135,7 +137,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - A grounding squawk immediately makes the aircraft `grounded`, or `VFR only` if it grounds only IFR (and can notify officers).
 - Each maintenance item says what happens when it's overdue: ground the aircraft, ground it for IFR only (e.g. VOR check, pitot-static), or only warn.
 - A grounded aircraft can't be checked out.  A `VFR only` aircraft can, once the pilot confirms they'll fly VFR.
-- **Only members tagged `officer` can resolve a grounding squawk / unground an aircraft.** Resolution requires a note and records who/when.
+- **Only officers, and the aircraft's plane captains, can resolve a grounding squawk / unground an aircraft.** Resolution requires a note and records who/when.
 
 **Pre-flight warnings** (shown on the flight log page)
 - Aircraft is grounded or VFR only, and why.
@@ -167,8 +169,9 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Fleet status overview (what's flyable, what's coming due)
 - Manage members & role tags
 - Manage aircraft & their meters / billing and logbook meters
-- Manage maintenance items; log maintenance completion
-- Resolve squawks
+- Manage maintenance items; log maintenance completion (officers and the aircraft's captains)
+- Resolve squawks (officers and the aircraft's captains)
+- Assign plane captains
 - Edit locked flights (audited)
 
 Build these by hand as needed; no generic admin framework for now. Drizzle Studio is fine for the developer's occasional data fixes but not for officers.

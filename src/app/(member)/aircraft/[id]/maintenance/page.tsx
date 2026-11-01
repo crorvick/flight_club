@@ -10,6 +10,8 @@ import { ListSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { aircraft, maintenanceItem } from "@/db/schema";
+import { hasRole } from "@/lib/access";
+import { requireMaintainer } from "@/lib/captains";
 import { today } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
@@ -37,10 +39,12 @@ async function Maintenance({
   params,
   searchParams,
 }: Pick<PageProps<"/aircraft/[id]/maintenance">, "params" | "searchParams">) {
-  await requireMember("officer");
+  await requireMember();
   const { id } = await params;
   const { saved } = await searchParams;
   if (!isUuid(id)) notFound();
+  // Officers, and this aircraft's captains.
+  const member = await requireMaintainer(id);
 
   const plane = await db().query.aircraft.findFirst({
     where: eq(aircraft.id, id),
@@ -61,9 +65,11 @@ async function Maintenance({
         <h1 className="text-2xl font-semibold tracking-tight">
           {plane.tailNumber} maintenance
         </h1>
-        <Link href={`/aircraft/${plane.id}`} className="text-sm underline">
-          Aircraft and meters
-        </Link>
+        {hasRole(member, "officer") && (
+          <Link href={`/aircraft/${plane.id}`} className="text-sm underline">
+            Aircraft and meters
+          </Link>
+        )}
       </div>
 
       {plane.maintenanceItems.length > 0 && (

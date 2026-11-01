@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -11,13 +11,26 @@ import { FormSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
-import { aircraft, flightMeterReading } from "@/db/schema";
+import { aircraft, flightMeterReading, member } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder, METER_DISPLAY_ORDER } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
-import { addMeter, removeMeter, updateAircraft, updateMeter } from "../actions";
-import { AddMeterForm, DetailsForm, MeterForm } from "../aircraft-forms";
+import {
+  addCaptain,
+  addMeter,
+  removeCaptain,
+  removeMeter,
+  updateAircraft,
+  updateMeter,
+} from "../actions";
+import {
+  AddCaptainForm,
+  AddMeterForm,
+  CaptainList,
+  DetailsForm,
+  MeterForm,
+} from "../aircraft-forms";
 
 export const metadata: Metadata = { title: "Aircraft · Flight Club" };
 
@@ -25,6 +38,7 @@ const CONFIRMATIONS: Record<string, string> = {
   created: "Aircraft added.",
   details: "Details saved.",
   meter: "Meters saved.",
+  captains: "Plane captains saved.",
 };
 
 export default function AircraftPage({
@@ -49,9 +63,25 @@ async function AircraftDetails({
 
   const plane = await db().query.aircraft.findFirst({
     where: eq(aircraft.id, id),
-    with: { meters: true },
+    with: {
+      meters: true,
+      captains: {
+        columns: {},
+        with: { member: { columns: { id: true, name: true } } },
+      },
+    },
   });
   if (!plane) notFound();
+  const captains = plane.captains
+    .map((c) => c.member)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const candidates = (
+    await db()
+      .select({ id: member.id, name: member.name })
+      .from(member)
+      .where(eq(member.active, true))
+      .orderBy(asc(member.name))
+  ).filter((m) => !captains.some((c) => c.id === m.id));
   const meters = [...plane.meters].sort(byMeterOrder);
 
   // Meters flights have recorded can't be removed, nor can the ones it's
@@ -97,14 +127,34 @@ async function AircraftDetails({
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">
-        <SectionCard title="Details">
-          <DetailsForm
-            key={version}
-            action={updateAircraft.bind(null, plane.id)}
-            aircraft={plane}
-            meters={meters.map((m) => ({ id: m.id, label: m.label }))}
-          />
-        </SectionCard>
+        <div className="flex min-w-0 flex-col gap-6">
+          <SectionCard title="Details">
+            <DetailsForm
+              key={version}
+              action={updateAircraft.bind(null, plane.id)}
+              aircraft={plane}
+              meters={meters.map((m) => ({ id: m.id, label: m.label }))}
+            />
+          </SectionCard>
+
+          <SectionCard
+            title="Plane captains"
+            aria-label="Plane captains"
+            description="They manage this aircraft's maintenance and squawks as an officer would."
+          >
+            <CaptainList
+              captains={captains.map((c) => ({
+                ...c,
+                removeAction: removeCaptain.bind(null, plane.id, c.id),
+              }))}
+            />
+            <AddCaptainForm
+              key={captains.length}
+              action={addCaptain.bind(null, plane.id)}
+              candidates={candidates}
+            />
+          </SectionCard>
+        </div>
 
         <SectionCard
           title="Meters"

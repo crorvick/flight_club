@@ -8,8 +8,10 @@ import { db } from "@/db";
 import { type Transaction, writeAudit } from "@/db/audit";
 import {
   aircraft,
+  aircraftCaptain,
   flightMeterReading,
   maintenanceItem,
+  member,
   meter,
 } from "@/db/schema";
 import { changedFields } from "@/lib/audit-diff";
@@ -542,4 +544,84 @@ export async function removeMeter(meterId: string): Promise<FormState> {
     return rejection(error, {});
   }
   redirect(`/aircraft/${aircraftId}?saved=meter`);
+}
+
+// Make an active member a plane captain of the aircraft, so they can
+// manage its maintenance and squawks.
+export async function addCaptain(
+  aircraftId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const officer = await requireMember("officer");
+  if (!isUuid(aircraftId)) return { error: "No such aircraft." };
+  const values = formValues(formData, ["memberId"]);
+  if (!isUuid(values.memberId)) {
+    return { fieldErrors: { memberId: ["Choose a member."] }, values };
+  }
+
+  try {
+    await db().transaction(async (tx) => {
+      const [who] = await tx
+        .select({ id: member.id })
+        .from(member)
+        .where(and(eq(member.id, values.memberId), eq(member.active, true)));
+      if (!who) throw new Rejected("Choose an active member.", "memberId");
+      const [plane] = await tx
+        .select({ id: aircraft.id })
+        .from(aircraft)
+        .where(eq(aircraft.id, aircraftId));
+      if (!plane) throw new Rejected("No such aircraft.");
+
+      const added = await tx
+        .insert(aircraftCaptain)
+        .values({ aircraftId, memberId: who.id })
+        .onConflictDoNothing()
+        .returning({ memberId: aircraftCaptain.memberId });
+      if (added.length === 0) return;
+      await writeAudit(tx, {
+        actorId: officer.id,
+        action: "captain.add",
+        entityType: "aircraft",
+        entityId: aircraftId,
+        before: null,
+        after: { memberId: who.id },
+      });
+    });
+  } catch (error) {
+    return rejection(error, values);
+  }
+  redirect(`/aircraft/${aircraftId}?saved=captains`);
+}
+
+export async function removeCaptain(
+  aircraftId: string,
+  memberId: string,
+): Promise<FormState> {
+  const officer = await requireMember("officer");
+  if (!isUuid(aircraftId) || !isUuid(memberId)) {
+    return { error: "No such captain." };
+  }
+
+  await db().transaction(async (tx) => {
+    const removed = await tx
+      .delete(aircraftCaptain)
+      .where(
+        and(
+          eq(aircraftCaptain.aircraftId, aircraftId),
+          eq(aircraftCaptain.memberId, memberId),
+        ),
+      )
+      .returning({ memberId: aircraftCaptain.memberId });
+    if (removed.length === 0) return;
+    await writeAudit(tx, {
+      actorId: officer.id,
+      action: "captain.remove",
+      entityType: "aircraft",
+      entityId: aircraftId,
+      before: { memberId },
+      after: null,
+    });
+  });
+  redirect(`/aircraft/${aircraftId}?saved=captains`);
 }

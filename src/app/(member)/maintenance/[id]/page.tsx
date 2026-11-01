@@ -10,6 +10,7 @@ import { DetailSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { maintenanceCompletion, maintenanceItem } from "@/db/schema";
+import { requireMaintainer } from "@/lib/captains";
 import { formatDate } from "@/lib/dates";
 import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
@@ -43,7 +44,7 @@ async function ItemDetails({
   params,
   searchParams,
 }: Pick<PageProps<"/maintenance/[id]">, "params" | "searchParams">) {
-  await requireMember("officer");
+  await requireMember();
   const { id } = await params;
   const { saved } = await searchParams;
   if (!isUuid(id)) notFound();
@@ -65,6 +66,8 @@ async function ItemDetails({
     },
   });
   if (!item) notFound();
+  // Officers, and the aircraft's captains.
+  await requireMaintainer(item.aircraft.id);
 
   const logbook = item.aircraft.logbookMeter;
   const hours = item.intervalHours !== null;

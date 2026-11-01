@@ -427,3 +427,87 @@ export function AddMeterForm({
     </form>
   );
 }
+
+export function CaptainList({
+  captains,
+}: {
+  captains: { id: string; name: string; removeAction: Action }[];
+}) {
+  if (captains.length === 0) {
+    return <p className="text-sm text-muted-foreground">None yet.</p>;
+  }
+  return (
+    <ul className="divide-y rounded-lg border">
+      {captains.map((c) => (
+        <CaptainRow key={c.id} name={c.name} removeAction={c.removeAction} />
+      ))}
+    </ul>
+  );
+}
+
+function CaptainRow({
+  name,
+  removeAction,
+}: {
+  name: string;
+  removeAction: Action;
+}) {
+  const [state, remove, removing] = useForm(removeAction);
+  return (
+    <li className="flex min-h-12 flex-wrap items-center justify-between gap-2 px-3 py-1">
+      <span className="font-medium">{name}</span>
+      <form action={remove}>
+        <FormError message={state.error} />
+        <Button
+          type="submit"
+          variant="ghost"
+          aria-label={`Remove ${name} as captain`}
+          className="h-10 text-destructive"
+          disabled={removing}
+        >
+          Remove
+        </Button>
+      </form>
+    </li>
+  );
+}
+
+export function AddCaptainForm({
+  action,
+  candidates,
+}: {
+  action: Action;
+  // Active members who aren't captains of this aircraft yet.
+  candidates: { id: string; name: string }[];
+}) {
+  const [state, formAction, pending] = useForm(action);
+  const errors = state.fieldErrors ?? {};
+  if (candidates.length === 0) return null;
+  return (
+    <form action={formAction} className="flex flex-col gap-2" noValidate>
+      <FormError message={state.error} />
+      <label htmlFor="captain-member" className="text-sm font-medium">
+        Add a captain
+      </label>
+      <div className="flex gap-2">
+        <select
+          id="captain-member"
+          name="memberId"
+          defaultValue={state.values?.memberId ?? ""}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-transparent px-2 text-base"
+        >
+          <option value="" disabled>
+            Choose a member…
+          </option>
+          {candidates.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <Saving pending={pending} label="Add" variant="outline" />
+      </div>
+      <ErrorText errors={errors.memberId} />
+    </form>
+  );
+}
