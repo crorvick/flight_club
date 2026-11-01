@@ -35,22 +35,31 @@ test("can be installed to the home screen", async ({ page, request }) => {
 test("follows the device's dark mode", async ({ browser }) => {
   // The page background's brightness, 0–255.  Browsers report computed
   // colours in different spaces (rgb, oklch, lab), so paint it and read
-  // the pixel back.
-  const brightness = async (colorScheme: "light" | "dark") => {
+  // the pixel back.  Polled, since the dev server can apply its styles a
+  // moment after the page has loaded.
+  const expectBrightness = async (
+    colorScheme: "light" | "dark",
+    check: (brightness: number) => boolean,
+  ) => {
     const context = await browser.newContext({ colorScheme });
     const page = await context.newPage();
     await page.goto("/");
-    const value = await page.evaluate(() => {
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = 1;
-      const context = canvas.getContext("2d")!;
-      context.fillStyle = getComputedStyle(document.body).backgroundColor;
-      context.fillRect(0, 0, 1, 1);
-      return context.getImageData(0, 0, 1, 1).data[0];
-    });
+    await expect
+      .poll(async () =>
+        check(
+          await page.evaluate(() => {
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = 1;
+            const context = canvas.getContext("2d")!;
+            context.fillStyle = getComputedStyle(document.body).backgroundColor;
+            context.fillRect(0, 0, 1, 1);
+            return context.getImageData(0, 0, 1, 1).data[0];
+          }),
+        ),
+      )
+      .toBe(true);
     await context.close();
-    return value;
   };
-  expect(await brightness("light")).toBeGreaterThan(230);
-  expect(await brightness("dark")).toBeLessThan(40);
+  await expectBrightness("light", (b) => b > 230);
+  await expectBrightness("dark", (b) => b < 40);
 });
