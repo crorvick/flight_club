@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { formatDate } from "../src/lib/dates";
 import { addMonths } from "../src/lib/maintenance";
 
 import {
@@ -159,7 +160,7 @@ test("a day interval is due exactly that many days later", async ({ page }) => {
   // A quarter of 30 days: due soon from 7 days out, not 30.
   await expect(page.getByText("Due soon")).toBeVisible();
   await expect(
-    page.getByText(`due ${daysAgo(-5)} (5 days)`, { exact: false }),
+    page.getByText(`due ${formatDate(daysAgo(-5))} (5 days)`, { exact: false }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Log completion" }).click();
@@ -180,7 +181,7 @@ test("months can run to the day instead of the month's end", async ({
   });
   // A month to the day, not the end of next month.
   await expect(
-    page.getByText(`due ${addMonths(lastOn, 1)}`, { exact: false }),
+    page.getByText(`due ${formatDate(addMonths(lastOn, 1))}`, { exact: false }),
   ).toBeVisible();
 });
 

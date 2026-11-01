@@ -5,9 +5,11 @@ import { Suspense } from "react";
 
 import { and, arrayContains, asc, eq, or } from "drizzle-orm";
 
+import { FormSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { formatDate } from "@/lib/dates";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
@@ -23,7 +25,7 @@ export default function EditFlightPage({
   params,
 }: PageProps<"/flights/[id]/edit">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<FormSkeleton title fields={5} />}>
       <EditFlight params={params} />
     </Suspense>
   );
@@ -39,7 +41,7 @@ async function EditFlight({
 
   const title = (
     <h1 className="text-2xl font-semibold tracking-tight">
-      Edit {flight.aircraft.tailNumber} on {flight.date}
+      Edit {flight.aircraft.tailNumber} on {formatDate(flight.date)}
     </h1>
   );
 
@@ -122,7 +124,7 @@ async function OfficerCorrection({
     <>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Correct {flight.aircraft.tailNumber} on {flight.date}
+          Correct {flight.aircraft.tailNumber} on {formatDate(flight.date)}
         </h1>
         <p className="text-muted-foreground">
           As an officer. The change and your reason are recorded.

@@ -2,6 +2,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aircraft } from "@/db/schema";
+import { formatDate } from "@/lib/dates";
 import { getCheckouts, getQualifications } from "@/lib/pilots";
 import { flightReviewExpires } from "@/lib/qualifications";
 
@@ -41,7 +42,7 @@ export async function QualificationsPanel({
         {qualifications.flightReviewOn && (
           <p className="text-sm text-muted-foreground">
             Flight review good through{" "}
-            {flightReviewExpires(qualifications.flightReviewOn)}.
+            {formatDate(flightReviewExpires(qualifications.flightReviewOn))}.
           </p>
         )}
         <QualificationsForm
@@ -65,7 +66,7 @@ export async function QualificationsPanel({
                 <span>
                   <span className="font-medium">{c.tailNumber}</span>{" "}
                   <span className="text-sm text-muted-foreground">
-                    since {c.checkedOutOn}
+                    since {formatDate(c.checkedOutOn)}
                   </span>
                 </span>
                 {canManageCheckouts && (

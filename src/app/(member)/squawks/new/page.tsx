@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AircraftPicker } from "@/components/aircraft-picker";
+import { PickerSkeleton } from "@/components/page-skeleton";
 import { listActiveAircraft } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
@@ -17,7 +18,7 @@ export default function NewSquawkPage({
   searchParams,
 }: PageProps<"/squawks/new">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<PickerSkeleton />}>
       <ReportSquawk searchParams={searchParams} />
     </Suspense>
   );

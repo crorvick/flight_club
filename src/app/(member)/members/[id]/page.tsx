@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { LocalTime } from "@/components/local-time";
+import { FormSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { member } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
@@ -21,7 +24,7 @@ export default function MemberPage({
   searchParams,
 }: PageProps<"/members/[id]">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<FormSkeleton title />}>
       <MemberDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -42,19 +45,12 @@ async function MemberDetails({
 
   return (
     <>
-      {saved && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
-        >
-          Saved.
-        </p>
-      )}
+      <Flash message={!!saved && "Saved."} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{row.name}</h1>
         <p className="break-all text-muted-foreground">{row.email}</p>
         <p className="text-sm text-muted-foreground">
-          Joined {row.createdAt.toISOString().slice(0, 10)}
+          Joined <LocalTime at={row.createdAt} format="date" />
           {isPending({ active: row.active, roles }) &&
             " · waiting for approval"}
         </p>

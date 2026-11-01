@@ -148,13 +148,13 @@ describe("describeDue", () => {
   it("describes a date limit", () => {
     expect(
       describeDue({ state: "ok", dueOn: "2026-12-31", daysLeft: 30 }),
-    ).toBe("due 2026-12-31 (30 days)");
+    ).toBe("due Dec 31, 2026 (30 days)");
     expect(
       describeDue({ state: "due-soon", dueOn: "2026-11-01", daysLeft: 0 }),
-    ).toBe("due 2026-11-01 (today)");
+    ).toBe("due Nov 1, 2026 (today)");
     expect(
       describeDue({ state: "overdue", dueOn: "2026-10-31", daysLeft: -1 }),
-    ).toBe("1 day overdue (due 2026-10-31)");
+    ).toBe("1 day overdue (due Oct 31, 2026)");
   });
 
   it("describes an hours limit on its meter", () => {
@@ -179,7 +179,7 @@ describe("describeDue", () => {
         "Tach",
       ),
     ).toBe(
-      "due 2027-01-31 (91 days), or due at 4250.0 on the tach (4.0 hours left)",
+      "due Jan 31, 2027 (91 days), or due at 4250.0 on the tach (4.0 hours left)",
     );
   });
 });

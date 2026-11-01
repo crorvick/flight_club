@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { ListSkeleton } from "@/components/page-skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { aircraft } from "@/db/schema";
@@ -16,7 +17,7 @@ export default function AircraftListPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Aircraft</h1>
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<ListSkeleton />}>
         <AircraftList />
       </Suspense>
     </>

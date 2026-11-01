@@ -5,6 +5,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { LocalTime } from "@/components/local-time";
+import { DetailSkeleton } from "@/components/page-skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { squawk } from "@/db/schema";
@@ -35,7 +37,7 @@ export default function SquawkPage({
   searchParams,
 }: PageProps<"/squawks/[id]">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<DetailSkeleton />}>
       <SquawkDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -107,7 +109,7 @@ async function SquawkDetails({
           Squawk on {tail}
         </h1>
         <p className="text-muted-foreground">
-          {row.reportedBy.name}, {row.reportedAt.toISOString().slice(0, 10)}
+          {row.reportedBy.name}, <LocalTime at={row.reportedAt} />
         </p>
       </div>
 
@@ -132,7 +134,7 @@ async function SquawkDetails({
         <div className="rounded-lg bg-muted p-4">
           <p className="text-sm text-muted-foreground">
             Resolved by {row.resolvedBy?.name},{" "}
-            {row.resolvedAt?.toISOString().slice(0, 10)}
+            {row.resolvedAt && <LocalTime at={row.resolvedAt} />}
           </p>
           <p className="whitespace-pre-wrap">{row.resolutionNote}</p>
         </div>

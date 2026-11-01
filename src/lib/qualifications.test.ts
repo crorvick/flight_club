@@ -38,7 +38,7 @@ describe("pilotWarnings", () => {
     expect(
       pilotWarnings({ ...current, medicalExpiresOn: "2026-10-31" }, today),
     ).toEqual([
-      { severity: "expired", message: "Your medical expired on 2026-10-31." },
+      { severity: "expired", message: "Your medical expired on Oct 31, 2026." },
     ]);
   });
 
@@ -48,7 +48,7 @@ describe("pilotWarnings", () => {
     ).toEqual([
       {
         severity: "soon",
-        message: "Your medical expires on 2026-11-30 (29 days).",
+        message: "Your medical expires on Nov 30, 2026 (29 days).",
       },
     ]);
   });
@@ -59,7 +59,7 @@ describe("pilotWarnings", () => {
     ).toEqual([
       {
         severity: "expired",
-        message: "Your flight review expired on 2026-10-31.",
+        message: "Your flight review expired on Oct 31, 2026.",
       },
     ]);
     expect(

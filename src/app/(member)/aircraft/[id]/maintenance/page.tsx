@@ -5,6 +5,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { ListSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { aircraft, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
@@ -25,7 +27,7 @@ export default function AircraftMaintenancePage({
   searchParams,
 }: PageProps<"/aircraft/[id]/maintenance">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<ListSkeleton title />}>
       <Maintenance params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -57,14 +59,7 @@ async function Maintenance({
 
   return (
     <>
-      {saved === "deleted" && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
-        >
-          Item removed.
-        </p>
-      )}
+      <Flash message={saved === "deleted" && "Item removed."} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
           {plane.tailNumber} maintenance

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { forbidden, notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { LocalTime } from "@/components/local-time";
+import { FormSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { dispatch } from "@/db/schema";
 import { hasRole } from "@/lib/access";
@@ -18,15 +21,12 @@ import { ActionButton } from "./action-button";
 
 export const metadata: Metadata = { title: "Checked out · Flight Club" };
 
-const time = (at: Date) =>
-  at.toISOString().slice(0, 16).replace("T", " ") + " UTC";
-
 export default function DispatchPage({
   params,
   searchParams,
 }: PageProps<"/dispatches/[id]">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<FormSkeleton title fields={5} />}>
       <Dispatch params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -90,7 +90,7 @@ async function Dispatch({
               VFR only ·{" "}
             </span>
           )}
-          Checked out {time(row.checkedOutAt)}
+          Checked out <LocalTime at={row.checkedOutAt} />
           {row.status === "cancelled" && " · cancelled"}
           {row.status === "in" && " · checked in"}
         </p>
@@ -136,11 +136,7 @@ async function Dispatch({
         </section>
       )}
 
-      {saved === "reviewed" && (
-        <p role="status" className="font-medium">
-          Marked reviewed.
-        </p>
-      )}
+      <Flash message={saved === "reviewed" && "Marked reviewed."} />
 
       {row.status === "out" ? (
         <>

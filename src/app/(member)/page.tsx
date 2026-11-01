@@ -1,4 +1,5 @@
 import { cn } from "cn";
+import { and, count, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import {
   ChevronRight,
   CircleCheck,
@@ -12,10 +13,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { and, count, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import { AircraftStatusLabel } from "@/components/aircraft-status";
 import { BrandMark } from "@/components/brand-mark";
+import { LocalTime } from "@/components/local-time";
+import { DashboardSkeleton } from "@/components/page-skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import {
@@ -25,6 +27,7 @@ import {
   member as memberTable,
 } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { formatDate } from "@/lib/dates";
 import { fleetStatus, today } from "@/lib/fleet";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
@@ -38,13 +41,10 @@ import { recentFlights } from "./flights/data";
 
 type Fleet = Awaited<ReturnType<typeof fleetStatus>>;
 
-const time = (at: Date) =>
-  at.toISOString().slice(0, 16).replace("T", " ") + " UTC";
-
 export default function Home() {
   return (
     // Reads the session, so it streams in after the static shell.
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<DashboardSkeleton />}>
       <Dashboard />
     </Suspense>
   );
@@ -184,7 +184,7 @@ async function FlyCard({ member }: { member: Member }) {
           <div>
             <p className="text-lg font-semibold">You have {out.tailNumber}</p>
             <p className="text-sm text-muted-foreground">
-              {out.makeModel} · checked out {time(out.checkedOutAt)}
+              {out.makeModel} · checked out <LocalTime at={out.checkedOutAt} />
               {out.vfrOnly && " · VFR only"}
             </p>
           </div>
@@ -273,7 +273,7 @@ function AttentionRow({
   icon: typeof Clock;
   tone: "danger" | "warning" | "info";
   title: string;
-  detail?: string;
+  detail?: React.ReactNode;
 }) {
   return (
     <li>
@@ -364,7 +364,11 @@ async function NeedsAttention({ fleet }: { fleet: Fleet }) {
               icon={Gauge}
               tone="warning"
               title={`Unlogged time on ${g.tailNumber}`}
-              detail={`Found by ${g.pilot}, ${g.at.toISOString().slice(0, 10)}`}
+              detail={
+                <>
+                  Found by {g.pilot}, <LocalTime at={g.at} format="date" />
+                </>
+              }
             />
           ))}
           {squawks.map((s) => (
@@ -487,7 +491,9 @@ async function RecentFlights({ member }: { member: Member }) {
             >
               <span>
                 <span className="font-medium">{f.tailNumber}</span>{" "}
-                <span className="text-muted-foreground">{f.date}</span>
+                <span className="text-muted-foreground">
+                  {formatDate(f.date, { weekday: true })}
+                </span>
               </span>
               <span className="text-sm text-muted-foreground tabular-nums">
                 {formatHours(parseHours(f.billedHours)!)} h

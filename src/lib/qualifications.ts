@@ -2,6 +2,7 @@
 // sections 5 and 6).  Passenger currency isn't tracked: landings aren't
 // recorded, and staying current is the pilot's responsibility.
 
+import { formatDate } from "./dates";
 import { dueDate } from "./maintenance";
 
 export const EXPIRING_SOON_DAYS = 30;
@@ -59,13 +60,13 @@ function expiry(
   if (days < 0) {
     return {
       severity: "expired",
-      message: `Your ${what} expired on ${expiresOn}.`,
+      message: `Your ${what} expired on ${formatDate(expiresOn)}.`,
     };
   }
   if (days <= EXPIRING_SOON_DAYS) {
     return {
       severity: "soon",
-      message: `Your ${what} expires on ${expiresOn} (${days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"}`}).`,
+      message: `Your ${what} expires on ${formatDate(expiresOn)} (${days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"}`}).`,
     };
   }
   return undefined;

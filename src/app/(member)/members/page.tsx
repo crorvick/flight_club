@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { ListSkeleton } from "@/components/page-skeleton";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import { member } from "@/db/schema";
@@ -18,7 +19,7 @@ export default function MembersPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<ListSkeleton rows={6} />}>
         <Members />
       </Suspense>
     </>

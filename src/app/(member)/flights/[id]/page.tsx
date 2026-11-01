@@ -5,10 +5,14 @@ import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { LocalTime } from "@/components/local-time";
+import { DetailSkeleton } from "@/components/page-skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { auditLog, member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { formatDate } from "@/lib/dates";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatAmount } from "@/lib/fluids";
 import { formatHours, parseHours } from "@/lib/hours";
@@ -30,7 +34,7 @@ export default function FlightPage({
   searchParams,
 }: PageProps<"/flights/[id]">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<DetailSkeleton />}>
       <FlightDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -67,18 +71,12 @@ async function FlightDetails({
 
   return (
     <>
-      {confirmation && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
-        >
-          {confirmation}
-        </p>
-      )}
+      <Flash message={confirmation} />
 
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          {flight.aircraft.tailNumber} on {flight.date}
+          {flight.aircraft.tailNumber} on{" "}
+          {formatDate(flight.date, { weekday: true })}
         </h1>
         <p className="text-muted-foreground">{flight.pilot.name}</p>
       </div>
@@ -185,7 +183,7 @@ async function FlightDetails({
             {corrections.map((c) => (
               <li key={c.id} className="rounded-lg bg-muted p-3 text-sm">
                 <span className="text-muted-foreground">
-                  {c.by ?? "A script"}, {c.at.toISOString().slice(0, 10)}:
+                  {c.by ?? "A script"}, <LocalTime at={c.at} format="date" />:
                 </span>{" "}
                 {String((c.after as { reason?: string } | null)?.reason ?? "")}
               </li>

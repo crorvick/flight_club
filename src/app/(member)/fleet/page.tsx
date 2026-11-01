@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AircraftStatusLabel } from "@/components/aircraft-status";
+import { LocalTime } from "@/components/local-time";
+import { ListSkeleton } from "@/components/page-skeleton";
 import { fleetStatus, recentlyResolved } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
 import { requireMember } from "@/lib/session";
@@ -15,7 +17,7 @@ export default function FleetPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Fleet</h1>
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<ListSkeleton rows={3} tall />}>
         <Fleet />
       </Suspense>
     </>
@@ -131,7 +133,9 @@ async function Fleet() {
                     {s.description}
                   </span>
                   <span className="shrink-0 text-sm text-muted-foreground">
-                    {s.resolvedAt?.toISOString().slice(0, 10)}
+                    {s.resolvedAt && (
+                      <LocalTime at={s.resolvedAt} format="date" />
+                    )}
                   </span>
                 </Link>
               </li>

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { formatDate } from "../src/lib/dates";
 import {
   closeSql,
   createAircraft,
@@ -76,7 +77,7 @@ test("an expired medical is flagged as serious", async ({ page }, testInfo) => {
 
   await openLog(page);
   await expect(warnings(page)).toContainText(
-    `Your medical expired on ${expired}.`,
+    `Your medical expired on ${formatDate(expired)}.`,
   );
 });
 

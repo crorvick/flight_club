@@ -5,8 +5,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { DetailSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { maintenanceCompletion, maintenanceItem } from "@/db/schema";
+import { formatDate } from "@/lib/dates";
 import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
@@ -30,7 +33,7 @@ export default function MaintenanceItemPage({
   searchParams,
 }: PageProps<"/maintenance/[id]">) {
   return (
-    <Suspense fallback={<div className="h-96" />}>
+    <Suspense fallback={<DetailSkeleton />}>
       <ItemDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -70,14 +73,7 @@ async function ItemDetails({
 
   return (
     <>
-      {confirmation && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
-        >
-          {confirmation}
-        </p>
-      )}
+      <Flash message={confirmation} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{item.name}</h1>
         <Link
@@ -124,7 +120,7 @@ async function ItemDetails({
           <ul className="flex flex-col gap-2">
             {item.completions.map((c) => (
               <li key={c.id} className="rounded-lg bg-muted p-3 text-sm">
-                <span className="font-medium">{c.completedOn}</span>
+                <span className="font-medium">{formatDate(c.completedOn)}</span>
                 {c.reading !== null && (
                   <> at {formatHours(parseHours(c.reading)!)}</>
                 )}

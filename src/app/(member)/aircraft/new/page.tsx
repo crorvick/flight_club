@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { FormSkeleton } from "@/components/page-skeleton";
 import { METER_DISPLAY_ORDER } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
@@ -13,7 +14,7 @@ export default function NewAircraftPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Add an aircraft</h1>
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<FormSkeleton />}>
         <NewAircraft />
       </Suspense>
     </>

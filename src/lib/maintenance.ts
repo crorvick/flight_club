@@ -2,6 +2,7 @@
 // next due date and reading are always computed from the last completion,
 // never stored, so they can't drift from it.
 
+import { formatDate } from "./dates";
 import { parseHours } from "./hours";
 
 // Early enough to book the shop, but never more than a quarter of the
@@ -157,8 +158,8 @@ export function describeDue(status: MaintenanceStatus, meterLabel?: string) {
   if (status.dueOn !== undefined && status.daysLeft !== undefined) {
     parts.push(
       status.daysLeft < 0
-        ? `${daysText(status.daysLeft)} overdue (due ${status.dueOn})`
-        : `due ${status.dueOn} (${status.daysLeft === 0 ? "today" : daysText(status.daysLeft)})`,
+        ? `${daysText(status.daysLeft)} overdue (due ${formatDate(status.dueOn)})`
+        : `due ${formatDate(status.dueOn)} (${status.daysLeft === 0 ? "today" : daysText(status.daysLeft)})`,
     );
   }
   if (status.dueAt !== undefined && status.hoursLeft !== undefined) {

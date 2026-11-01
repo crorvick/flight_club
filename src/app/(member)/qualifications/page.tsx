@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { Flash } from "@/components/flash";
+import { FormSkeleton } from "@/components/page-skeleton";
 import { requireMember } from "@/lib/session";
 
 import { QualificationsPanel } from "./qualifications-panel";
@@ -15,7 +17,7 @@ export default function QualificationsPage({
       <h1 className="text-2xl font-semibold tracking-tight">
         My qualifications
       </h1>
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<FormSkeleton />}>
         <MyQualifications searchParams={searchParams} />
       </Suspense>
     </>
@@ -29,14 +31,7 @@ async function MyQualifications({
   const { saved } = await searchParams;
   return (
     <>
-      {saved && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
-        >
-          Saved.
-        </p>
-      )}
+      <Flash message={!!saved && "Saved."} />
       <QualificationsPanel memberId={member.id} canManageCheckouts={false} />
     </>
   );

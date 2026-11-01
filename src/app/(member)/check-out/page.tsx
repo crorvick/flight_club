@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { AircraftPicker } from "@/components/aircraft-picker";
+import { Flash } from "@/components/flash";
+import { PickerSkeleton } from "@/components/page-skeleton";
 import { PreflightWarnings } from "@/components/preflight-warnings";
 import { db } from "@/db";
 import { dispatch } from "@/db/schema";
@@ -27,7 +29,7 @@ export default function CheckOutPage({
         Check out an aircraft
       </h1>
       {/* Reads the session and the URL, so it streams in after the shell. */}
-      <Suspense fallback={<div className="h-96" />}>
+      <Suspense fallback={<PickerSkeleton />}>
         <CheckOut searchParams={searchParams} />
       </Suspense>
     </>
@@ -69,11 +71,10 @@ async function CheckOut({
 
   return (
     <>
-      {cancelled && (
-        <p role="status" className="rounded-lg bg-muted p-4 font-medium">
-          Cancelled. No flight was recorded.
-        </p>
-      )}
+      <Flash
+        message={!!cancelled && "Cancelled. No flight was recorded."}
+        param="cancelled"
+      />
       <AircraftPicker fleet={fleet} selectedId={plane.id} path="/check-out" />
       <PreflightWarnings
         tailNumber={plane.tailNumber}
