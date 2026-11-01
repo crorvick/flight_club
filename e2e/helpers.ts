@@ -130,7 +130,11 @@ export async function createSquawk(
   squawk: { description: string; grounds: boolean },
 ) {
   const db = sql();
-  const [{ id: reporterId }] = await db`select id from member limit 1`;
+  // Any member will do; a seeded one rather than another test's, which
+  // the clean-up might be about to remove.
+  const [{ id: reporterId }] = await db`
+    select id from member order by created_at limit 1
+  `;
   const [{ id }] = await db`
     insert into squawk (aircraft_id, reported_by_id, description, grounds)
     values (${aircraftId}, ${reporterId}, ${squawk.description}, ${squawk.grounds})

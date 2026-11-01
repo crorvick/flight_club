@@ -6,6 +6,7 @@ const isCI = !!process.env.CI;
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/warm-up.ts",
+  globalTeardown: "./e2e/clean-up.ts",
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
