@@ -200,6 +200,69 @@ try {
             where id = ${meterIds[kind as MeterKind]}
           `;
         }
+
+        // Every aircraft has the calendar items; the club's trainer also
+        // needs a 100-hour, and the 182 an oil change that's run over but
+        // only warns.  None ground anything, so the fleet stays flyable.
+        const isoDaysAgo = (days: number) =>
+          daysAgo(days, 12).toISOString().slice(0, 10);
+        const tach = readings.tach!;
+        const items: {
+          name: string;
+          months?: number;
+          hours?: number;
+          lastDaysAgo: number;
+          lastReading?: number;
+          grounds?: boolean;
+        }[] = [
+          // Due within the month for the first aircraft.
+          {
+            name: "Annual inspection",
+            months: 12,
+            lastDaysAgo: plane.tailNumber === "N172FC" ? 340 : 120,
+          },
+          { name: "ELT inspection", months: 12, lastDaysAgo: 200 },
+          {
+            name: "Transponder and pitot-static",
+            months: 24,
+            lastDaysAgo: 400,
+          },
+        ];
+        if (plane.tailNumber === "N172FC") {
+          // 6 hours left on the tach.
+          items.push({
+            name: "100-hour inspection",
+            hours: 10000,
+            lastDaysAgo: 60,
+            lastReading: tach - 9400,
+          });
+        }
+        if (plane.tailNumber === "N182FC") {
+          items.push({
+            name: "Oil change",
+            months: 4,
+            hours: 5000,
+            lastDaysAgo: 50,
+            lastReading: tach - 5300,
+            grounds: false,
+          });
+        }
+        for (const item of items) {
+          await tx`
+            insert into maintenance_item (
+              aircraft_id, name, interval_months, interval_hours, meter_id,
+              last_completed_on, last_completed_reading, grounds_when_overdue
+            )
+            values (
+              ${aircraftId}, ${item.name}, ${item.months ?? null},
+              ${item.hours === undefined ? null : toHours(item.hours)},
+              ${item.hours === undefined ? null : meterIds.tach},
+              ${isoDaysAgo(item.lastDaysAgo)},
+              ${item.lastReading === undefined ? null : toHours(item.lastReading)},
+              ${item.grounds ?? true}
+            )
+          `;
+        }
       }
 
       // One grounded aircraft, a deferred and an open nuisance squawk, and
@@ -282,11 +345,13 @@ try {
         (select count(*) from member)::int as members,
         (select count(*) from aircraft)::int as aircraft,
         (select count(*) from flight)::int as flights,
-        (select count(*) from squawk)::int as squawks
+        (select count(*) from squawk)::int as squawks,
+        (select count(*) from maintenance_item)::int as maintenance
     `;
     console.log(
       `Seeded ${totals.members} members, ${totals.aircraft} aircraft, ` +
-        `${totals.flights} flights and ${totals.squawks} squawks`,
+        `${totals.flights} flights, ${totals.squawks} squawks and ` +
+        `${totals.maintenance} maintenance items`,
     );
   }
 } finally {

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { AircraftPicker } from "@/components/aircraft-picker";
+import { PreflightWarnings } from "@/components/preflight-warnings";
 import { listActiveAircraft } from "@/lib/fleet";
 import { requireMember } from "@/lib/session";
 
@@ -49,18 +50,7 @@ async function LogFlight({
     <>
       <AircraftPicker fleet={fleet} selectedId={plane.id} path="/flights/new" />
 
-      {plane.groundingSquawks.length > 0 && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-          <p className="font-semibold text-destructive">
-            {plane.tailNumber} is grounded
-          </p>
-          <ul className="mt-1 list-disc pl-5 text-sm">
-            {plane.groundingSquawks.map((description) => (
-              <li key={description}>{description}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <PreflightWarnings tailNumber={plane.tailNumber} alerts={plane.alerts} />
 
       {/* Keyed so switching aircraft starts with a fresh form. */}
       <FlightForm

@@ -1,0 +1,181 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  describeDue,
+  dueDate,
+  maintenanceStatus,
+  type MaintenanceInput,
+} from "./maintenance";
+
+const none: MaintenanceInput = {
+  intervalMonths: null,
+  intervalHours: null,
+  lastCompletedOn: null,
+  lastCompletedReading: null,
+  currentReading: null,
+};
+
+describe("dueDate", () => {
+  it("counts calendar months to the end of the month", () => {
+    expect(dueDate("2026-03-14", 12)).toBe("2027-03-31");
+    expect(dueDate("2026-03-01", 12)).toBe("2027-03-31");
+  });
+
+  it("handles short months and leap years", () => {
+    expect(dueDate("2027-02-10", 12)).toBe("2028-02-29");
+    expect(dueDate("2026-11-30", 3)).toBe("2027-02-28");
+  });
+
+  it("rolls over the year", () => {
+    expect(dueDate("2026-11-05", 24)).toBe("2028-11-30");
+    expect(dueDate("2026-12-05", 1)).toBe("2027-01-31");
+  });
+});
+
+describe("maintenanceStatus by date", () => {
+  const annual = { ...none, intervalMonths: 12, lastCompletedOn: "2025-12-03" };
+
+  it("is ok well before the due date", () => {
+    expect(maintenanceStatus(annual, "2026-10-01")).toEqual({
+      state: "ok",
+      dueOn: "2026-12-31",
+      daysLeft: 91,
+    });
+  });
+
+  it("is due soon within 30 days", () => {
+    expect(maintenanceStatus(annual, "2026-12-01").state).toBe("due-soon");
+  });
+
+  it("is still due, not overdue, on the due date", () => {
+    expect(maintenanceStatus(annual, "2026-12-31")).toMatchObject({
+      state: "due-soon",
+      daysLeft: 0,
+    });
+  });
+
+  it("is overdue the day after", () => {
+    expect(maintenanceStatus(annual, "2027-01-01")).toMatchObject({
+      state: "overdue",
+      daysLeft: -1,
+    });
+  });
+});
+
+describe("maintenanceStatus by hours", () => {
+  const hundredHour = {
+    ...none,
+    intervalHours: "100.00",
+    lastCompletedReading: "4200.00",
+  };
+
+  it("counts hours left on the meter", () => {
+    expect(
+      maintenanceStatus(
+        { ...hundredHour, currentReading: "4250.50" },
+        "2026-11-01",
+      ),
+    ).toEqual({ state: "ok", dueAt: 430000, hoursLeft: 4950 });
+  });
+
+  it("is due soon within 10 hours", () => {
+    expect(
+      maintenanceStatus(
+        { ...hundredHour, currentReading: "4290.00" },
+        "2026-11-01",
+      ).state,
+    ).toBe("due-soon");
+  });
+
+  it("is due, not overdue, at exactly the reading", () => {
+    expect(
+      maintenanceStatus(
+        { ...hundredHour, currentReading: "4300.00" },
+        "2026-11-01",
+      ).state,
+    ).toBe("due-soon");
+  });
+
+  it("is overdue once flown past it", () => {
+    expect(
+      maintenanceStatus(
+        { ...hundredHour, currentReading: "4300.10" },
+        "2026-11-01",
+      ),
+    ).toMatchObject({ state: "overdue", hoursLeft: -10 });
+  });
+});
+
+describe("maintenanceStatus with both intervals", () => {
+  const oilChange = {
+    ...none,
+    intervalMonths: 4,
+    intervalHours: "50.00",
+    lastCompletedOn: "2026-09-10",
+    lastCompletedReading: "4200.00",
+  };
+
+  it("is overdue when either limit has passed", () => {
+    expect(
+      maintenanceStatus(
+        { ...oilChange, currentReading: "4251.00" },
+        "2026-10-01",
+      ).state,
+    ).toBe("overdue");
+    expect(
+      maintenanceStatus(
+        { ...oilChange, currentReading: "4210.00" },
+        "2027-02-01",
+      ).state,
+    ).toBe("overdue");
+  });
+
+  it("reports both limits", () => {
+    expect(
+      maintenanceStatus(
+        { ...oilChange, currentReading: "4210.00" },
+        "2026-10-01",
+      ),
+    ).toMatchObject({ state: "ok", dueOn: "2027-01-31", dueAt: 425000 });
+  });
+});
+
+describe("describeDue", () => {
+  it("describes a date limit", () => {
+    expect(
+      describeDue({ state: "ok", dueOn: "2026-12-31", daysLeft: 30 }),
+    ).toBe("due 2026-12-31 (30 days)");
+    expect(
+      describeDue({ state: "due-soon", dueOn: "2026-11-01", daysLeft: 0 }),
+    ).toBe("due 2026-11-01 (today)");
+    expect(
+      describeDue({ state: "overdue", dueOn: "2026-10-31", daysLeft: -1 }),
+    ).toBe("1 day overdue (due 2026-10-31)");
+  });
+
+  it("describes an hours limit on its meter", () => {
+    expect(
+      describeDue({ state: "due-soon", dueAt: 430000, hoursLeft: 950 }, "Tach"),
+    ).toBe("due at 4300.0 on the tach (9.5 hours left)");
+    expect(
+      describeDue({ state: "overdue", dueAt: 430000, hoursLeft: -520 }, "Tach"),
+    ).toBe("5.2 hours overdue on the tach");
+  });
+
+  it("joins both limits", () => {
+    expect(
+      describeDue(
+        {
+          state: "due-soon",
+          dueOn: "2027-01-31",
+          daysLeft: 91,
+          dueAt: 425000,
+          hoursLeft: 400,
+        },
+        "Tach",
+      ),
+    ).toBe(
+      "due 2027-01-31 (91 days), or due at 4250.0 on the tach (4.0 hours left)",
+    );
+  });
+});

@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aircraft, flight } from "@/db/schema";
-import { groundingSquawks } from "@/lib/fleet";
+import { aircraftAlerts } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder } from "@/lib/meters";
 
@@ -25,7 +25,7 @@ export async function getAircraftForLog(id: string) {
     with: { meters: true },
   });
   if (!plane) return undefined;
-  const squawks = await groundingSquawks([plane.id]);
+  const alerts = (await aircraftAlerts([plane.id])).get(plane.id)!;
   return {
     id: plane.id,
     tailNumber: plane.tailNumber,
@@ -38,7 +38,7 @@ export async function getAircraftForLog(id: string) {
         billing: m.id === plane.billingMeterId,
       }))
       .sort(byMeterOrder),
-    groundingSquawks: squawks.map((s) => s.description),
+    alerts,
   };
 }
 

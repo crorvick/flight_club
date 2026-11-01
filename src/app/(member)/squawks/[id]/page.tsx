@@ -8,7 +8,7 @@ import { Suspense } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { squawk } from "@/db/schema";
-import { groundingSquawks } from "@/lib/fleet";
+import { aircraftAlerts } from "@/lib/fleet";
 import { hasRole } from "@/lib/access";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
@@ -62,7 +62,9 @@ async function SquawkDetails({
     },
   });
   if (!row) notFound();
-  const grounded = (await groundingSquawks([row.aircraft.id])).length > 0;
+  const { grounded } = (await aircraftAlerts([row.aircraft.id])).get(
+    row.aircraft.id,
+  )!;
   const tail = row.aircraft.tailNumber;
   const changeConfirmation =
     typeof changed === "string" && CHANGE_CONFIRMATIONS[changed];

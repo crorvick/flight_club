@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { fleetStatus, recentlyResolved } from "@/lib/fleet";
+import { describeDue } from "@/lib/maintenance";
 import { requireMember } from "@/lib/session";
 import { STATUS_LABELS } from "@/lib/squawk-rules";
 
@@ -57,6 +58,33 @@ async function Fleet() {
                   {plane.grounded ? "Grounded" : "Airworthy"}
                 </span>
               </header>
+              {plane.maintenance.length > 0 && (
+                <ul className="divide-y border-t">
+                  {plane.maintenance.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex min-h-12 items-center justify-between gap-3 px-4 py-2"
+                    >
+                      <span>
+                        {m.name}{" "}
+                        <span className="text-sm text-muted-foreground">
+                          {describeDue(m, m.meterLabel)}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 text-sm font-medium",
+                          m.state === "overdue"
+                            ? "text-destructive"
+                            : "text-amber-700 dark:text-amber-400",
+                        )}
+                      >
+                        {m.state === "overdue" ? "Overdue" : "Due soon"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {plane.squawks.length > 0 && (
                 <ul className="divide-y border-t">
                   {plane.squawks.map((s) => (

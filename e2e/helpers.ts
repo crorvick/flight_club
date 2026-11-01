@@ -118,6 +118,7 @@ export async function deleteAircraft(id: string) {
       )
     `;
     await tx`delete from squawk where aircraft_id = ${id}`;
+    await tx`delete from maintenance_item where aircraft_id = ${id}`;
     await tx`update aircraft set billing_meter_id = null where id = ${id}`;
     await tx`delete from meter where aircraft_id = ${id}`;
     await tx`delete from aircraft where id = ${id}`;

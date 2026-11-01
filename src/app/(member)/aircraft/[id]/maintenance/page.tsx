@@ -1,0 +1,126 @@
+import { cn } from "cn";
+import { asc, eq } from "drizzle-orm";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Suspense } from "react";
+
+import { db } from "@/db";
+import { aircraft, maintenanceItem } from "@/db/schema";
+import { today } from "@/lib/fleet";
+import { isUuid } from "@/lib/ids";
+import { describeDue, maintenanceStatus } from "@/lib/maintenance";
+import { byMeterOrder } from "@/lib/meters";
+import { requireMember } from "@/lib/session";
+
+import { createItem } from "../../../maintenance/actions";
+import { ItemForm } from "../../../maintenance/maintenance-forms";
+
+export const metadata: Metadata = { title: "Maintenance · Flight Club" };
+
+const STATE_LABELS = { ok: "OK", "due-soon": "Due soon", overdue: "Overdue" };
+
+export default function AircraftMaintenancePage({
+  params,
+  searchParams,
+}: PageProps<"/aircraft/[id]/maintenance">) {
+  return (
+    <Suspense fallback={<div className="h-96" />}>
+      <Maintenance params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function Maintenance({
+  params,
+  searchParams,
+}: Pick<PageProps<"/aircraft/[id]/maintenance">, "params" | "searchParams">) {
+  await requireMember("officer");
+  const { id } = await params;
+  const { saved } = await searchParams;
+  if (!isUuid(id)) notFound();
+
+  const plane = await db().query.aircraft.findFirst({
+    where: eq(aircraft.id, id),
+    columns: { id: true, tailNumber: true },
+    with: {
+      meters: { columns: { id: true, kind: true, label: true } },
+      maintenanceItems: {
+        orderBy: asc(maintenanceItem.name),
+        with: { meter: { columns: { label: true, currentReading: true } } },
+      },
+    },
+  });
+  if (!plane) notFound();
+  const date = today();
+  const meters = [...plane.meters].sort(byMeterOrder);
+
+  return (
+    <>
+      {saved === "deleted" && (
+        <p
+          role="status"
+          className="rounded-lg border border-green-600/40 bg-green-600/10 p-4 font-semibold text-green-800 dark:text-green-300"
+        >
+          Item removed.
+        </p>
+      )}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {plane.tailNumber} maintenance
+        </h1>
+        <Link href={`/aircraft/${plane.id}`} className="text-sm underline">
+          Aircraft and meters
+        </Link>
+      </div>
+
+      {plane.maintenanceItems.length > 0 && (
+        <ul className="divide-y rounded-lg border">
+          {plane.maintenanceItems.map((item) => {
+            const status = maintenanceStatus(
+              { ...item, currentReading: item.meter?.currentReading ?? null },
+              date,
+            );
+            return (
+              <li key={item.id}>
+                <Link
+                  href={`/maintenance/${item.id}`}
+                  className="flex min-h-12 items-center justify-between gap-3 px-3 py-2 hover:bg-muted"
+                >
+                  <span>
+                    <span className="block font-medium">{item.name}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {describeDue(status, item.meter?.label)}
+                      {!item.groundsWhenOverdue && " · warns only"}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm font-medium",
+                      status.state === "overdue" && "text-destructive",
+                      status.state === "due-soon" &&
+                        "text-amber-700 dark:text-amber-400",
+                      status.state === "ok" && "text-muted-foreground",
+                    )}
+                  >
+                    {STATE_LABELS[status.state]}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
+        <h2 className="text-lg font-semibold">Add an item</h2>
+        <ItemForm
+          key={plane.maintenanceItems.length}
+          action={createItem.bind(null, plane.id)}
+          meters={meters.map((m) => ({ id: m.id, label: m.label }))}
+          submitLabel="Add item"
+        />
+      </section>
+    </>
+  );
+}

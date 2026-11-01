@@ -1,10 +1,11 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { db } from "@/db";
-import { aircraft, flightMeterReading } from "@/db/schema";
+import { aircraft, flightMeterReading, maintenanceItem } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder, METER_DISPLAY_ORDER } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
@@ -47,21 +48,22 @@ async function AircraftDetails({
   if (!plane) notFound();
   const meters = [...plane.meters].sort(byMeterOrder);
 
-  // Meters flights have recorded can't be removed.
+  // Meters flights have recorded, or maintenance is counted on, can't be
+  // removed.
+  const meterIds = meters.map((m) => m.id);
   const used = new Set(
-    meters.length === 0
+    meterIds.length === 0
       ? []
-      : (
-          await db()
+      : [
+          ...(await db()
             .selectDistinct({ meterId: flightMeterReading.meterId })
             .from(flightMeterReading)
-            .where(
-              inArray(
-                flightMeterReading.meterId,
-                meters.map((m) => m.id),
-              ),
-            )
-        ).map((r) => r.meterId),
+            .where(inArray(flightMeterReading.meterId, meterIds))),
+          ...(await db()
+            .selectDistinct({ meterId: maintenanceItem.meterId })
+            .from(maintenanceItem)
+            .where(inArray(maintenanceItem.meterId, meterIds))),
+        ].map((r) => r.meterId),
   );
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
   // A save redirects back here; keying on the stored values makes the
@@ -78,9 +80,17 @@ async function AircraftDetails({
           {confirmation}
         </p>
       )}
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {plane.tailNumber}
-      </h1>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {plane.tailNumber}
+        </h1>
+        <Link
+          href={`/aircraft/${plane.id}/maintenance`}
+          className="text-sm underline"
+        >
+          Maintenance items
+        </Link>
+      </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Details</h2>

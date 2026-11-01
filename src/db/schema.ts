@@ -311,6 +311,87 @@ export const squawkPhoto = pgTable(
   (table) => [index("squawk_photo_squawk_idx").on(table.squawkId)],
 );
 
+// Recurring maintenance: an annual, 100-hour, ELT check, AD and so on.
+// Due by calendar months, by hours on one of the aircraft's meters, or
+// whichever comes first; the next due date and reading are computed from
+// the last completion (lib/maintenance.ts), never stored.
+export const maintenanceItem = pgTable(
+  "maintenance_item",
+  {
+    id: id(),
+    aircraftId: uuid("aircraft_id")
+      .notNull()
+      .references(() => aircraft.id),
+    name: text("name").notNull(),
+    intervalMonths: integer("interval_months"),
+    intervalHours: hours("interval_hours"),
+    meterId: uuid("meter_id"),
+    lastCompletedOn: date("last_completed_on"),
+    lastCompletedReading: hours("last_completed_reading"),
+    // Chosen per item: an overdue annual grounds the aircraft, an overdue
+    // oil change might only warn.
+    groundsWhenOverdue: boolean("grounds_when_overdue").default(true).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("maintenance_item_aircraft_idx").on(table.aircraftId),
+    // Like the billing meter, an hours interval can only use one of the
+    // aircraft's own meters.
+    foreignKey({
+      name: "maintenance_item_meter_fk",
+      columns: [table.meterId, table.aircraftId],
+      foreignColumns: [meter.id, meter.aircraftId],
+    }),
+    check(
+      "maintenance_item_has_interval",
+      sql`${table.intervalMonths} is not null or ${table.intervalHours} is not null`,
+    ),
+    check(
+      "maintenance_item_months_positive",
+      sql`${table.intervalMonths} is null or ${table.intervalMonths} > 0`,
+    ),
+    // An hours interval needs a meter to count on and a reading to count
+    // from; a months interval needs a date.
+    check(
+      "maintenance_item_hours_complete",
+      sql`(${table.intervalHours} is null) = (${table.meterId} is null)
+        and (${table.intervalHours} is null
+          or (${table.intervalHours} > 0
+            and ${table.lastCompletedReading} is not null))`,
+    ),
+    check(
+      "maintenance_item_months_complete",
+      sql`${table.intervalMonths} is null or ${table.lastCompletedOn} is not null`,
+    ),
+  ],
+);
+
+// Each time an item was done, so its history survives the item being
+// reset by the next completion.
+export const maintenanceCompletion = pgTable(
+  "maintenance_completion",
+  {
+    id: id(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => maintenanceItem.id, { onDelete: "cascade" }),
+    completedOn: date("completed_on").notNull(),
+    reading: hours("reading"),
+    note: text("note"),
+    recordedById: uuid("recorded_by_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("maintenance_completion_item_idx").on(
+      table.itemId,
+      table.completedOn,
+    ),
+  ],
+);
+
 // Who changed what, and when, with the record before and after.  Written
 // for officer edits to locked flights and for squawk resolutions; actor is
 // null for changes made by scripts.
@@ -367,6 +448,7 @@ export const aircraftRelations = relations(aircraft, ({ one, many }) => ({
   meters: many(meter, { relationName: "aircraft_meters" }),
   flights: many(flight),
   squawks: many(squawk),
+  maintenanceItems: many(maintenanceItem),
 }));
 
 export const meterRelations = relations(meter, ({ one }) => ({
@@ -424,3 +506,32 @@ export const squawkPhotoRelations = relations(squawkPhoto, ({ one }) => ({
     references: [squawk.id],
   }),
 }));
+
+export const maintenanceItemRelations = relations(
+  maintenanceItem,
+  ({ one, many }) => ({
+    aircraft: one(aircraft, {
+      fields: [maintenanceItem.aircraftId],
+      references: [aircraft.id],
+    }),
+    meter: one(meter, {
+      fields: [maintenanceItem.meterId],
+      references: [meter.id],
+    }),
+    completions: many(maintenanceCompletion),
+  }),
+);
+
+export const maintenanceCompletionRelations = relations(
+  maintenanceCompletion,
+  ({ one }) => ({
+    item: one(maintenanceItem, {
+      fields: [maintenanceCompletion.itemId],
+      references: [maintenanceItem.id],
+    }),
+    recordedBy: one(member, {
+      fields: [maintenanceCompletion.recordedById],
+      references: [member.id],
+    }),
+  }),
+);

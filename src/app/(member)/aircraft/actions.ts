@@ -6,7 +6,12 @@ import { z } from "zod";
 
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
-import { aircraft, flightMeterReading, meter } from "@/db/schema";
+import {
+  aircraft,
+  flightMeterReading,
+  maintenanceItem,
+  meter,
+} from "@/db/schema";
 import { changedFields } from "@/lib/audit-diff";
 import { type FormState, formValues } from "@/lib/form-state";
 import { parseHours, toHours } from "@/lib/hours";
@@ -389,6 +394,15 @@ export async function removeMeter(meterId: string): Promise<FormState> {
         .select({ used: count() })
         .from(flightMeterReading)
         .where(eq(flightMeterReading.meterId, meterId));
+      const [{ tracked }] = await tx
+        .select({ tracked: count() })
+        .from(maintenanceItem)
+        .where(eq(maintenanceItem.meterId, meterId));
+      if (tracked > 0) {
+        throw new Rejected(
+          "Maintenance is counted on this meter. Move those items to another meter first.",
+        );
+      }
       if (used > 0) {
         throw new Rejected(
           "Flights have recorded this meter, so it can't be removed.",
