@@ -106,6 +106,11 @@ export async function createAircraft(
 export async function deleteAircraft(id: string) {
   const db = sql();
   await db.begin(async (tx) => {
+    await tx`
+      delete from audit_log where entity_id in (
+        select id from flight where aircraft_id = ${id}
+      )
+    `;
     await tx`delete from flight where aircraft_id = ${id}`;
     await tx`
       delete from audit_log where entity_id in (

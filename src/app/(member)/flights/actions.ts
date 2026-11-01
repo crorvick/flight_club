@@ -6,7 +6,15 @@ import { forbidden, notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { aircraft, flight, flightMeterReading, meter } from "@/db/schema";
+import { writeAudit } from "@/db/audit";
+import {
+  aircraft,
+  flight,
+  flightMeterReading,
+  member,
+  meter,
+} from "@/db/schema";
+import { changedFields } from "@/lib/audit-diff";
 import { canEditFlight, checkReading } from "@/lib/flight-rules";
 import { type FormState, formValues } from "@/lib/form-state";
 import { isUuid } from "@/lib/ids";
@@ -23,6 +31,14 @@ const LOCKED =
 // Thrown inside a transaction to roll it back.
 class StaleReadings extends Error {}
 class FlightLocked extends Error {}
+class Rejected extends Error {
+  constructor(
+    readonly field: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 const landings = z.coerce
   .number<string>("Enter a number.")
@@ -307,4 +323,165 @@ export async function updateFlight(
   }
 
   redirect(`/flights/${flightId}?saved=updated`);
+}
+
+// An officer's correction to any flight, locked or not.  Unlike a pilot's
+// edit it can change the out readings and the pilot, since a typo in a
+// locked flight usually carried into the next one's out readings and
+// both need fixing.  The readings before and after aren't required to
+// line up with neighbouring flights: fixing two flights takes two saves.
+// Every correction is audited, with the officer's reason.
+export async function officerUpdateFlight(
+  flightId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const officer = await requireMember("officer");
+  if (!isUuid(flightId)) notFound();
+
+  const existing = await db().query.flight.findFirst({
+    where: eq(flight.id, flightId),
+    with: { readings: { with: { meter: true } } },
+  });
+  if (!existing) notFound();
+  const meterIds = existing.readings.map((r) => r.meterId);
+  const values = formValues(formData, [
+    ...DETAIL_FIELDS,
+    "pilotId",
+    "reason",
+    ...meterIds.map(inField),
+    ...meterIds.map(outField),
+  ]);
+
+  // Out readings come from the form here, so validate them first and
+  // check each in reading against the corrected out.
+  const fieldErrors: Record<string, string[]> = {};
+  const outs: MeterOut[] = [];
+  for (const id of meterIds) {
+    const out = parseHours(values[outField(id)]);
+    if (out === null) {
+      fieldErrors[outField(id)] = ["Enter a reading like 1234.5."];
+    } else {
+      outs.push({ id, out });
+    }
+  }
+  const parsed = parseFlightForm(formData, outs);
+  if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);
+  const reason = values.reason.trim();
+  if (!reason) fieldErrors.reason = ["Say why the flight is being changed."];
+  if (!isUuid(values.pilotId)) fieldErrors.pilotId = ["Choose the pilot."];
+  if (parsed.fieldErrors || Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values };
+  }
+  const { details, ins } = parsed;
+
+  try {
+    await db().transaction(async (tx) => {
+      // Meters first, then the flight, in the same order as logging and
+      // pilot edits, so none of them can deadlock with another.
+      const current = await tx
+        .select({ id: meter.id, reading: meter.currentReading })
+        .from(meter)
+        .where(eq(meter.aircraftId, existing.aircraftId))
+        .for("update");
+      const [row] = await tx
+        .select()
+        .from(flight)
+        .where(eq(flight.id, flightId))
+        .for("update");
+      if (!row) throw new StaleReadings();
+
+      const [pilot] = await tx
+        .select({ id: member.id })
+        .from(member)
+        .where(and(eq(member.id, values.pilotId), eq(member.active, true)));
+      if (!pilot) throw new Rejected("pilotId", "Choose an active member.");
+
+      // The aircraft's latest flight still sets its meters, as when a
+      // pilot edits it; they must still read what it logged.
+      const latest = row.lockedAt === null;
+      if (latest) {
+        const readingById = new Map(current.map((m) => [m.id, m.reading]));
+        for (const r of existing.readings) {
+          const reading = readingById.get(r.meterId);
+          if (
+            reading === undefined ||
+            parseHours(reading) !== parseHours(r.in)
+          ) {
+            throw new StaleReadings();
+          }
+        }
+      }
+
+      const billing = existing.readings.find(
+        (r) => r.meter.kind === existing.billingMeterKind,
+      )!;
+      const outById = new Map(outs.map((m) => [m.id, m.out]));
+      const billed = ins.get(billing.meterId)! - outById.get(billing.meterId)!;
+
+      const next = {
+        ...details,
+        pilotId: pilot.id,
+        billedHours: toHours(billed),
+      };
+      await tx.update(flight).set(next).where(eq(flight.id, flightId));
+
+      const readingsBefore: Record<string, string> = {};
+      const readingsAfter: Record<string, string> = {};
+      for (const r of existing.readings) {
+        const out = toHours(outById.get(r.meterId)!);
+        const inReading = toHours(ins.get(r.meterId)!);
+        await tx
+          .update(flightMeterReading)
+          .set({ out, in: inReading })
+          .where(
+            and(
+              eq(flightMeterReading.flightId, flightId),
+              eq(flightMeterReading.meterId, r.meterId),
+            ),
+          );
+        if (latest) {
+          await tx
+            .update(meter)
+            .set({ currentReading: inReading })
+            .where(eq(meter.id, r.meterId));
+        }
+        // Relational queries return numerics without trailing zeros;
+        // normalise so before and after compare like for like.
+        readingsBefore[r.meter.label] =
+          `${toHours(parseHours(r.out)!)}–${toHours(parseHours(r.in)!)}`;
+        readingsAfter[r.meter.label] = `${out}–${inReading}`;
+      }
+
+      const diff = changedFields(
+        {
+          date: row.date,
+          dayLandings: row.dayLandings,
+          nightLandings: row.nightLandings,
+          notes: row.notes,
+          pilotId: row.pilotId,
+          billedHours: row.billedHours,
+          ...readingsBefore,
+        },
+        { ...next, ...readingsAfter },
+      );
+      if (!diff.changed) return;
+      await writeAudit(tx, {
+        actorId: officer.id,
+        action: "flight.update",
+        entityType: "flight",
+        entityId: flightId,
+        before: diff.before,
+        after: { ...diff.after, reason },
+      });
+    });
+  } catch (error) {
+    if (error instanceof StaleReadings) return { error: STALE, values };
+    if (error instanceof Rejected) {
+      return { fieldErrors: { [error.field]: [error.message] }, values };
+    }
+    throw error;
+  }
+
+  redirect(`/flights/${flightId}?saved=corrected`);
 }

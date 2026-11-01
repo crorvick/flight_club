@@ -1,10 +1,14 @@
 import { cn } from "cn";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { and, desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { db } from "@/db";
+import { auditLog, member as memberTable } from "@/db/schema";
+import { hasRole } from "@/lib/access";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
 import { METER_LABELS } from "@/lib/meters";
@@ -17,6 +21,7 @@ export const metadata: Metadata = { title: "Flight · Flight Club" };
 const CONFIRMATIONS: Record<string, string> = {
   logged: "Flight logged.",
   updated: "Flight updated.",
+  corrected: "Flight corrected.",
 };
 
 export default function FlightPage({
@@ -41,7 +46,23 @@ async function FlightDetails({
   if (!flight) notFound();
 
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
-  const editable = canEditFlight(flight, member.id);
+  const editable = hasRole(member, "pilot") && canEditFlight(flight, member.id);
+  const officer = hasRole(member, "officer");
+
+  // Officers' corrections, newest first.
+  const corrections = await db()
+    .select({
+      id: auditLog.id,
+      at: auditLog.createdAt,
+      after: auditLog.after,
+      by: memberTable.name,
+    })
+    .from(auditLog)
+    .leftJoin(memberTable, eq(memberTable.id, auditLog.actorId))
+    .where(
+      and(eq(auditLog.entityType, "flight"), eq(auditLog.entityId, flight.id)),
+    )
+    .orderBy(desc(auditLog.createdAt));
 
   return (
     <>
@@ -115,12 +136,41 @@ async function FlightDetails({
           Edit flight
         </Link>
       ) : (
-        flight.lockedAt && (
-          <p className="text-sm text-muted-foreground">
-            Locked: a later flight on {flight.aircraft.tailNumber} has been
-            logged.
-          </p>
-        )
+        <>
+          {flight.lockedAt && (
+            <p className="text-sm text-muted-foreground">
+              Locked: a later flight on {flight.aircraft.tailNumber} has been
+              logged.
+            </p>
+          )}
+          {officer && (
+            <Link
+              href={`/flights/${flight.id}/edit`}
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "h-11 text-base",
+              )}
+            >
+              Correct flight (officer)
+            </Link>
+          )}
+        </>
+      )}
+
+      {corrections.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">Corrections</h2>
+          <ul className="flex flex-col gap-2">
+            {corrections.map((c) => (
+              <li key={c.id} className="rounded-lg bg-muted p-3 text-sm">
+                <span className="text-muted-foreground">
+                  {c.by ?? "A script"}, {c.at.toISOString().slice(0, 10)}:
+                </span>{" "}
+                {String((c.after as { reason?: string } | null)?.reason ?? "")}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </>
   );

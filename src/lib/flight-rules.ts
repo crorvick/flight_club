@@ -45,8 +45,8 @@ export type EditableFlight = {
 };
 
 // A pilot may edit their own flight until the next flight on that
-// aircraft is logged, which locks it.  Officers editing locked flights
-// (audited) comes with the officer pages.
+// aircraft is logged, which locks it.  After that only an officer can
+// change it, through an audited correction.
 export function canEditFlight(flight: EditableFlight, memberId: string) {
   return flight.pilotId === memberId && flight.lockedAt === null;
 }
