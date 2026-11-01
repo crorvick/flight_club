@@ -91,6 +91,7 @@ test("correcting a meter needs a reason and moves the next out reading", async (
   created.push(plane.id);
 
   await page.goto(`/aircraft/${plane.id}`);
+  await page.getByRole("button", { name: "Edit Tach" }).click();
   await page.getByLabel("Tach reading").fill("401.5");
   await page.getByRole("button", { name: "Save Tach" }).click();
   await expect(
@@ -102,7 +103,9 @@ test("correcting a meter needs a reason and moves the next out reading", async (
     .fill("Last pilot forgot to log a flight.");
   await page.getByRole("button", { name: "Save Tach" }).click();
   await expect(page.getByText("Meters saved.")).toBeVisible();
-  await expect(page.getByLabel("Tach reading")).toHaveValue("401.5");
+  await expect(
+    page.getByRole("region", { name: "Meters" }).getByText("401.5"),
+  ).toBeVisible();
 
   const [entry] = await sql()`
     select a.after from audit_log a
@@ -148,6 +151,8 @@ test("meters can be added, and removed until a flight records them", async ({
 
   await page.goto(`/aircraft/${plane.id}`);
   // The billing meter can't be removed.
+  await page.getByRole("button", { name: "Edit Tach" }).click();
+  await expect(page.getByLabel("Tach reading")).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove Tach" })).toHaveCount(
     0,
   );
@@ -156,17 +161,19 @@ test("meters can be added, and removed until a flight records them", async ({
   await page.getByLabel("Current reading").fill("450.0");
   await page.getByRole("button", { name: "Add meter" }).click();
   await expect(page.getByText("Meters saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit Hobbs" }).click();
   await page.getByRole("button", { name: "Remove Hobbs" }).click();
-  await expect(page.getByLabel("Hobbs reading")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Edit Hobbs" })).toHaveCount(0);
 
   await page.getByLabel("Kind").selectOption("Hobbs");
   await page.getByLabel("Current reading").fill("450.0");
   await page.getByRole("button", { name: "Add meter" }).click();
-  await expect(page.getByLabel("Hobbs reading")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Hobbs" })).toBeVisible();
 
   // Once a flight has recorded it, it stays.
   await logFlight(page, plane, { Hobbs: "451.0", Tach: "400.8" });
   await page.goto(`/aircraft/${plane.id}`);
+  await page.getByRole("button", { name: "Edit Hobbs" }).click();
   await expect(page.getByLabel("Hobbs reading")).toBeVisible();
   await expect(page.getByRole("button", { name: "Remove Hobbs" })).toHaveCount(
     0,

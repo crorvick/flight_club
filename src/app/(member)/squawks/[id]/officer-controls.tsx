@@ -23,10 +23,10 @@ export function OfficerControls({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-4 rounded-lg border p-4"
+      className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5"
       noValidate
     >
-      <h2 className="text-lg font-semibold">Officer</h2>
+      <h2 className="text-base font-semibold">Officer</h2>
       <FormError message={state.error} />
 
       {allowed.includes("resolve") && (

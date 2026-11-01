@@ -1,4 +1,6 @@
+import { cn } from "cn";
 import { eq, inArray } from "drizzle-orm";
+import { Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,6 +8,8 @@ import { Suspense } from "react";
 
 import { Flash } from "@/components/flash";
 import { FormSkeleton } from "@/components/page-skeleton";
+import { SectionCard } from "@/components/section-card";
+import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { aircraft, flightMeterReading, maintenanceItem } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
@@ -73,49 +77,63 @@ async function AircraftDetails({
   const version = plane.updatedAt.getTime();
 
   return (
-    <>
+    <div className="wide flex flex-col gap-6">
       <Flash message={confirmation} />
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {plane.tailNumber}
-        </h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {plane.tailNumber}
+          </h1>
+          <p className="text-muted-foreground">{plane.makeModel}</p>
+        </div>
         <Link
           href={`/aircraft/${plane.id}/maintenance`}
-          className="text-sm underline"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-10 gap-1.5 px-4",
+          )}
         >
+          <Wrench aria-hidden />
           Maintenance items
         </Link>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Details</h2>
-        <DetailsForm
-          key={version}
-          action={updateAircraft.bind(null, plane.id)}
-          aircraft={plane}
-          meters={meters.map((m) => ({ id: m.id, label: m.label }))}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Meters</h2>
-        {meters.map((m) => (
-          <MeterForm
-            key={`${m.id}-${m.updatedAt.getTime()}`}
-            action={updateMeter.bind(null, m.id)}
-            removeAction={removeMeter.bind(null, m.id)}
-            meter={{ id: m.id, label: m.label, reading: m.currentReading }}
-            removable={!used.has(m.id) && m.id !== plane.billingMeterId}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <SectionCard title="Details">
+          <DetailsForm
+            key={version}
+            action={updateAircraft.bind(null, plane.id)}
+            aircraft={plane}
+            meters={meters.map((m) => ({ id: m.id, label: m.label }))}
           />
-        ))}
-        <AddMeterForm
-          key={meters.length}
-          action={addMeter.bind(null, plane.id)}
-          kinds={METER_DISPLAY_ORDER.filter(
-            (k) => !meters.some((m) => m.kind === k),
-          )}
-        />
-      </section>
-    </>
+        </SectionCard>
+
+        <SectionCard
+          title="Meters"
+          aria-label="Meters"
+          description="Correct a reading only to fix a mistake; flights move them on their own."
+        >
+          <div className="flex flex-col gap-2">
+            {meters.map((m) => (
+              <MeterForm
+                key={`${m.id}-${m.updatedAt.getTime()}`}
+                action={updateMeter.bind(null, m.id)}
+                removeAction={removeMeter.bind(null, m.id)}
+                meter={{ id: m.id, label: m.label, reading: m.currentReading }}
+                billing={m.id === plane.billingMeterId}
+                removable={!used.has(m.id) && m.id !== plane.billingMeterId}
+              />
+            ))}
+          </div>
+          <AddMeterForm
+            key={meters.length}
+            action={addMeter.bind(null, plane.id)}
+            kinds={METER_DISPLAY_ORDER.filter(
+              (k) => !meters.some((m) => m.kind === k),
+            )}
+          />
+        </SectionCard>
+      </div>
+    </div>
   );
 }

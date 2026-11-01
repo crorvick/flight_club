@@ -1,11 +1,20 @@
+import { cn } from "cn";
+
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Placeholders shaped like the page that's loading, so a slow connection
 // shows the page taking shape rather than a blank screen.
 
-function Loading({ children }: { children: React.ReactNode }) {
+function Loading({
+  wide = false,
+  children,
+}: {
+  // Spans the layout's full width, like the page it stands in for.
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div aria-busy className="flex flex-col gap-6">
+    <div aria-busy className={cn("flex flex-col gap-6", wide && "wide")}>
       <span className="sr-only">Loading…</span>
       {children}
     </div>
@@ -106,7 +115,7 @@ export function PickerSkeleton() {
 
 export function DashboardSkeleton() {
   return (
-    <Loading>
+    <Loading wide>
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-40 w-full rounded-xl" />
       <div className="flex flex-col gap-2">

@@ -7,6 +7,7 @@ import { Suspense } from "react";
 
 import { Flash } from "@/components/flash";
 import { DetailSkeleton } from "@/components/page-skeleton";
+import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { maintenanceCompletion, maintenanceItem } from "@/db/schema";
 import { formatDate } from "@/lib/dates";
@@ -115,8 +116,7 @@ async function ItemDetails({
       />
 
       {item.completions.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">History</h2>
+        <SectionCard title="History">
           <ul className="flex flex-col gap-2">
             {item.completions.map((c) => (
               <li key={c.id} className="rounded-lg bg-muted p-3 text-sm">
@@ -132,11 +132,10 @@ async function ItemDetails({
               </li>
             ))}
           </ul>
-        </section>
+        </SectionCard>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Edit</h2>
+      <SectionCard title="Edit">
         <ItemForm
           key={item.updatedAt.getTime()}
           action={updateItem.bind(null, item.id)}
@@ -145,7 +144,7 @@ async function ItemDetails({
           submitLabel="Save item"
         />
         <DeleteItemForm action={deleteItem.bind(null, item.id)} />
-      </section>
+      </SectionCard>
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 
+import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { aircraft } from "@/db/schema";
 import { formatDate } from "@/lib/dates";
@@ -37,23 +38,25 @@ export async function QualificationsPanel({
 
   return (
     <>
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Medical and flight review</h2>
-        {qualifications.flightReviewOn && (
-          <p className="text-sm text-muted-foreground">
-            Flight review good through{" "}
-            {formatDate(flightReviewExpires(qualifications.flightReviewOn))}.
-          </p>
-        )}
+      <SectionCard
+        title="Medical and flight review"
+        description={
+          qualifications.flightReviewOn && (
+            <>
+              Flight review good through{" "}
+              {formatDate(flightReviewExpires(qualifications.flightReviewOn))}.
+            </>
+          )
+        }
+      >
         <QualificationsForm
           key={`${qualifications.medicalClass}-${qualifications.medicalExpiresOn}-${qualifications.flightReviewOn}`}
           action={updateQualifications.bind(null, memberId)}
           initial={qualifications}
         />
-      </section>
+      </SectionCard>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Aircraft checkouts</h2>
+      <SectionCard title="Aircraft checkouts">
         {checkouts.length === 0 ? (
           <p className="text-muted-foreground">None recorded.</p>
         ) : (
@@ -86,7 +89,7 @@ export async function QualificationsPanel({
             fleet={fleet}
           />
         )}
-      </section>
+      </SectionCard>
     </>
   );
 }

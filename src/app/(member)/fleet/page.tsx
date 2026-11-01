@@ -15,12 +15,12 @@ export const metadata: Metadata = { title: "Fleet · Flight Club" };
 
 export default function FleetPage() {
   return (
-    <>
+    <div className="wide flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Fleet</h1>
       <Suspense fallback={<ListSkeleton rows={3} tall />}>
         <Fleet />
       </Suspense>
-    </>
+    </div>
   );
 }
 
@@ -33,7 +33,7 @@ async function Fleet() {
 
   return (
     <>
-      <ul className="flex flex-col gap-4">
+      <ul className="grid items-start gap-4 md:grid-cols-2">
         {fleet.map((plane) => (
           <li key={plane.id}>
             <section
@@ -41,7 +41,7 @@ async function Fleet() {
               aria-label={plane.tailNumber}
               className={cn(
                 // Clear of the sticky header when linked to from home.
-                "scroll-mt-20 rounded-lg border",
+                "scroll-mt-20 overflow-hidden rounded-xl border bg-card",
                 plane.status === "grounded" && "border-destructive/50",
                 plane.status === "vfr-only" && "border-amber-600/50",
               )}
@@ -120,8 +120,10 @@ async function Fleet() {
 
       {resolved.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold">Recently resolved</h2>
-          <ul className="divide-y rounded-lg border">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            Recently resolved
+          </h2>
+          <ul className="divide-y overflow-hidden rounded-xl border bg-card">
             {resolved.map((s) => (
               <li key={s.id}>
                 <Link

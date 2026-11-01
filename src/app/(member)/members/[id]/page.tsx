@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { Flash } from "@/components/flash";
 import { LocalTime } from "@/components/local-time";
 import { FormSkeleton } from "@/components/page-skeleton";
+import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { member } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
@@ -55,14 +56,16 @@ async function MemberDetails({
             " · waiting for approval"}
         </p>
       </div>
-      {/* Keyed so a save re-renders the form with the stored values. */}
-      <MemberForm
-        key={`${row.active}-${roles.join()}`}
-        action={updateMember.bind(null, row.id)}
-        active={row.active}
-        roles={roles}
-        self={row.id === officer.id}
-      />
+      <SectionCard title="Membership">
+        {/* Keyed so a save re-renders the form with the stored values. */}
+        <MemberForm
+          key={`${row.active}-${roles.join()}`}
+          action={updateMember.bind(null, row.id)}
+          active={row.active}
+          roles={roles}
+          self={row.id === officer.id}
+        />
+      </SectionCard>
       {roles.includes("pilot") && (
         <QualificationsPanel memberId={row.id} canManageCheckouts />
       )}

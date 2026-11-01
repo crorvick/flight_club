@@ -80,16 +80,24 @@ async function Dashboard() {
   const officer = hasRole(member, "officer");
   const fleet = await fleetStatus();
   return (
-    <>
+    <div className="wide flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">
         Welcome, {member.name.split(/\s+/)[0]}
       </h1>
-      {pilot && <FlyCard member={member} />}
-      {pilot && <Reminders member={member} />}
-      {officer && <NeedsAttention fleet={fleet} />}
-      <FleetGlance fleet={fleet} />
-      {pilot && <RecentFlights member={member} />}
-    </>
+      {/* One column on phones; on wide screens, what to do on the left
+          and the state of things on the right. */}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-6">
+          {pilot && <FlyCard member={member} />}
+          {pilot && <Reminders member={member} />}
+          {officer && <NeedsAttention fleet={fleet} />}
+        </div>
+        <div className="flex min-w-0 flex-col gap-6">
+          <FleetGlance fleet={fleet} />
+          {pilot && <RecentFlights member={member} />}
+        </div>
+      </div>
+    </div>
   );
 }
 

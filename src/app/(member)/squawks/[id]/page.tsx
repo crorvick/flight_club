@@ -115,7 +115,7 @@ async function SquawkDetails({
 
       <p className="whitespace-pre-wrap">{row.description}</p>
 
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border bg-card p-4 sm:p-5">
         <dt className="text-muted-foreground">Grounds the airplane</dt>
         <dd>
           {grounding === "all"

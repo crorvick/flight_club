@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { Pencil } from "lucide-react";
+import { useActionState, useState } from "react";
 
 import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -16,9 +18,22 @@ function useForm(action: Action) {
   return useActionState(action, {} as FormState);
 }
 
-function Saving({ pending, label }: { pending: boolean; label: string }) {
+function Saving({
+  pending,
+  label,
+  variant = "default",
+}: {
+  pending: boolean;
+  label: string;
+  variant?: "default" | "outline";
+}) {
   return (
-    <Button type="submit" className="h-11 text-base" disabled={pending}>
+    <Button
+      type="submit"
+      variant={variant}
+      className="h-11 text-base"
+      disabled={pending}
+    >
       {pending ? "Saving…" : label}
     </Button>
   );
@@ -212,11 +227,14 @@ export function MeterForm({
   action,
   removeAction,
   meter,
+  billing,
   removable,
 }: {
   action: Action;
   removeAction: Action;
   meter: { id: string; label: string; reading: string };
+  // Flights are billed by it.
+  billing: boolean;
   removable: boolean;
 }) {
   const [state, formAction, pending] = useForm(action);
@@ -224,53 +242,87 @@ export function MeterForm({
   const values = state.values;
   const errors = state.fieldErrors ?? {};
   const id = (name: string) => `${meter.id}-${name}`;
+  const shown = display(meter.reading);
+  // A changed reading is a correction and needs a reason; a new label
+  // alone doesn't, so the reason is only asked for once it's needed.
+  const [reading, setReading] = useState(values?.reading ?? shown);
+  const correcting = reading.trim() !== shown || errors.reason !== undefined;
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-4">
-      <form action={formAction} className="flex flex-col gap-3" noValidate>
-        <FormError message={state.error} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            id={id("label")}
-            name="label"
-            label="Label"
-            defaultValue={values?.label ?? meter.label}
-            errors={errors.label}
-          />
-          <Field
-            id={id("reading")}
-            name="reading"
-            label={`${values?.label ?? meter.label} reading`}
-            inputMode="decimal"
-            autoComplete="off"
-            defaultValue={values?.reading ?? display(meter.reading)}
-            errors={errors.reading}
-          />
+    <Collapsible.Root className="rounded-lg border">
+      <div className="flex items-center justify-between gap-3 px-3 py-2">
+        <div>
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            {meter.label}
+            {billing && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                billed
+              </span>
+            )}
+          </p>
+          <p className="text-xl font-semibold tabular-nums">{shown}</p>
         </div>
-        <Field
-          id={id("reason")}
-          name="reason"
-          label={`Reason for correcting ${meter.label}`}
-          placeholder="Only needed when changing the reading"
-          defaultValue={values?.reason}
-          errors={errors.reason}
-        />
-        <Saving pending={pending} label={`Save ${meter.label}`} />
-      </form>
-      {removable && (
-        <form action={remove}>
-          <FormError message={removeState.error} />
-          <Button
-            type="submit"
-            variant="ghost"
-            className="h-11 w-full text-base text-destructive"
-            disabled={removing}
-          >
-            Remove {meter.label}
-          </Button>
+        <Collapsible.Trigger
+          aria-label={`Edit ${meter.label}`}
+          render={
+            <Button
+              variant="outline"
+              className="h-10 gap-1.5 px-3 data-panel-open:bg-muted"
+            />
+          }
+        >
+          <Pencil aria-hidden />
+          Edit
+        </Collapsible.Trigger>
+      </div>
+      <Collapsible.Panel className="flex flex-col gap-3 border-t p-3">
+        <form action={formAction} className="flex flex-col gap-3" noValidate>
+          <FormError message={state.error} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              id={id("label")}
+              name="label"
+              label="Label"
+              defaultValue={values?.label ?? meter.label}
+              errors={errors.label}
+            />
+            <Field
+              id={id("reading")}
+              name="reading"
+              label={`${values?.label ?? meter.label} reading`}
+              inputMode="decimal"
+              autoComplete="off"
+              defaultValue={values?.reading ?? shown}
+              onChange={(e) => setReading(e.target.value)}
+              errors={errors.reading}
+            />
+          </div>
+          {correcting && (
+            <Field
+              id={id("reason")}
+              name="reason"
+              label={`Reason for correcting ${meter.label}`}
+              defaultValue={values?.reason}
+              errors={errors.reason}
+            />
+          )}
+          <Saving pending={pending} label={`Save ${meter.label}`} />
         </form>
-      )}
-    </div>
+        {removable && (
+          <form action={remove}>
+            <FormError message={removeState.error} />
+            <Button
+              type="submit"
+              variant="ghost"
+              className="h-11 w-full text-base text-destructive"
+              disabled={removing}
+            >
+              Remove {meter.label}
+            </Button>
+          </form>
+        )}
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
 
@@ -289,10 +341,10 @@ export function AddMeterForm({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-3 rounded-lg border border-dashed p-4"
+      className="flex flex-col gap-3 rounded-lg border border-dashed p-3"
       noValidate
     >
-      <h3 className="font-semibold">Add a meter</h3>
+      <h3 className="text-sm font-medium">Add a meter</h3>
       <FormError message={state.error} />
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-2">
@@ -323,7 +375,7 @@ export function AddMeterForm({
           errors={errors.reading}
         />
       </div>
-      <Saving pending={pending} label="Add meter" />
+      <Saving pending={pending} label="Add meter" variant="outline" />
     </form>
   );
 }

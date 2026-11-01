@@ -7,6 +7,7 @@ import { Suspense } from "react";
 
 import { Flash } from "@/components/flash";
 import { ListSkeleton } from "@/components/page-skeleton";
+import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { aircraft, maintenanceItem } from "@/db/schema";
 import { today } from "@/lib/fleet";
@@ -70,7 +71,7 @@ async function Maintenance({
       </div>
 
       {plane.maintenanceItems.length > 0 && (
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y overflow-hidden rounded-xl border bg-card">
           {plane.maintenanceItems.map((item) => {
             const status = maintenanceStatus(
               { ...item, currentReading: item.meter?.currentReading ?? null },
@@ -113,15 +114,14 @@ async function Maintenance({
         </ul>
       )}
 
-      <section className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
-        <h2 className="text-lg font-semibold">Add an item</h2>
+      <SectionCard title="Add an item">
         <ItemForm
           key={plane.maintenanceItems.length}
           action={createItem.bind(null, plane.id)}
           meters={meters.map((m) => ({ id: m.id, label: m.label }))}
           submitLabel="Add item"
         />
-      </section>
+      </SectionCard>
     </>
   );
 }
