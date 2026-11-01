@@ -183,9 +183,68 @@ in a later release once nothing reads them.
 
 ## Backups
 
-Render's paid Postgres plans include daily backups with point-in-time
-recovery.  Restore a backup into a new database once to confirm the
-procedure works, before there's real member data to lose.
+### What's backed up
 
-Photos aren't part of those backups.  R2 stores them redundantly, but
+Render's paid Postgres plans take continuous backups with point-in-time
+recovery: the database can be restored to its state at any moment in
+the last few days (how many depends on the plan; see the database's
+Recovery page).  Render keeps those backups itself, so nothing needs
+scheduling.
+
+For anything older, take your own logical backup now and then, e.g.
+before a risky migration or at the end of each month:
+
+```sh
+# The database → Info → External Database URL (add your IP under
+# Networking → Access Control first; the Blueprint allows none).
+docker run --rm -v "$PWD:/backup" postgres:18-alpine \
+  pg_dump --format=custom --file=/backup/flightclub-$(date +%F).dump \
+  "<external-database-url>"
+```
+
+Keep the dump somewhere other than Render.  Remove your IP from the
+access control list afterwards.
+
+Photos aren't in the database backups.  R2 stores them redundantly, but
 doesn't keep old versions, so a photo deleted from the bucket is gone.
+
+### Restoring
+
+A restore always makes a *new* database; the damaged one is left as it
+is until you remove it.
+
+1. **Restore into a new database.**  In Render: the database → Recovery
+   → Point-in-Time Recovery → Restore Database.  Name it, e.g.
+   `flight-club-production-db-restored`, choose the time to restore to
+   (just before the mistake; at least ten minutes ago), keep the
+   existing settings, and start the recovery.
+2. **Check it.**  Once it's available, connect with psql (its Info page
+   has the commands) and confirm the data you expect is there, e.g. the
+   latest flights: `select date, billed_hours from flight order by
+   created_at desc limit 5;`.
+3. **Point the service at it.**  Copy the restored database's Internal
+   Database URL into the service's `DATABASE_URL` (the service →
+   Environment), and Save and deploy.  The deploy runs migrations, which
+   does nothing if the restored database is already up to date.
+4. **Keep the Blueprint in step.**  `render.yaml` still names the old
+   database and links the service's `DATABASE_URL` to it, so a Blueprint
+   sync could undo step 3.  Change the database's `name` in
+   `render.yaml`, and the `fromDatabase` that refers to it, to the
+   restored one's.  The restored database wasn't created by the
+   Blueprint, so before applying the next sync, read the changes Render
+   proposes on the Blueprint's page and make sure it isn't about to
+   create or delete a database.
+5. **Remove the old database** once everything is working against the
+   restored one.  Until then it's a second copy you're paying for.
+
+To restore one of your own dumps instead, create an empty database (or
+use the restored one) and load it:
+
+```sh
+docker run --rm -v "$PWD:/backup" postgres:18-alpine \
+  pg_restore --no-owner --clean --if-exists \
+  --dbname="<external-database-url>" /backup/flightclub-2026-11-01.dump
+```
+
+Try the whole procedure once on staging, before there's real member
+data to lose.
