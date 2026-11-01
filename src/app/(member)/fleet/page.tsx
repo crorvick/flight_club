@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { Wrench } from "lucide-react";
+import { BookOpen, Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -120,13 +120,22 @@ async function Fleet() {
               )}
               {/* Officers, and the aircraft's captains, manage it from here. */}
               {manages(plane.id) && (
-                <Link
-                  href={`/aircraft/${plane.id}/maintenance`}
-                  className="flex items-center gap-2 border-t px-4 py-2.5 text-sm font-medium text-primary hover:bg-muted"
-                >
-                  <Wrench aria-hidden className="size-4" />
-                  Maintenance
-                </Link>
+                <div className="grid grid-cols-2 divide-x border-t">
+                  <Link
+                    href={`/aircraft/${plane.id}/maintenance`}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                  >
+                    <Wrench aria-hidden className="size-4" />
+                    Maintenance
+                  </Link>
+                  <Link
+                    href={`/aircraft/${plane.id}/flights`}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary hover:bg-muted"
+                  >
+                    <BookOpen aria-hidden className="size-4" />
+                    Flights
+                  </Link>
+                </div>
               )}
             </section>
           </li>

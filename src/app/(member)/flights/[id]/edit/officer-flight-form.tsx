@@ -12,17 +12,27 @@ import { formatHours, parseHours } from "@/lib/hours";
 import { inField, outField } from "../../fields";
 import { FluidFields, type FluidValues } from "../../fluid-fields";
 
+// Readings as stored, or blank for a flight being added.
 type Reading = { meterId: string; label: string; out: string; in: string };
 
+const show = (reading: string) =>
+  reading ? formatHours(parseHours(reading)!) : "";
+
+// Every field of a flight, for an officer or the aircraft's captain:
+// correcting one, or adding one that wasn't logged at the time.
 export function OfficerFlightForm({
   action,
   pilots,
   flight,
   totalizer,
   readings,
+  meterNote,
+  reasonLabel,
+  submitLabel,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   pilots: { id: string; name: string }[];
+  // Blank fields for a new flight.
   flight: {
     pilotId: string;
     date: string;
@@ -30,6 +40,9 @@ export function OfficerFlightForm({
   } & FluidValues;
   totalizer: boolean;
   readings: Reading[];
+  meterNote: string;
+  reasonLabel: string;
+  submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const values = state.values;
@@ -39,8 +52,8 @@ export function OfficerFlightForm({
   const [typed, setTyped] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       readings.flatMap((r) => [
-        [outField(r.meterId), formatHours(parseHours(r.out)!)],
-        [inField(r.meterId), formatHours(parseHours(r.in)!)],
+        [outField(r.meterId), show(r.out)],
+        [inField(r.meterId), show(r.in)],
       ]),
     ),
   );
@@ -52,12 +65,20 @@ export function OfficerFlightForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="pilotId">Pilot</Label>
+        {/* Keyed on the choice: a select doesn't pick up a new default
+            when the form resets after a rejected save. */}
         <select
+          key={values?.pilotId ?? flight.pilotId}
           id="pilotId"
           name="pilotId"
           defaultValue={values?.pilotId ?? flight.pilotId}
           className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
         >
+          {!flight.pilotId && (
+            <option value="" disabled>
+              Choose the pilot…
+            </option>
+          )}
           {pilots.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -71,10 +92,7 @@ export function OfficerFlightForm({
 
       <fieldset className="flex flex-col gap-4">
         <legend className="mb-1 text-lg font-semibold">Meters</legend>
-        <p className="text-sm text-muted-foreground">
-          The flights before and after this one aren&apos;t changed. If a
-          reading was carried into the next flight, correct that one too.
-        </p>
+        <p className="text-sm text-muted-foreground">{meterNote}</p>
         {readings.map((r) => {
           const out = parseHours(typed[outField(r.meterId)] ?? "");
           const inTyped = typed[inField(r.meterId)] ?? "";
@@ -144,13 +162,13 @@ export function OfficerFlightForm({
 
       <Field
         name="reason"
-        label="Reason for the correction"
+        label={reasonLabel}
         defaultValue={values?.reason}
         errors={errors.reason}
       />
 
       <Button type="submit" className="h-12 text-base" disabled={pending}>
-        {pending ? "Saving…" : "Save correction"}
+        {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
   );

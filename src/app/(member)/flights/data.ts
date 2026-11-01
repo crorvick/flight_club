@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, arrayContains, asc, desc, eq, ne, or } from "drizzle-orm";
 
 import { db } from "@/db";
-import { aircraft, flight, squawk } from "@/db/schema";
+import { aircraft, flight, member, squawk } from "@/db/schema";
 import { aircraftAlerts } from "@/lib/fleet";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder } from "@/lib/meters";
@@ -123,3 +123,20 @@ export const hasTotalizer = (
     aircraft: { hasFuelTotalizer: boolean };
   },
 ) => flight.aircraft.hasFuelTotalizer || flight.totalizerFuel !== null;
+
+// The pilots a flight can be logged to: active pilots, plus whoever it's
+// logged to now, even if they've since lost the tag.
+export async function pilotChoices(currentPilotId?: string) {
+  return db()
+    .select({ id: member.id, name: member.name })
+    .from(member)
+    .where(
+      or(
+        and(eq(member.active, true), arrayContains(member.roles, ["pilot"])),
+        currentPilotId === undefined
+          ? undefined
+          : eq(member.id, currentPilotId),
+      ),
+    )
+    .orderBy(asc(member.name));
+}

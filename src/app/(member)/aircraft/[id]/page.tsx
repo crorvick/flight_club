@@ -1,6 +1,6 @@
 import { cn } from "cn";
 import { asc, eq, inArray } from "drizzle-orm";
-import { Wrench } from "lucide-react";
+import { BookOpen, Wrench } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -114,16 +114,28 @@ async function AircraftDetails({
           </h1>
           <p className="text-muted-foreground">{plane.makeModel}</p>
         </div>
-        <Link
-          href={`/aircraft/${plane.id}/maintenance`}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "h-10 gap-1.5 px-4",
-          )}
-        >
-          <Wrench aria-hidden />
-          Maintenance items
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/aircraft/${plane.id}/flights`}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-10 gap-1.5 px-4",
+            )}
+          >
+            <BookOpen aria-hidden />
+            Flights
+          </Link>
+          <Link
+            href={`/aircraft/${plane.id}/maintenance`}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-10 gap-1.5 px-4",
+            )}
+          >
+            <Wrench aria-hidden />
+            Maintenance items
+          </Link>
+        </div>
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-2">

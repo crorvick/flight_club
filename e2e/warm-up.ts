@@ -25,6 +25,8 @@ export default async function warmUp(config: FullConfig) {
     "/qualifications",
     `/aircraft/${ID}`,
     `/aircraft/${ID}/maintenance`,
+    `/aircraft/${ID}/flights`,
+    `/aircraft/${ID}/flights/new`,
     `/maintenance/${ID}`,
     `/members/${ID}`,
     `/flights/${ID}`,

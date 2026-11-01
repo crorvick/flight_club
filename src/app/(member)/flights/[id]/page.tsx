@@ -12,6 +12,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { db } from "@/db";
 import { auditLog, member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { canMaintainAircraft } from "@/lib/captains";
 import { formatDate } from "@/lib/dates";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatAmount } from "@/lib/fluids";
@@ -27,6 +28,7 @@ const CONFIRMATIONS: Record<string, string> = {
   logged: "Flight logged.",
   updated: "Flight updated.",
   corrected: "Flight corrected.",
+  added: "Flight added.",
 };
 
 export default function FlightPage({
@@ -52,6 +54,8 @@ async function FlightDetails({
 
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
   const editable = hasRole(member, "pilot") && canEditFlight(flight, member.id);
+  // Officers, and the aircraft's captains, can correct any of its flights.
+  const maintainer = await canMaintainAircraft(member, flight.aircraft.id);
   const officer = hasRole(member, "officer");
 
   // Officers' corrections, newest first.
@@ -177,11 +181,11 @@ async function FlightDetails({
         <>
           {flight.lockedAt && (
             <p className="text-sm text-muted-foreground">
-              Locked: a later flight on {flight.aircraft.tailNumber} has been
-              logged.
+              Locked: {flight.aircraft.tailNumber} has flown since, so only an
+              officer or its plane captain can change it.
             </p>
           )}
-          {officer && (
+          {maintainer && (
             <Link
               href={`/flights/${flight.id}/edit`}
               className={cn(
@@ -189,7 +193,7 @@ async function FlightDetails({
                 "h-11 text-base",
               )}
             >
-              Correct flight (officer)
+              Correct flight ({officer ? "officer" : "plane captain"})
             </Link>
           )}
         </>

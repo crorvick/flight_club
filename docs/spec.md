@@ -130,7 +130,8 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 **Editing flights**
 - A pilot may edit their own flight **until the next flight is logged on that aircraft**; then it locks.
-- Officers can edit locked flights; every such edit writes to the AuditLog.
+- Officers can edit locked flights, and an aircraft's plane captains can edit its flights; every such edit writes to the AuditLog.
+- Officers and the aircraft's plane captains can also add a past flight that wasn't logged at the time (from the paper log, say), with every reading entered and a note of where it came from (audited). One that starts at or after every meter's current reading, while the aircraft isn't checked out, is its latest flight and moves the meters on; an earlier one is history: locked from the start, and the meters stay as they are.
 
 **Squawks & grounding**
 - Any pilot can report a squawk and mark it as grounding the aircraft for all flying or for IFR only.

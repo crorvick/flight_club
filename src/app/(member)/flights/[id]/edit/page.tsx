@@ -3,19 +3,16 @@ import Link from "next/link";
 import { forbidden, notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { and, arrayContains, asc, eq, or } from "drizzle-orm";
-
 import { FormSkeleton } from "@/components/page-skeleton";
-import { db } from "@/db";
-import { member as memberTable } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { canMaintainAircraft } from "@/lib/captains";
 import { formatDate } from "@/lib/dates";
 import { canEditFlight } from "@/lib/flight-rules";
 import { formatHours, parseHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
 import { officerUpdateFlight, updateFlight } from "../../actions";
-import { fluidValues, getFlight, hasTotalizer } from "../../data";
+import { fluidValues, getFlight, hasTotalizer, pilotChoices } from "../../data";
 import { FlightForm } from "../../flight-form";
 import { OfficerFlightForm } from "./officer-flight-form";
 
@@ -49,8 +46,13 @@ async function EditFlight({
   // an officer: nothing about it needs auditing yet.
   const ownUnlocked =
     hasRole(member, "pilot") && canEditFlight(flight, member.id);
-  if (!ownUnlocked && hasRole(member, "officer")) {
-    return <OfficerCorrection flight={flight} />;
+  if (!ownUnlocked && (await canMaintainAircraft(member, flight.aircraft.id))) {
+    return (
+      <OfficerCorrection
+        flight={flight}
+        asOfficer={hasRole(member, "officer")}
+      />
+    );
   }
   if (flight.pilotId !== member.id) forbidden();
 
@@ -99,26 +101,15 @@ async function EditFlight({
   );
 }
 
+// For officers, and the aircraft's captains.
 async function OfficerCorrection({
   flight,
+  asOfficer,
 }: {
   flight: NonNullable<Awaited<ReturnType<typeof getFlight>>>;
+  asOfficer: boolean;
 }) {
-  // Anyone who could have flown it: active pilots, plus whoever it's
-  // logged to now, even if they've since lost the tag.
-  const pilots = await db()
-    .select({ id: memberTable.id, name: memberTable.name })
-    .from(memberTable)
-    .where(
-      or(
-        and(
-          eq(memberTable.active, true),
-          arrayContains(memberTable.roles, ["pilot"]),
-        ),
-        eq(memberTable.id, flight.pilotId),
-      ),
-    )
-    .orderBy(asc(memberTable.name));
+  const pilots = await pilotChoices(flight.pilotId);
 
   return (
     <>
@@ -127,7 +118,10 @@ async function OfficerCorrection({
           Correct {flight.aircraft.tailNumber} on {formatDate(flight.date)}
         </h1>
         <p className="text-muted-foreground">
-          As an officer. The change and your reason are recorded.
+          {asOfficer
+            ? "As an officer."
+            : `As ${flight.aircraft.tailNumber}'s plane captain.`}{" "}
+          The change and your reason are recorded.
         </p>
       </div>
       <OfficerFlightForm
@@ -141,6 +135,9 @@ async function OfficerCorrection({
         }}
         totalizer={hasTotalizer(flight)}
         readings={flight.readings}
+        meterNote="The flights before and after this one aren't changed. If a reading was carried into the next flight, correct that one too."
+        reasonLabel="Reason for the correction"
+        submitLabel="Save correction"
       />
     </>
   );

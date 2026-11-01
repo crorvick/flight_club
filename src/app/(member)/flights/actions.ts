@@ -5,8 +5,16 @@ import { forbidden, notFound, redirect } from "next/navigation";
 
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
-import { flight, flightMeterReading, member, meter } from "@/db/schema";
+import {
+  aircraft,
+  dispatch,
+  flight,
+  flightMeterReading,
+  member,
+  meter,
+} from "@/db/schema";
 import { changedFields } from "@/lib/audit-diff";
+import { requireMaintainer } from "@/lib/captains";
 import { canEditFlight } from "@/lib/flight-rules";
 import { type FormState, formValues } from "@/lib/form-state";
 import { isUuid } from "@/lib/ids";
@@ -21,6 +29,7 @@ import {
   type MeterOut,
   parseFlightForm,
 } from "./form-data";
+import { recordFlight } from "./record";
 
 const STALE =
   "This aircraft's meters changed since the page loaded. Review the readings and submit again.";
@@ -135,18 +144,19 @@ export async function updateFlight(
   redirect(`/flights/${flightId}?saved=updated`);
 }
 
-// An officer's correction to any flight, locked or not.  Unlike a pilot's
-// edit it can change the out readings and the pilot, since a typo in a
-// locked flight usually carried into the next one's out readings and
-// both need fixing.  The readings before and after aren't required to
-// line up with neighbouring flights: fixing two flights takes two saves.
-// Every correction is audited, with the officer's reason.
+// A correction to any flight, locked or not, by an officer or the
+// aircraft's captain.  Unlike a pilot's edit it can change the out
+// readings and the pilot, since a typo in a locked flight usually carried
+// into the next one's out readings and both need fixing.  The readings
+// before and after aren't required to line up with neighbouring flights:
+// fixing two flights takes two saves.  Every correction is audited, with
+// the reason given.
 export async function officerUpdateFlight(
   flightId: string,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const officer = await requireMember("officer");
+  await requireMember();
   if (!isUuid(flightId)) notFound();
 
   const existing = await db().query.flight.findFirst({
@@ -157,6 +167,8 @@ export async function officerUpdateFlight(
     },
   });
   if (!existing) notFound();
+  // Officers, and the aircraft's captains.
+  const actor = await requireMaintainer(existing.aircraftId);
   const meterIds = existing.readings.map((r) => r.meterId);
   const values = formValues(formData, [
     ...DETAIL_FIELDS,
@@ -283,7 +295,7 @@ export async function officerUpdateFlight(
       );
       if (!diff.changed) return;
       await writeAudit(tx, {
-        actorId: officer.id,
+        actorId: actor.id,
         action: "flight.update",
         entityType: "flight",
         entityId: flightId,
@@ -300,4 +312,145 @@ export async function officerUpdateFlight(
   }
 
   redirect(`/flights/${flightId}?saved=corrected`);
+}
+
+// Add a flight that happened but wasn't logged at the time, from the
+// paper log or a pilot's word.  Out readings come from the form, as in a
+// correction.  A flight that starts at or after every meter's current
+// reading is the aircraft's latest and moves the meters on, as checking
+// in does; one from before that is history and leaves them alone.  So
+// does any flight added while the aircraft is checked out, whose pilot
+// confirmed the meters at check-out.  Audited, with where it came from.
+export async function addPastFlight(
+  aircraftId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  if (!isUuid(aircraftId)) notFound();
+  // Officers, and the aircraft's captains.
+  const actor = await requireMaintainer(aircraftId);
+
+  const plane = await db().query.aircraft.findFirst({
+    where: eq(aircraft.id, aircraftId),
+    with: { meters: { columns: { id: true, label: true } } },
+  });
+  if (!plane) notFound();
+  const meterIds = plane.meters.map((m) => m.id);
+  const values = formValues(formData, [
+    ...DETAIL_FIELDS,
+    "pilotId",
+    "reason",
+    ...meterIds.map(inField),
+    ...meterIds.map(outField),
+  ]);
+
+  const fieldErrors: Record<string, string[]> = {};
+  const outs: MeterOut[] = [];
+  for (const id of meterIds) {
+    const out = parseHours(values[outField(id)]);
+    if (out === null) {
+      fieldErrors[outField(id)] = ["Enter a reading like 1234.5."];
+    } else {
+      outs.push({ id, out });
+    }
+  }
+  const parsed = parseFlightForm(formData, outs, {
+    totalizer: plane.hasFuelTotalizer,
+  });
+  if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);
+  const reason = values.reason.trim();
+  if (!reason) {
+    fieldErrors.reason = [
+      "Say where the flight comes from, e.g. the paper log.",
+    ];
+  }
+  if (!isUuid(values.pilotId)) fieldErrors.pilotId = ["Choose the pilot."];
+  if (parsed.fieldErrors || Object.keys(fieldErrors).length > 0) {
+    return { fieldErrors, values };
+  }
+  const { details, ins } = parsed;
+
+  let flightId: string;
+  try {
+    flightId = await db().transaction(async (tx) => {
+      // Locked, as for logging, so nothing moves them while this decides
+      // whether the flight is the latest.
+      const current = await tx
+        .select({
+          id: meter.id,
+          kind: meter.kind,
+          reading: meter.currentReading,
+        })
+        .from(meter)
+        .where(eq(meter.aircraftId, aircraftId))
+        .for("update");
+      // A meter added or removed since the page loaded.
+      if (
+        current.length !== meterIds.length ||
+        current.some((m) => !meterIds.includes(m.id))
+      ) {
+        throw new StaleReadings();
+      }
+      const [pilot] = await tx
+        .select({ id: member.id })
+        .from(member)
+        .where(and(eq(member.id, values.pilotId), eq(member.active, true)));
+      if (!pilot) throw new Rejected("pilotId", "Choose an active member.");
+      const [billing] = await tx
+        .select({ id: aircraft.billingMeterId })
+        .from(aircraft)
+        .where(eq(aircraft.id, aircraftId));
+      const billingMeter = current.find((m) => m.id === billing.id)!;
+
+      const [out] = await tx
+        .select({ id: dispatch.id })
+        .from(dispatch)
+        .where(
+          and(eq(dispatch.aircraftId, aircraftId), eq(dispatch.status, "out")),
+        );
+      const outById = new Map(outs.map((m) => [m.id, m.out]));
+      const latest =
+        !out &&
+        current.every((m) => outById.get(m.id)! >= parseHours(m.reading)!);
+
+      const id = await recordFlight(tx, {
+        aircraftId,
+        pilotId: pilot.id,
+        billingMeter,
+        outs,
+        ins,
+        details,
+        latest,
+      });
+      const labels = new Map(plane.meters.map((m) => [m.id, m.label]));
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: "flight.create",
+        entityType: "flight",
+        entityId: id,
+        before: null,
+        after: {
+          aircraftId,
+          pilotId: pilot.id,
+          ...details,
+          ...Object.fromEntries(
+            outs.map((m) => [
+              labels.get(m.id),
+              `${toHours(m.out)}–${toHours(ins.get(m.id)!)}`,
+            ]),
+          ),
+          latest,
+          reason,
+        },
+      });
+      return id;
+    });
+  } catch (error) {
+    if (error instanceof StaleReadings) return { error: STALE, values };
+    if (error instanceof Rejected) {
+      return { fieldErrors: { [error.field]: [error.message] }, values };
+    }
+    throw error;
+  }
+  redirect(`/flights/${flightId}?saved=added`);
 }

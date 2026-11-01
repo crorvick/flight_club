@@ -10,9 +10,11 @@ import type { MeterKind } from "@/lib/meters";
 import type { MeterOut } from "./form-data";
 
 // Record a flight inside the caller's transaction, which must already hold
-// locks on the aircraft's meters and have checked they still read `outs`.
-// Moves each meter to its in reading and locks the aircraft's previous
-// flight for its pilot.
+// locks on the aircraft's meters.  The latest flight (the usual case, for
+// which the caller has checked the meters still read `outs`) moves each
+// meter to its in reading and locks the aircraft's previous flight for
+// its pilot.  A past flight, added after later ones, is history: it's
+// locked from the start and leaves the meters where they are.
 export async function recordFlight(
   tx: Transaction,
   flightData: {
@@ -28,9 +30,18 @@ export async function recordFlight(
       oilAdded: string | null;
       totalizerFuel: string | null;
     };
+    latest?: boolean;
   },
 ) {
-  const { aircraftId, pilotId, billingMeter, outs, ins, details } = flightData;
+  const {
+    aircraftId,
+    pilotId,
+    billingMeter,
+    outs,
+    ins,
+    details,
+    latest = true,
+  } = flightData;
   const outById = new Map(outs.map((m) => [m.id, m.out]));
   const billed = ins.get(billingMeter.id)! - outById.get(billingMeter.id)!;
 
@@ -42,6 +53,7 @@ export async function recordFlight(
       ...details,
       billingMeterKind: billingMeter.kind,
       billedHours: toHours(billed),
+      lockedAt: latest ? null : new Date(),
     })
     .returning({ id: flight.id });
 
@@ -53,6 +65,8 @@ export async function recordFlight(
       in: toHours(ins.get(m.id)!),
     })),
   );
+  if (!latest) return created.id;
+
   for (const m of outs) {
     await tx
       .update(meter)
