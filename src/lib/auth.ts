@@ -7,6 +7,7 @@ import { nextCookies } from "better-auth/next-js";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { serverEnv } from "@/lib/env";
+import { LATEST_RELEASE_NOTE } from "@/lib/release-notes";
 
 const DAY = 60 * 60 * 24;
 
@@ -43,6 +44,14 @@ function createAuth() {
           input: false,
           required: false,
           defaultValue: false,
+        },
+        // A new member has nothing to catch up on, so starts at the
+        // latest release notes rather than being shown them all.
+        lastSeenReleaseNote: {
+          type: "number",
+          input: false,
+          required: false,
+          defaultValue: LATEST_RELEASE_NOTE,
         },
       },
     },

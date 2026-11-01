@@ -1,4 +1,7 @@
+import { Suspense } from "react";
+
 import { SiteHeader, TabBar } from "@/components/site-header";
+import { WhatsNew } from "@/components/whats-new";
 
 export default function MemberLayout({ children }: LayoutProps<"/">) {
   return (
@@ -12,6 +15,10 @@ export default function MemberLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <TabBar />
+      {/* Reads the session, so it streams in after the static shell. */}
+      <Suspense fallback={null}>
+        <WhatsNew />
+      </Suspense>
     </>
   );
 }

@@ -171,6 +171,10 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 4. Photos straight from the camera.
 5. Confirmation showing the aircraft's updated status.
 
+### What's new
+- After a release, the first page a member opens shows a popup of brief highlights: every release since they last saw one, not just the latest, newest first. Bullets can be aimed at pilots, officers or plane captains; others don't see them.
+- Closing it marks everything seen. New members start up to date. The full list stays under "What's new" in the account menu.
+
 ### Also needed (simpler, officer-facing)
 - Fleet status overview (what's flyable, what's coming due)
 - Manage members & role tags

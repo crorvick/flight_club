@@ -164,6 +164,11 @@ with none, their roles are left as they are.  Locally, it's
 
 ## Promoting to production
 
+If members will notice anything new, add an entry at the top of
+`src/lib/release-notes.ts` first: a few short bullets in their terms.
+Each member is shown every entry they haven't seen, once, in a "What's
+new" popup the first time they open the app after the release.
+
 Check the commit on staging first, on a real phone as well as a desktop.
 Then:
 

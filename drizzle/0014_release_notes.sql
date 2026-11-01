@@ -1,0 +1,1 @@
+ALTER TABLE "member" ADD COLUMN "last_seen_release_note" integer DEFAULT 0 NOT NULL;

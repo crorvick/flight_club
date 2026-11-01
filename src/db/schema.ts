@@ -67,6 +67,9 @@ export const member = pgTable(
       .default(sql`'{}'`)
       .notNull(),
     active: boolean("active").default(false).notNull(),
+    // The newest entry of lib/release-notes.ts they've been shown.  New
+    // accounts start at the latest (lib/auth.ts); 0 shows them all.
+    lastSeenReleaseNote: integer("last_seen_release_note").default(0).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

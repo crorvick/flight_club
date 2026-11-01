@@ -1,6 +1,6 @@
 "use client";
 
-import { IdCard, LogOut, Settings } from "lucide-react";
+import { IdCard, LogOut, Megaphone, Settings } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -72,6 +72,10 @@ export function AccountMenu({
         <Link href="/settings" className={item} onClick={() => setOpen(false)}>
           <Settings aria-hidden className="size-4 text-muted-foreground" />
           Settings
+        </Link>
+        <Link href="/whats-new" className={item} onClick={() => setOpen(false)}>
+          <Megaphone aria-hidden className="size-4 text-muted-foreground" />
+          What&apos;s new
         </Link>
         <form action={signOut}>
           <button type="submit" className={item}>

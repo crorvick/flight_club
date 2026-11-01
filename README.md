@@ -187,6 +187,9 @@ as a desktop):
 gh workflow run promote.yml -f sha=<commit>
 ```
 
+Members see what's new in a popup after each release, from the entries
+in `src/lib/release-notes.ts`; add one for anything they'd notice.
+
 Migrations run before each deploy switches traffic, so a failed
 migration leaves the old version serving. Roll back by promoting an
 earlier commit; migrations aren't reversed, so keep them backward
