@@ -15,6 +15,7 @@ import { parseHours, toHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import {
   FIELDS,
+  KIND_LABELS,
   MAINTENANCE_KINDS,
   parseCompletionDetails,
 } from "@/lib/maintenance-kinds";
@@ -53,15 +54,14 @@ const optionalHours = (message: string) =>
       return toHours(hundredths);
     });
 
-// What an officer or the plane's captain enters for an item.  The last completion is asked for
-// up front because the next due date and reading are counted from it.
+// What an officer or the plane's captain enters for an item.  The last
+// completion is asked for up front because the next due date and reading
+// are counted from it.
 const itemSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1, "Name the item, e.g. Annual inspection.")
-      .max(100, "Keep it under 100 characters."),
+    // Only a general item needs one; another kind is named for its kind
+    // when left blank.
+    name: z.string().trim().max(100, "Keep it under 100 characters."),
     // Every N months or days.  Months either run to the end of the month
     // (annuals) or to the day; days are always to the day (VOR checks).
     calendarInterval: z
@@ -88,6 +88,13 @@ const itemSchema = z
     ),
   })
   .superRefine((item, ctx) => {
+    if (item.kind === "general" && !item.name) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["name"],
+        message: "Name the item, e.g. Annual inspection.",
+      });
+    }
     if (item.calendarInterval === null && item.intervalHours === null) {
       ctx.addIssue({
         code: "custom",
@@ -106,6 +113,7 @@ const itemSchema = z
   .transform(
     ({ calendarInterval, calendarUnit, calendarDeadline, ...item }) => ({
       ...item,
+      name: item.name || KIND_LABELS[item.kind],
       intervalMonths: calendarUnit === "months" ? calendarInterval : null,
       intervalDays: calendarUnit === "days" ? calendarInterval : null,
       dueEndOfMonth:

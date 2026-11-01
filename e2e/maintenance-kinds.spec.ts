@@ -136,3 +136,27 @@ test("checking in a twin asks for each engine's oil", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText("0.5 qt")).toBeVisible();
 });
+
+test("only a general item needs a name", async ({ page }) => {
+  await page.goto(`/aircraft/${aircraft.id}/maintenance`);
+  await page.getByLabel("Calendar time").fill("30");
+  await page.getByLabel("In", { exact: true }).selectOption("days");
+  await page.getByLabel("Date").fill("2026-10-20");
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(
+    page.getByText("Name the item, e.g. Annual inspection."),
+  ).toBeVisible();
+
+  // Named for its kind.
+  await page.getByLabel("Kind").selectOption({ label: "VOR check" });
+  await expect(page.getByLabel("Name (optional)")).toBeVisible();
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByText("Item added.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "VOR check" })).toBeVisible();
+
+  // Its name follows the kind until it's given one of its own.
+  await page
+    .getByRole("combobox", { name: "Kind" })
+    .selectOption({ label: "Oil change" });
+  await expect(page.getByRole("textbox", { name: /^Name/ })).toHaveValue("");
+});

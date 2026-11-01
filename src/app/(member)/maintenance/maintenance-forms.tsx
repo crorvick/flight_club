@@ -57,23 +57,26 @@ export function ItemForm({
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const values = state.values;
   const errors = state.fieldErrors ?? {};
+  const [kind, setKind] = useState<MaintenanceKind>(
+    (values?.kind as MaintenanceKind) ?? item?.kind ?? "general",
+  );
+  // A name that's only the kind's own shows as blank, so changing the
+  // kind renames the item too.
+  const ownName =
+    item && item.kind !== "general" && item.name === KIND_LABELS[item.kind]
+      ? ""
+      : item?.name;
 
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
       <FormError message={state.error} />
-      <Field
-        name="name"
-        label="Name"
-        placeholder="Annual inspection"
-        defaultValue={values?.name ?? item?.name}
-        errors={errors.name}
-      />
       <div className="flex flex-col gap-2">
         <Label htmlFor="kind">Kind</Label>
         <select
           id="kind"
           name="kind"
-          defaultValue={values?.kind ?? item?.kind ?? "general"}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as MaintenanceKind)}
           className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
         >
           {MAINTENANCE_KINDS.map((kind) => (
@@ -88,6 +91,17 @@ export function ItemForm({
         </p>
         <ErrorText errors={errors.kind} />
       </div>
+      {/* Only a general item needs a name; another kind is named for it
+          unless given one. */}
+      <Field
+        name="name"
+        label={kind === "general" ? "Name" : "Name (optional)"}
+        placeholder={
+          kind === "general" ? "Annual inspection" : KIND_LABELS[kind]
+        }
+        defaultValue={values?.name ?? ownName}
+        errors={errors.name}
+      />
 
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-1 font-medium">
