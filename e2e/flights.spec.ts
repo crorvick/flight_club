@@ -1,12 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
-  approve,
   closeSql,
   createAircraft,
   deleteAircraft,
-  newMember,
-  signUp,
+  signUpPilot,
   sql,
 } from "./helpers";
 
@@ -18,10 +16,7 @@ test.beforeEach(async ({ page }, testInfo) => {
     { hobbs: "100.00", tach: "80.00" },
     "hobbs",
   );
-  const pilot = newMember(testInfo);
-  await signUp(page, pilot);
-  await expect(page.getByRole("status")).toBeVisible();
-  approve(pilot.email, "pilot");
+  await signUpPilot(page, testInfo);
 });
 
 test.afterEach(async () => {

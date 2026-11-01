@@ -9,6 +9,7 @@ import { db } from "@/db";
 import { aircraft, flight, flightMeterReading, meter } from "@/db/schema";
 import { canEditFlight, checkReading } from "@/lib/flight-rules";
 import { type FormState, formValues } from "@/lib/form-state";
+import { isUuid } from "@/lib/ids";
 import { parseHours, toHours } from "@/lib/hours";
 import { requireMember } from "@/lib/session";
 
@@ -49,7 +50,13 @@ const detailsSchema = z.object({
     .transform((notes) => notes || null),
 });
 
-const DETAIL_FIELDS = ["date", "dayLandings", "nightLandings", "notes"];
+const DETAIL_FIELDS = [
+  "date",
+  "dayLandings",
+  "nightLandings",
+  "notes",
+  "reportSquawk",
+];
 
 type MeterOut = { id: string; out: number };
 
@@ -97,6 +104,7 @@ export async function logFlight(
   formData: FormData,
 ): Promise<FormState> {
   const member = await requireMember("pilot");
+  if (!isUuid(aircraftId)) notFound();
 
   const plane = await db().query.aircraft.findFirst({
     where: and(eq(aircraft.id, aircraftId), eq(aircraft.active, true)),
@@ -202,6 +210,11 @@ export async function logFlight(
     throw error;
   }
 
+  // Straight on to the squawk form for this aircraft, which confirms the
+  // flight too.
+  if (formData.get("reportSquawk") === "on") {
+    redirect(`/squawks/new?aircraft=${aircraftId}&flight=${flightId}`);
+  }
   redirect(`/flights/${flightId}?saved=logged`);
 }
 
@@ -211,6 +224,7 @@ export async function updateFlight(
   formData: FormData,
 ): Promise<FormState> {
   const member = await requireMember("pilot");
+  if (!isUuid(flightId)) notFound();
 
   const existing = await db().query.flight.findFirst({
     where: eq(flight.id, flightId),

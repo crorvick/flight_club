@@ -1,9 +1,11 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { aircraft, flight, squawk } from "@/db/schema";
+import { aircraft, flight } from "@/db/schema";
+import { groundingSquawks } from "@/lib/fleet";
+import { isUuid } from "@/lib/ids";
 
 // Display order for meters: the order pilots read them off the panel.
 const METER_ORDER = { hobbs: 0, tach: 1, air_time: 2 } as const;
@@ -12,49 +14,6 @@ export type MeterKind = keyof typeof METER_ORDER;
 
 export function byMeterOrder<T extends { kind: MeterKind }>(a: T, b: T) {
   return METER_ORDER[a.kind] - METER_ORDER[b.kind];
-}
-
-// An aircraft is grounded while any open squawk on it grounds it; the
-// status is never stored, so it can't disagree with the squawks.
-async function groundingSquawks(aircraftIds: string[]) {
-  if (aircraftIds.length === 0) return [];
-  return db()
-    .select({
-      aircraftId: squawk.aircraftId,
-      description: squawk.description,
-    })
-    .from(squawk)
-    .where(
-      and(
-        inArray(squawk.aircraftId, aircraftIds),
-        eq(squawk.status, "open"),
-        eq(squawk.grounds, true),
-      ),
-    )
-    .orderBy(asc(squawk.reportedAt));
-}
-
-export type AircraftCard = {
-  id: string;
-  tailNumber: string;
-  makeModel: string;
-  grounded: boolean;
-};
-
-export async function listActiveAircraft(): Promise<AircraftCard[]> {
-  const rows = await db()
-    .select({
-      id: aircraft.id,
-      tailNumber: aircraft.tailNumber,
-      makeModel: aircraft.makeModel,
-    })
-    .from(aircraft)
-    .where(eq(aircraft.active, true))
-    .orderBy(asc(aircraft.tailNumber));
-  const grounded = new Set(
-    (await groundingSquawks(rows.map((r) => r.id))).map((s) => s.aircraftId),
-  );
-  return rows.map((r) => ({ ...r, grounded: grounded.has(r.id) }));
 }
 
 export async function lastFlownAircraftId(pilotId: string) {
@@ -96,6 +55,7 @@ export type AircraftForLog = NonNullable<
 >;
 
 export async function getFlight(id: string) {
+  if (!isUuid(id)) return undefined;
   const row = await db().query.flight.findFirst({
     where: eq(flight.id, id),
     with: {

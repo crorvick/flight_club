@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
     // Enables forbidden() and forbidden.tsx for signed-in members who lack
     // a role.
     authInterrupts: true,
+    serverActions: {
+      // Squawk photos: up to four, shrunk in the browser to a few hundred
+      // KB each, but up to 2 MB each if shrinking fails (lib/squawk-rules).
+      bodySizeLimit: "10mb",
+    },
   },
   partialPrefetching: true,
   turbopack: {

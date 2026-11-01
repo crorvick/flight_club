@@ -1,7 +1,7 @@
 import { cn } from "cn";
 import Link from "next/link";
 
-import type { AircraftCard } from "./data";
+import type { AircraftCard } from "@/lib/fleet";
 
 // Big cards rather than a dropdown: one tap, and the status is visible
 // before choosing.  Each is a link, so the choice lives in the URL and the
@@ -9,9 +9,12 @@ import type { AircraftCard } from "./data";
 export function AircraftPicker({
   fleet,
   selectedId,
+  path,
 }: {
   fleet: AircraftCard[];
   selectedId: string;
+  // The page the cards link back to, with ?aircraft= appended.
+  path: "/flights/new" | "/squawks/new";
 }) {
   return (
     <nav aria-label="Aircraft">
@@ -21,7 +24,7 @@ export function AircraftPicker({
           return (
             <li key={plane.id}>
               <Link
-                href={`/flights/new?aircraft=${plane.id}`}
+                href={`${path}?aircraft=${plane.id}`}
                 replace
                 scroll={false}
                 aria-current={selected ? "page" : undefined}

@@ -1,4 +1,5 @@
-# Local development database.  Start with `docker compose up -d`.
+# Local development database and S3-compatible photo storage.  Start
+# with `pnpm db:up`.
 services:
   db:
     image: postgres:18-alpine
@@ -18,5 +19,20 @@ services:
       timeout: 5s
       retries: 15
 
+  # Stands in for the S3-compatible bucket squawk photos are stored in.
+  # Create the bucket with `pnpm storage:init`; the web console is on
+  # http://localhost:9001.
+  storage:
+    image: rustfs/rustfs:1.0.1
+    environment:
+      RUSTFS_ACCESS_KEY: flightclub
+      RUSTFS_SECRET_KEY: flightclub-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - storagedata:/data
+
 volumes:
   pgdata:
+  storagedata:

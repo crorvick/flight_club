@@ -1,6 +1,38 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerEnv } from "./env";
+import { parseServerEnv, parseStorageEnv } from "./env";
+
+describe("parseStorageEnv", () => {
+  const storage = {
+    S3_BUCKET: "photos",
+    S3_ACCESS_KEY_ID: "key",
+    S3_SECRET_ACCESS_KEY: "secret",
+  };
+
+  it("defaults to R2-style settings", () => {
+    expect(parseStorageEnv(storage)).toEqual({
+      ...storage,
+      S3_REGION: "auto",
+      S3_FORCE_PATH_STYLE: false,
+    });
+  });
+
+  it("reads path-style addressing for local emulators", () => {
+    const env = parseStorageEnv({
+      ...storage,
+      S3_ENDPOINT: "http://localhost:9000",
+      S3_FORCE_PATH_STYLE: "true",
+    });
+    expect(env.S3_FORCE_PATH_STYLE).toBe(true);
+    expect(env.S3_ENDPOINT).toBe("http://localhost:9000");
+  });
+
+  it("rejects a missing bucket", () => {
+    expect(() => parseStorageEnv({ ...storage, S3_BUCKET: undefined })).toThrow(
+      /S3_BUCKET/,
+    );
+  });
+});
 
 const valid = {
   DATABASE_URL: "postgres://user:pass@localhost:5432/db",

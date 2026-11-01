@@ -28,7 +28,44 @@ export function parseServerEnv(source: Record<string, string | undefined>) {
   return result.data;
 }
 
+// Squawk photo storage: any S3-compatible bucket (R2, S3, B2, ...).  Kept
+// apart from the rest so the app runs, and squawks can be reported
+// without photos, before a bucket is set up.
+const storageEnvSchema = z.object({
+  // Omit for AWS itself; other providers give an endpoint URL.
+  S3_ENDPOINT: z.url({ protocol: /^https?$/ }).optional(),
+  // R2 wants "auto"; AWS wants the bucket's region.
+  S3_REGION: z.string().min(1).default("auto"),
+  S3_BUCKET: z.string().min(1),
+  S3_ACCESS_KEY_ID: z.string().min(1),
+  S3_SECRET_ACCESS_KEY: z.string().min(1),
+  // Local emulators serve buckets at endpoint/bucket rather than as a
+  // subdomain.
+  S3_FORCE_PATH_STYLE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+});
+
+export type StorageEnv = z.infer<typeof storageEnvSchema>;
+
+export function parseStorageEnv(source: Record<string, string | undefined>) {
+  const result = storageEnvSchema.safeParse(source);
+  if (!result.success) {
+    throw new Error(
+      `Invalid photo storage environment:\n${z.prettifyError(result.error)}`,
+    );
+  }
+  return result.data;
+}
+
 let cached: ServerEnv | undefined;
+let cachedStorage: StorageEnv | undefined;
+
+export function storageEnv(): StorageEnv {
+  cachedStorage ??= parseStorageEnv(process.env);
+  return cachedStorage;
+}
 
 // Parsed on first use rather than at import so `next build` works without
 // a database configured; the same image is promoted across environments

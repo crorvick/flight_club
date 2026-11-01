@@ -37,6 +37,8 @@ type FlightFormProps = {
   };
   submitLabel: string;
   pendingLabel: string;
+  // Offer to go straight on to reporting a squawk on this aircraft.
+  offerSquawk?: boolean;
 };
 
 // Today in the member's own time zone, which the server doesn't know.
@@ -53,6 +55,7 @@ export function FlightForm({
   initial,
   submitLabel,
   pendingLabel,
+  offerSquawk = false,
 }: FlightFormProps) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const values = state.values;
@@ -158,6 +161,18 @@ export function FlightForm({
           </p>
         )}
       </div>
+
+      {offerSquawk && (
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-base has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+          <input
+            type="checkbox"
+            name="reportSquawk"
+            defaultChecked={values?.reportSquawk === "on"}
+            className="size-5 accent-primary"
+          />
+          Report a squawk after logging
+        </label>
+      )}
 
       <Button type="submit" className="h-12 text-base" disabled={pending}>
         {pending ? pendingLabel : submitLabel}

@@ -9,7 +9,7 @@ import { formatHours, parseHours } from "@/lib/hours";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { signOut } from "./(auth)/actions";
-import { recentFlights } from "./flights/data";
+import { recentFlights } from "./(member)/flights/data";
 
 export default function Home() {
   return (
@@ -63,12 +63,23 @@ async function MemberStatus() {
           </p>
           {hasRole(member, "pilot") && (
             <>
-              <Link
-                href="/flights/new"
-                className={cn(buttonVariants(), "h-12 text-base")}
-              >
-                Log a flight
-              </Link>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Link
+                  href="/flights/new"
+                  className={cn(buttonVariants(), "h-12 text-base")}
+                >
+                  Log a flight
+                </Link>
+                <Link
+                  href="/squawks/new"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "h-12 text-base",
+                  )}
+                >
+                  Report a squawk
+                </Link>
+              </div>
               <RecentFlights member={member} />
             </>
           )}

@@ -15,6 +15,13 @@
       "when": 1793164417974,
       "tag": "0001_club_records",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793506622622,
+      "tag": "0002_squawk_photos",
+      "breakpoints": true
     }
   ]
 }

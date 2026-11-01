@@ -22,6 +22,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { ROLE_TAGS } from "@/lib/roles";
+import { SQUAWK_CATEGORIES } from "@/lib/squawk-rules";
 
 const id = () =>
   uuid("id")
@@ -130,12 +131,7 @@ export const verification = pgTable(
 
 export const meterKind = pgEnum("meter_kind", ["tach", "hobbs", "air_time"]);
 
-export const squawkCategory = pgEnum("squawk_category", [
-  "engine",
-  "avionics",
-  "airframe",
-  "other",
-]);
+export const squawkCategory = pgEnum("squawk_category", SQUAWK_CATEGORIES);
 
 export const squawkStatus = pgEnum("squawk_status", [
   "open",
@@ -297,6 +293,23 @@ export const squawk = pgTable(
   ],
 );
 
+// Photos live in the S3-compatible bucket; this records which belong to
+// which squawk, under what key.
+export const squawkPhoto = pgTable(
+  "squawk_photo",
+  {
+    id: id(),
+    squawkId: uuid("squawk_id")
+      .notNull()
+      .references(() => squawk.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("squawk_photo_squawk_idx").on(table.squawkId)],
+);
+
 // Who changed what, and when, with the record before and after.  Written
 // for officer edits to locked flights and for squawk resolutions; actor is
 // null for changes made by scripts.
@@ -386,7 +399,7 @@ export const flightMeterReadingRelations = relations(
   }),
 );
 
-export const squawkRelations = relations(squawk, ({ one }) => ({
+export const squawkRelations = relations(squawk, ({ one, many }) => ({
   aircraft: one(aircraft, {
     fields: [squawk.aircraftId],
     references: [aircraft.id],
@@ -400,5 +413,13 @@ export const squawkRelations = relations(squawk, ({ one }) => ({
     fields: [squawk.resolvedById],
     references: [member.id],
     relationName: "squawk_resolved_by",
+  }),
+  photos: many(squawkPhoto),
+}));
+
+export const squawkPhotoRelations = relations(squawkPhoto, ({ one }) => ({
+  squawk: one(squawk, {
+    fields: [squawkPhoto.squawkId],
+    references: [squawk.id],
   }),
 }));

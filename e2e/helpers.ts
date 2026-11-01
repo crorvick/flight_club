@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 
-import type { Page, TestInfo } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 import postgres from "postgres";
 
 // CI sets DATABASE_URL; locally it comes from .env, like the dev server's.
@@ -39,6 +39,15 @@ export function approve(email: string, ...roles: string[]) {
   execFileSync("pnpm", ["-s", "member:approve", email, ...roles], {
     stdio: "pipe",
   });
+}
+
+// A signed-in, approved pilot of the test's own.
+export async function signUpPilot(page: Page, testInfo: TestInfo) {
+  const pilot = newMember(testInfo);
+  await signUp(page, pilot);
+  await expect(page.getByRole("status")).toBeVisible();
+  approve(pilot.email, "pilot");
+  return pilot;
 }
 
 let client: postgres.Sql | undefined;

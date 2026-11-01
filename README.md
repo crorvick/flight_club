@@ -19,8 +19,9 @@ Docker.
 ```sh
 pnpm install
 cp .env.example .env
-pnpm db:up          # Postgres 18 in Docker Compose
+pnpm db:up          # Postgres 18 and photo storage in Docker Compose
 pnpm db:migrate
+pnpm storage:init   # create the photo bucket
 pnpm db:seed        # sample members, aircraft, flights and squawks
 pnpm dev            # http://localhost:3000
 ```

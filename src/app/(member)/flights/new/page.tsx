@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { AircraftPicker } from "@/components/aircraft-picker";
+import { listActiveAircraft } from "@/lib/fleet";
 import { requireMember } from "@/lib/session";
 
 import { logFlight } from "../actions";
-import { AircraftPicker } from "../aircraft-picker";
-import {
-  getAircraftForLog,
-  lastFlownAircraftId,
-  listActiveAircraft,
-} from "../data";
+import { getAircraftForLog, lastFlownAircraftId } from "../data";
 import { FlightForm } from "../flight-form";
 
 export const metadata: Metadata = { title: "Log a flight · Flight Club" };
@@ -50,7 +47,7 @@ async function LogFlight({
 
   return (
     <>
-      <AircraftPicker fleet={fleet} selectedId={plane.id} />
+      <AircraftPicker fleet={fleet} selectedId={plane.id} path="/flights/new" />
 
       {plane.groundingSquawks.length > 0 && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
@@ -76,6 +73,7 @@ async function LogFlight({
           billing: m.billing,
         }))}
         sendOuts
+        offerSquawk
         submitLabel={`Log flight in ${plane.tailNumber}`}
         pendingLabel="Logging…"
       />

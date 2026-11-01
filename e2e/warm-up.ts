@@ -8,7 +8,13 @@ import type { FullConfig } from "@playwright/test";
 export default async function warmUp(config: FullConfig) {
   if (process.env.CI) return;
   const baseURL = config.projects[0].use.baseURL;
-  for (const path of ["/", "/sign-in", "/sign-up", "/flights/new"]) {
+  for (const path of [
+    "/",
+    "/sign-in",
+    "/sign-up",
+    "/flights/new",
+    "/squawks/new",
+  ]) {
     await fetch(new URL(path, baseURL), { redirect: "manual" });
   }
 }
