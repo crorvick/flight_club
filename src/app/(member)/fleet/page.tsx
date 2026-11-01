@@ -35,9 +35,11 @@ async function Fleet() {
         {fleet.map((plane) => (
           <li key={plane.id}>
             <section
+              id={plane.tailNumber}
               aria-label={plane.tailNumber}
               className={cn(
-                "rounded-lg border",
+                // Clear of the sticky header when linked to from home.
+                "scroll-mt-20 rounded-lg border",
                 plane.status === "grounded" && "border-destructive/50",
                 plane.status === "vfr-only" && "border-amber-600/50",
               )}
@@ -50,10 +52,7 @@ async function Fleet() {
                     {plane.checkedOutTo && ` · out with ${plane.checkedOutTo}`}
                   </p>
                 </div>
-                <AircraftStatusLabel
-                  status={plane.status}
-                  className="font-medium"
-                />
+                <AircraftStatusLabel status={plane.status} />
               </header>
               {plane.maintenance.length > 0 && (
                 <ul className="divide-y border-t">

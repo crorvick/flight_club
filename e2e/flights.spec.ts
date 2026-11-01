@@ -111,16 +111,17 @@ test("a meter reading more than logged is accepted and flagged", async ({
   const context = await browser.newContext();
   const officer = await context.newPage();
   await signUpPilot(officer, testInfo, ["officer"]);
+  const unlogged = officer
+    .getByRole("region", { name: "Needs attention" })
+    .getByRole("link", {
+      name: new RegExp(`Unlogged time on ${aircraft.tailNumber}`),
+    });
   await officer.goto("/");
-  await officer
-    .getByRole("link", { name: new RegExp(aircraft.tailNumber) })
-    .click();
+  await unlogged.click();
   await officer.getByRole("button", { name: "Mark reviewed" }).click();
   await expect(officer.getByText("Reviewed by an officer.")).toBeVisible();
   await officer.goto("/");
-  await expect(
-    officer.getByRole("link", { name: new RegExp(aircraft.tailNumber) }),
-  ).toHaveCount(0);
+  await expect(unlogged).toHaveCount(0);
   await context.close();
 });
 

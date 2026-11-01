@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { approve, newMember, signUp } from "./helpers";
+import { approve, newMember, signOut, signUp } from "./helpers";
 
 test("a new member waits for approval", async ({ page }, testInfo) => {
   const member = newMember(testInfo);
@@ -19,10 +19,10 @@ test("an approved member is signed in with their roles", async ({
 
   approve(member.email, "officer", "pilot");
   await page.reload();
-  await expect(page.getByText(`Signed in as ${member.name}`)).toContainText(
-    "officer, pilot",
-  );
-
+  await page.getByRole("button", { name: "Account" }).click();
+  const menu = page.getByRole("dialog");
+  await expect(menu).toContainText(member.name);
+  await expect(menu).toContainText("Officer · Pilot");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 
@@ -30,7 +30,11 @@ test("an approved member is signed in with their roles", async ({
   await page.getByLabel("Email").fill(member.email);
   await page.getByLabel("Password").fill(member.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText(`Signed in as ${member.name}`)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: `Welcome, ${member.name.split(" ")[0]}`,
+    }),
+  ).toBeVisible();
 });
 
 test("a wrong password keeps the email filled in", async ({
@@ -38,7 +42,7 @@ test("a wrong password keeps the email filled in", async ({
 }, testInfo) => {
   const member = newMember(testInfo);
   await signUp(page, member);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
 
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(member.email);

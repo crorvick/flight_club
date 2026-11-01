@@ -21,10 +21,10 @@ test("an officer approves a new member as a pilot", async ({
 
   await signUpPilot(page, testInfo, ["officer", "pilot"]);
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /Members/ })).toContainText(
-    "waiting",
-  );
-  await page.getByRole("link", { name: /Members/ }).click();
+  await page
+    .getByRole("region", { name: "Needs attention" })
+    .getByRole("link", { name: /waiting for approval/ })
+    .click();
 
   const row = page.getByRole("listitem").filter({ hasText: newcomer.email });
   await row.getByRole("button", { name: "Approve as pilot" }).click();
@@ -72,8 +72,11 @@ test("an officer changes a member's roles and deactivates them", async ({
   await expect(page.getByText("Saved.")).toBeVisible();
   await expect(page.getByLabel(/Officer/)).toBeChecked();
 
+  // Now an officer, they're offered the officer pages.
   await theirPage.reload();
-  await expect(theirPage.getByText(/pilot, officer/)).toBeVisible();
+  await expect(
+    theirPage.getByRole("link", { name: "Members", exact: true }),
+  ).toBeVisible();
 
   // Deactivated, they keep their roles but can do nothing.  ("Saved." is
   // still showing from the first save, so wait for the database.)

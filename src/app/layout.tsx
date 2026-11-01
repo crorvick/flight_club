@@ -27,10 +27,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Lets the header and tab bar pad themselves clear of the notch and the
+  // home indicator.
+  viewportFit: "cover",
   // The browser's toolbar matches the page in light and dark mode.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1318" },
   ],
 };
 

@@ -35,6 +35,12 @@ export async function signUp(page: Page, member: TestMember) {
   await page.getByRole("button", { name: "Create account" }).click();
 }
 
+// From the account menu in the header.
+export async function signOut(page: Page) {
+  await page.getByRole("button", { name: "Account" }).click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+}
+
 export function approve(email: string, ...roles: string[]) {
   execFileSync("pnpm", ["-s", "member:approve", email, ...roles], {
     stdio: "pipe",

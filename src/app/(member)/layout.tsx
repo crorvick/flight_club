@@ -1,17 +1,15 @@
-import Link from "next/link";
+import { SiteHeader, TabBar } from "@/components/site-header";
 
 export default function MemberLayout({ children }: LayoutProps<"/">) {
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-6 md:max-w-2xl">
-      <nav>
-        <Link
-          href="/"
-          className="inline-flex h-11 items-center text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          ← Flight Club
-        </Link>
-      </nav>
-      {children}
-    </main>
+    <>
+      <SiteHeader />
+      {/* Bottom padding keeps the end of the page clear of the tab bar on
+          phones. */}
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28 md:max-w-2xl md:pb-10">
+        {children}
+      </main>
+      <TabBar />
+    </>
   );
 }
