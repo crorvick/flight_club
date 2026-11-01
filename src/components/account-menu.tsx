@@ -1,6 +1,6 @@
 "use client";
 
-import { IdCard, LogOut } from "lucide-react";
+import { IdCard, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -69,6 +69,10 @@ export function AccountMenu({
             My qualifications
           </Link>
         )}
+        <Link href="/settings" className={item} onClick={() => setOpen(false)}>
+          <Settings aria-hidden className="size-4 text-muted-foreground" />
+          Settings
+        </Link>
         <form action={signOut}>
           <button type="submit" className={item}>
             <LogOut aria-hidden className="size-4 text-muted-foreground" />

@@ -2,10 +2,23 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Dark mode follows the device's own setting, which phones can switch
-   automatically at sunset: easier on the eyes in a dark cockpit than a
-   toggle someone has to remember. */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Dark mode follows the device's own setting by default, which phones can
+   switch automatically at sunset: easier on the eyes in a dark cockpit
+   than a toggle someone has to remember.  A member can pin light or dark
+   in Settings, which sets data-theme on <html> (lib/theme.ts). */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(
+      :root:not([data-theme="light"]),
+      :root:not([data-theme="light"]) *
+    ) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -89,8 +102,47 @@
   --sidebar-ring: oklch(0.6 0.1 252);
 }
 
+/* Dark: pinned in Settings, or following a dark device unless pinned
+   light.  The same values twice, since a media query can't share a rule
+   with a plain selector. */
+:root[data-theme="dark"] {
+  /* Native controls (date pickers, selects) match too. */
+  color-scheme: dark;
+  --background: oklch(0.16 0.01 255);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.012 255);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.21 0.012 255);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.75 0.11 245);
+  --primary-foreground: oklch(0.2 0.04 255);
+  --secondary: oklch(0.27 0.015 255);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.012 255);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.28 0.02 255);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.6 0.1 245);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.21 0.012 255);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.75 0.11 245);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.6 0.1 245);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     /* Native controls (date pickers, selects) match too. */
     color-scheme: dark;
     --background: oklch(0.16 0.01 255);
