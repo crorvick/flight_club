@@ -103,6 +103,10 @@ function subscribe(onChange: () => void) {
 // choice, so it renders "Match device" and the browser corrects it.
 export function ThemePicker() {
   const theme = useSyncExternalStore(subscribe, readTheme, () => "system");
+  const choose = (value: Theme) => {
+    applyTheme(value);
+    window.dispatchEvent(new Event("themechange"));
+  };
   return (
     <fieldset>
       <legend className="sr-only">Theme</legend>
@@ -117,10 +121,10 @@ export function ThemePicker() {
               name="theme"
               value={value}
               checked={theme === value}
-              onChange={() => {
-                applyTheme(value);
-                window.dispatchEvent(new Event("themechange"));
-              }}
+              onChange={() => choose(value)}
+              // Also on click: one tapped before the page hydrated is
+              // already checked, so tapping it again fires no change.
+              onClick={() => choose(value)}
               className="sr-only"
             />
             <Icon aria-hidden className="size-5" />

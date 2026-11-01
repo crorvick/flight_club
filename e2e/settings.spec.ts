@@ -72,14 +72,19 @@ test("a member pins the theme on their device", async ({
       return context.getImageData(0, 0, 1, 1).data[0];
     });
 
-  await page.getByText("Dark", { exact: true }).click();
-  await expect.poll(brightness).toBeLessThan(40);
+  // Retried: a click before the page hydrates has nothing to apply it.
+  const choose = (option: string, check: (b: number) => void) =>
+    expect(async () => {
+      await page.getByText(option, { exact: true }).click();
+      check(await brightness());
+    }).toPass();
+
+  await choose("Dark", (b) => expect(b).toBeLessThan(40));
   // Still dark after a reload, before anything has hydrated.
   await page.reload();
   await expect.poll(brightness).toBeLessThan(40);
   await expect(page.getByLabel("Dark")).toBeChecked();
 
-  await page.getByText("Match device", { exact: true }).click();
-  await expect.poll(brightness).toBeGreaterThan(230);
+  await choose("Match device", (b) => expect(b).toBeGreaterThan(230));
   await context.close();
 });
