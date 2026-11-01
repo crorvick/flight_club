@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import { member } from "@/db/schema";
 import { isPending } from "@/lib/member-rules";
-import { isRoleTag } from "@/lib/roles";
+import { knownRoles } from "@/lib/roles";
 import { requireMember } from "@/lib/session";
 
 import { approveAsPilot } from "./actions";
@@ -39,7 +39,7 @@ async function Members() {
     })
     .from(member)
     .orderBy(asc(member.name));
-  const members = rows.map((m) => ({ ...m, roles: m.roles.filter(isRoleTag) }));
+  const members = rows.map((m) => ({ ...m, roles: knownRoles(m.roles) }));
 
   const pending = members.filter(isPending);
   const active = members.filter((m) => m.active);

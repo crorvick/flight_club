@@ -6,7 +6,7 @@ import { cache } from "react";
 
 import { decideAccess, type Requirement } from "@/lib/access";
 import { auth } from "@/lib/auth";
-import { isRoleTag, type RoleTag } from "@/lib/roles";
+import { knownRoles, type RoleTag } from "@/lib/roles";
 
 export type Member = {
   id: string;
@@ -31,7 +31,7 @@ export const getCurrentMember = cache(async (): Promise<Member | null> => {
     id,
     name,
     email,
-    roles: (roles ?? []).filter(isRoleTag),
+    roles: knownRoles(roles ?? []),
     active: active ?? false,
   };
 });

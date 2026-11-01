@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { member } from "@/db/schema";
 import { isUuid } from "@/lib/ids";
 import { isPending } from "@/lib/member-rules";
-import { isRoleTag } from "@/lib/roles";
+import { knownRoles } from "@/lib/roles";
 import { requireMember } from "@/lib/session";
 
 import { QualificationsPanel } from "../../qualifications/qualifications-panel";
@@ -42,7 +42,7 @@ async function MemberDetails({
 
   const [row] = await db().select().from(member).where(eq(member.id, id));
   if (!row) notFound();
-  const roles = row.roles.filter(isRoleTag);
+  const roles = knownRoles(row.roles);
 
   return (
     <>

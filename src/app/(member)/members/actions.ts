@@ -11,7 +11,7 @@ import { changedFields } from "@/lib/audit-diff";
 import type { FormState } from "@/lib/form-state";
 import { isUuid } from "@/lib/ids";
 import { checkMemberChange } from "@/lib/member-rules";
-import { isRoleTag, ROLE_TAGS } from "@/lib/roles";
+import { knownRoles, ROLE_TAGS } from "@/lib/roles";
 import { requireMember } from "@/lib/session";
 
 const memberSchema = z.object({
@@ -43,11 +43,11 @@ async function applyChange(
     // (and audits) the same.
     const after = {
       active: next.active,
-      roles: ROLE_TAGS.filter((r) => next.roles.includes(r)),
+      roles: knownRoles(next.roles),
     };
     const before = {
       active: current.active,
-      roles: current.roles.filter(isRoleTag),
+      roles: knownRoles(current.roles),
     };
     const diff = changedFields(before, after);
     if (!diff.changed) return undefined;

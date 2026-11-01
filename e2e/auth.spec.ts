@@ -22,7 +22,7 @@ test("an approved member is signed in with their roles", async ({
   await page.getByRole("button", { name: "Account" }).click();
   const menu = page.getByRole("dialog");
   await expect(menu).toContainText(member.name);
-  await expect(menu).toContainText("Officer · Pilot");
+  await expect(menu).toContainText("Pilot · Officer");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 
