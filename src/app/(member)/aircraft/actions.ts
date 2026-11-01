@@ -268,9 +268,14 @@ export async function updateAircraft(
       const diff = changedFields(current, next);
       if (!diff.changed) return;
       await tx.update(aircraft).set(next).where(eq(aircraft.id, aircraftId));
-      if (next.logbookMeterId !== current.logbookMeterId) {
+      // An aircraft without a logbook meter has no hours items to move.
+      if (
+        current.logbookMeterId !== null &&
+        next.logbookMeterId !== current.logbookMeterId
+      ) {
         await moveHoursItems(tx, {
           aircraftId,
+          from: current.logbookMeterId,
           to: next.logbookMeterId,
           readings,
           actorId: officer.id,
@@ -307,11 +312,13 @@ async function moveHoursItems(
   tx: Transaction,
   {
     aircraftId,
+    from,
     to,
     readings,
     actorId,
   }: {
     aircraftId: string;
+    from: string;
     to: string;
     readings: Map<string, string>;
     actorId: string;
@@ -320,7 +327,6 @@ async function moveHoursItems(
   const items = await tx
     .select({
       id: maintenanceItem.id,
-      meterId: maintenanceItem.meterId,
       lastCompletedReading: maintenanceItem.lastCompletedReading,
     })
     .from(maintenanceItem)
@@ -332,21 +338,14 @@ async function moveHoursItems(
     )
     .for("update");
   for (const item of items) {
-    if (item.meterId === to) continue;
-    const before = {
-      meterId: item.meterId,
-      lastCompletedReading: item.lastCompletedReading,
-    };
+    // Set whenever there's an hours interval (maintenance_item_hours_complete).
+    const before = { lastCompletedReading: item.lastCompletedReading! };
     const after = {
-      meterId: to,
-      lastCompletedReading:
-        item.meterId === null || item.lastCompletedReading === null
-          ? item.lastCompletedReading
-          : moveReading(
-              item.lastCompletedReading,
-              readings.get(item.meterId)!,
-              readings.get(to)!,
-            ),
+      lastCompletedReading: moveReading(
+        before.lastCompletedReading,
+        readings.get(from)!,
+        readings.get(to)!,
+      ),
     };
     await tx
       .update(maintenanceItem)

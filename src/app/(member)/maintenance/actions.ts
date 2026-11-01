@@ -114,10 +114,8 @@ function parseItem(formData: FormData) {
   });
 }
 
-// Hours intervals count on the aircraft's logbook meter.  The item's own
-// meter column is kept in step with it for the previous release, which
-// still reads it during a deploy.  Undefined when there's no such
-// aircraft.
+// Hours intervals count on the aircraft's logbook meter, so one needs
+// it to have one.  Undefined when there's no such aircraft.
 async function logbookMeterOf(tx: Transaction, aircraftId: string) {
   const [plane] = await tx
     .select({ logbookMeterId: aircraft.logbookMeterId })
@@ -154,11 +152,7 @@ export async function createItem(
     if (hours && logbook.id === null) return NO_LOGBOOK_METER;
     const [created] = await tx
       .insert(maintenanceItem)
-      .values({
-        aircraftId,
-        ...parsed.data,
-        meterId: hours ? logbook.id : null,
-      })
+      .values({ aircraftId, ...parsed.data })
       .returning({ id: maintenanceItem.id });
     await writeAudit(tx, {
       actorId: officer.id,
@@ -197,7 +191,7 @@ export async function updateItem(
     const logbook = (await logbookMeterOf(tx, current.aircraftId))!;
     const hours = parsed.data.intervalHours !== null;
     if (hours && logbook.id === null) return NO_LOGBOOK_METER;
-    const next = { ...parsed.data, meterId: hours ? logbook.id : null };
+    const next = parsed.data;
     const diff = changedFields(current, next);
     if (!diff.changed) return undefined;
     await tx

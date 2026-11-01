@@ -477,11 +477,8 @@ export const maintenanceItem = pgTable(
     // Months run to the end of the month (annuals, ELTs) unless this is
     // false; days are always exact (a 30-day VOR check).
     dueEndOfMonth: boolean("due_end_of_month").default(true).notNull(),
+    // Counted on the aircraft's logbook meter.
     intervalHours: hours("interval_hours"),
-    // Superseded by the aircraft's logbook meter, which hours intervals
-    // now count on.  Still written (as the logbook meter) so the previous
-    // release keeps working during a deploy; to be dropped.
-    meterId: uuid("meter_id"),
     lastCompletedOn: date("last_completed_on"),
     lastCompletedReading: hours("last_completed_reading"),
     // Chosen per item: an overdue annual grounds the aircraft, an overdue
@@ -492,13 +489,6 @@ export const maintenanceItem = pgTable(
   },
   (table) => [
     index("maintenance_item_aircraft_idx").on(table.aircraftId),
-    // Like the billing meter, an hours interval can only use one of the
-    // aircraft's own meters.
-    foreignKey({
-      name: "maintenance_item_meter_fk",
-      columns: [table.meterId, table.aircraftId],
-      foreignColumns: [meter.id, meter.aircraftId],
-    }),
     check(
       "maintenance_item_has_interval",
       sql`${table.intervalMonths} is not null
@@ -518,14 +508,13 @@ export const maintenanceItem = pgTable(
       "maintenance_item_days_positive",
       sql`${table.intervalDays} is null or ${table.intervalDays} > 0`,
     ),
-    // An hours interval needs a meter to count on and a reading to count
-    // from; a calendar interval needs a date.
+    // An hours interval needs a reading to count from; a calendar
+    // interval needs a date.
     check(
       "maintenance_item_hours_complete",
-      sql`(${table.intervalHours} is null) = (${table.meterId} is null)
-        and (${table.intervalHours} is null
-          or (${table.intervalHours} > 0
-            and ${table.lastCompletedReading} is not null))`,
+      sql`${table.intervalHours} is null
+        or (${table.intervalHours} > 0
+          and ${table.lastCompletedReading} is not null)`,
     ),
     check(
       "maintenance_item_calendar_complete",
@@ -686,10 +675,6 @@ export const maintenanceItemRelations = relations(
     aircraft: one(aircraft, {
       fields: [maintenanceItem.aircraftId],
       references: [aircraft.id],
-    }),
-    meter: one(meter, {
-      fields: [maintenanceItem.meterId],
-      references: [meter.id],
     }),
     completions: many(maintenanceCompletion),
   }),

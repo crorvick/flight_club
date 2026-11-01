@@ -264,14 +264,13 @@ try {
           await tx`
             insert into maintenance_item (
               aircraft_id, name, interval_months, interval_days,
-              interval_hours, meter_id, last_completed_on,
+              interval_hours, last_completed_on,
               last_completed_reading, grounding
             )
             values (
               ${aircraftId}, ${item.name}, ${item.months ?? null},
               ${item.days ?? null},
               ${item.hours === undefined ? null : toHours(item.hours)},
-              ${item.hours === undefined ? null : meterIds.tach},
               ${isoDaysAgo(item.lastDaysAgo)},
               ${item.lastReading === undefined ? null : toHours(item.lastReading)},
               ${item.grounding ?? "all"}
