@@ -23,8 +23,8 @@ In this chapter you'll learn:
 flowchart LR
     PR["Pull request"] --> C1["Checks:<br/>typecheck, lint, format,<br/>unit, E2E"]
     PR --> D1["Docker build<br/>(not pushed)"]
-    M["Merge to master"] --> C2["Checks"] --> I["Build image once<br/>ghcr.io/…:&lt;sha&gt;"] --> S["Deploy to staging"]
-    P["Promote (by hand)<br/>sha=&lt;commit&gt;"] --> Prod["Deploy the same image<br/>to production"]
+    M["Merge to master"] --> C2["Checks"] --> I["Build image once<br/>tagged with the commit SHA"] --> S["Deploy to staging"]
+    P["Promote by hand<br/>with a commit SHA"] --> Prod["Deploy the same image<br/>to production"]
     I -.->|same image| Prod
 ```
 
@@ -245,7 +245,7 @@ sequenceDiagram
     participant Old as Old container
     participant New as New container
     participant DB as Database
-    GH->>R: Deploy hook: imgURL=…:<sha>
+    GH->>R: Deploy hook with the commit image
     R->>R: Pull image
     R->>DB: Pre-deploy: node scripts/migrate.mts
     Note over R,DB: Migration fails → deploy stops, Old keeps serving

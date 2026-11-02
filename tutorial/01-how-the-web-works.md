@@ -184,7 +184,7 @@ sequenceDiagram
     participant D as Database
     B->>S: POST /sign-in (email, password)
     S->>D: Check password, create session row
-    S-->>B: 303 See Other, Location: /<br/>Set-Cookie: session_token=abc123; HttpOnly; Secure
+    S-->>B: 303 See Other, Location: /<br/>Set-Cookie: session_token=abc123 (HttpOnly, Secure)
     B->>S: GET / (Cookie: session_token=abc123)
     S->>D: Which member owns session abc123?
     S-->>B: 200 OK, "Welcome back, Dana"

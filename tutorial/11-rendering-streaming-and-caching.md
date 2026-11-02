@@ -89,7 +89,7 @@ sequenceDiagram
     participant S as Server
     participant D as Database
     B->>S: GET /fleet
-    S-->>B: Shell: header, <h1>Fleet</h1>, skeleton (sent immediately)
+    S-->>B: Shell: header, Fleet heading, skeleton (sent immediately)
     S->>D: Session, fleet status, captains (in parallel)
     D-->>S: Results
     S-->>B: Streamed: the real aircraft cards, swapped into place
