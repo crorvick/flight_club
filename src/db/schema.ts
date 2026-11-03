@@ -60,6 +60,8 @@ export const member = pgTable(
     id: id(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
+    // As the member typed it, for other members to reach them.  Optional.
+    phone: text("phone"),
     emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
     roles: text("roles")

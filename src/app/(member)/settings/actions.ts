@@ -9,7 +9,9 @@ import { z } from "zod";
 import { db } from "@/db";
 import { writeAudit } from "@/db/audit";
 import { member } from "@/db/schema";
+import { changedFields } from "@/lib/audit-diff";
 import { auth } from "@/lib/auth";
+import { parsePhone } from "@/lib/contact";
 import { type FormState, formValues } from "@/lib/form-state";
 import { getCurrentMember } from "@/lib/session";
 
@@ -105,4 +107,100 @@ export async function changePassword(
     throw error;
   }
   redirect("/settings?saved=password");
+}
+
+// Email is also how a member signs in, so changing it needs their
+// password; the phone number doesn't.  Both are audited, since officers
+// and other members rely on them to reach the member.
+export async function updateContact(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const me = await signedIn();
+  const values = formValues(formData, ["email", "phone"]);
+  const fieldErrors: Record<string, string[]> = {};
+  const email = z
+    .email("Enter an email address like you@example.com.")
+    .safeParse(values.email.trim().toLowerCase());
+  if (!email.success) fieldErrors.email = [email.error.issues[0].message];
+  const phone = parsePhone(values.phone);
+  if (phone.status === "invalid") fieldErrors.phone = [phone.message];
+  if (!email.success || phone.status === "invalid") {
+    return { fieldErrors, values };
+  }
+
+  const [current] = await db()
+    .select({ phone: member.phone })
+    .from(member)
+    .where(eq(member.id, me.id));
+  const before = { email: me.email, phone: current.phone };
+  const after = { email: email.data, phone: phone.value };
+
+  if (after.email !== before.email) {
+    const password = String(formData.get("password") ?? "");
+    if (!password) {
+      return {
+        fieldErrors: {
+          password: ["Enter your password to change your email."],
+        },
+        values,
+      };
+    }
+    const requestHeaders = await headers();
+    try {
+      await auth().api.verifyPassword({
+        body: { password },
+        headers: requestHeaders,
+      });
+    } catch (error) {
+      if (
+        error instanceof APIError &&
+        error.body?.code === "INVALID_PASSWORD"
+      ) {
+        return {
+          fieldErrors: { password: ["That isn't your password."] },
+          values,
+        };
+      }
+      throw error;
+    }
+    // Better Auth quietly does nothing for an address that's taken, so
+    // as not to reveal who has an account; members see each other's
+    // anyway, so say so.
+    const [taken] = await db()
+      .select({ id: member.id })
+      .from(member)
+      .where(eq(member.email, after.email));
+    if (taken) {
+      return {
+        fieldErrors: { email: ["Another member already uses that email."] },
+        values,
+      };
+    }
+    // Through Better Auth, which also updates the session's copy.
+    await auth().api.changeEmail({
+      body: { newEmail: after.email },
+      headers: requestHeaders,
+    });
+  }
+
+  const diff = changedFields(before, after);
+  if (!diff.changed) redirect("/settings?saved=contact");
+  await db().transaction(async (tx) => {
+    if (after.phone !== before.phone) {
+      await tx
+        .update(member)
+        .set({ phone: after.phone })
+        .where(eq(member.id, me.id));
+    }
+    await writeAudit(tx, {
+      actorId: me.id,
+      action: "member.update",
+      entityType: "member",
+      entityId: me.id,
+      before: diff.before,
+      after: diff.after,
+    });
+  });
+  redirect("/settings?saved=contact");
 }

@@ -9,6 +9,7 @@ import { FormSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { member } from "@/db/schema";
+import { telHref } from "@/lib/contact";
 import { isUuid } from "@/lib/ids";
 import { isPending } from "@/lib/member-rules";
 import { knownRoles } from "@/lib/roles";
@@ -49,7 +50,17 @@ async function MemberDetails({
       <Flash message={!!saved && "Saved."} />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{row.name}</h1>
-        <p className="break-all text-muted-foreground">{row.email}</p>
+        <p className="break-all text-muted-foreground">
+          {row.email}
+          {row.phone && (
+            <>
+              {" · "}
+              <a href={telHref(row.phone)} className="underline">
+                {row.phone}
+              </a>
+            </>
+          )}
+        </p>
         <p className="text-sm text-muted-foreground">
           Joined <LocalTime at={row.createdAt} format="date" />
           {isPending({ active: row.active, roles }) &&

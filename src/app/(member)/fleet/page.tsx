@@ -8,6 +8,7 @@ import { AircraftStatusLabel } from "@/components/aircraft-status";
 import { LocalTime } from "@/components/local-time";
 import { ListSkeleton } from "@/components/page-skeleton";
 import { maintainedAircraft } from "@/lib/captains";
+import { telHref } from "@/lib/contact";
 import { fleetStatus, recentlyResolved } from "@/lib/fleet";
 import { describeDue } from "@/lib/maintenance";
 import { requireMember } from "@/lib/session";
@@ -57,6 +58,17 @@ async function Fleet() {
                   <p className="text-sm text-muted-foreground">
                     {plane.makeModel}
                     {plane.checkedOutTo && ` · out with ${plane.checkedOutTo}`}
+                    {plane.checkedOutPhone && (
+                      <>
+                        {", "}
+                        <a
+                          href={telHref(plane.checkedOutPhone)}
+                          className="underline"
+                        >
+                          {plane.checkedOutPhone}
+                        </a>
+                      </>
+                    )}
                   </p>
                 </div>
                 <AircraftStatusLabel status={plane.status} />

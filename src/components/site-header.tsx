@@ -59,6 +59,7 @@ async function HeaderNav() {
             name={member.name}
             email={member.email}
             roles={member.roles}
+            active={member.active}
             pilot={hasRole(member, "pilot")}
           />
         </div>

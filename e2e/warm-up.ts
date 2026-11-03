@@ -25,6 +25,7 @@ export default async function warmUp(config: FullConfig) {
     "/aircraft/new",
     "/qualifications",
     "/settings",
+    "/directory",
     "/whats-new",
     "/reports",
     "/reports/oil",

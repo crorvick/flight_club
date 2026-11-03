@@ -34,6 +34,58 @@ export function NameForm({ action, name }: { action: Action; name: string }) {
   );
 }
 
+// Email and phone, for officers and other members to reach them.  The
+// password is only needed to change the email, which is also how they
+// sign in.
+export function ContactForm({
+  action,
+  email,
+  phone,
+}: {
+  action: Action;
+  email: string;
+  phone: string;
+}) {
+  const [state, formAction, pending] = useActionState(action, {} as FormState);
+  const errors = state.fieldErrors ?? {};
+  return (
+    <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <FormError message={state.error} />
+      <Field
+        name="email"
+        label="Email"
+        type="email"
+        autoComplete="email"
+        defaultValue={state.values?.email ?? email}
+        errors={errors.email}
+      />
+      <Field
+        name="phone"
+        label="Phone (optional)"
+        type="tel"
+        autoComplete="tel"
+        defaultValue={state.values?.phone ?? phone}
+        errors={errors.phone}
+      />
+      <Field
+        name="password"
+        label="Password, to change your email"
+        type="password"
+        autoComplete="current-password"
+        errors={errors.password}
+      />
+      <Button
+        type="submit"
+        variant="outline"
+        className="h-11 self-start px-5 text-base"
+        disabled={pending}
+      >
+        {pending ? "Saving…" : "Save contact details"}
+      </Button>
+    </form>
+  );
+}
+
 export function PasswordForm({ action }: { action: Action }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const errors = state.fieldErrors ?? {};

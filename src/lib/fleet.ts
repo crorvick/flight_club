@@ -144,6 +144,8 @@ export type ActiveDispatch = {
   id: string;
   pilotId: string;
   pilotName: string;
+  // To reach them about it, if they've given one.
+  pilotPhone: string | null;
   checkedOutAt: Date;
 };
 
@@ -158,6 +160,7 @@ export async function activeDispatches(
       aircraftId: dispatch.aircraftId,
       pilotId: dispatch.pilotId,
       pilotName: member.name,
+      pilotPhone: member.phone,
       checkedOutAt: dispatch.checkedOutAt,
     })
     .from(dispatch)
@@ -234,6 +237,7 @@ export async function fleetStatus() {
       status,
       maintenance,
       checkedOutTo: out.get(plane.id)?.pilotName,
+      checkedOutPhone: out.get(plane.id)?.pilotPhone ?? null,
     };
   });
 }

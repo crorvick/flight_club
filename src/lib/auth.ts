@@ -29,6 +29,11 @@ function createAuth() {
     },
     user: {
       modelName: "member",
+      // Members change their own email in Settings.  The app sends no
+      // email, so there's no verifying the new address; the settings
+      // action asks for their password instead, so a session left open on
+      // a shared computer can't take over the account.
+      changeEmail: { enabled: true, updateEmailWithoutVerification: true },
       additionalFields: {
         // Both are server-owned (`input: false`): sign-up can't set them,
         // only an officer can.  New members wait, inactive and untagged,

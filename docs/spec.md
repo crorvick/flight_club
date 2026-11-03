@@ -61,7 +61,8 @@ Environment rules:
 ## 5. Data model (v1)
 
 ### Member
-- id, name, email, role tags, active flag, auth fields (managed by Better Auth)
+- id, name, email, phone (optional), role tags, active flag, auth fields (managed by Better Auth)
+- Members change their own name, email and phone in Settings; changing the email, which is also the sign-in, takes their password. Every active member can see every other's email and phone in the member directory, and the phone of whoever has an aircraft out.
 
 ### Aircraft
 - id, tail number, make/model, active flag, number of engines (single or twin; a twin's oil is recorded per engine, left and right), fuel totalizers (none, one, or on a twin one per engine)

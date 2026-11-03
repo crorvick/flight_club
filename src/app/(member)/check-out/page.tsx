@@ -9,6 +9,7 @@ import { PickerSkeleton } from "@/components/page-skeleton";
 import { PreflightWarnings } from "@/components/preflight-warnings";
 import { db } from "@/db";
 import { dispatch } from "@/db/schema";
+import { telHref } from "@/lib/contact";
 import { activeDispatches, listActiveAircraft, today } from "@/lib/fleet";
 import { pilotStatus } from "@/lib/pilots";
 import { pilotWarnings } from "@/lib/qualifications";
@@ -88,7 +89,16 @@ async function CheckOut({
         </p>
       ) : out ? (
         <p className="font-medium">
-          {plane.tailNumber} is checked out to {out.pilotName}.
+          {plane.tailNumber} is checked out to {out.pilotName}
+          {out.pilotPhone && (
+            <>
+              {", "}
+              <a href={telHref(out.pilotPhone)} className="underline">
+                {out.pilotPhone}
+              </a>
+            </>
+          )}
+          .
         </p>
       ) : (
         // Keyed so switching aircraft starts with a fresh form.

@@ -120,6 +120,13 @@
       "when": 1793680685587,
       "tag": "0016_fuel_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793684484636,
+      "tag": "0017_member_phone",
+      "breakpoints": true
     }
   ]
 }

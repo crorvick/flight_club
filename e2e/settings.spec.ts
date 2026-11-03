@@ -52,6 +52,78 @@ test("a member changes their password", async ({ page }, testInfo) => {
   await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
 });
 
+test("a member adds a phone number, which other members see", async ({
+  page,
+  browser,
+}, testInfo) => {
+  const me = await signUpPilot(page, testInfo);
+  await openSettings(page);
+  await page.getByLabel("Phone (optional)").fill("call me");
+  await page.getByRole("button", { name: "Save contact details" }).click();
+  await expect(
+    page.getByText("Enter a phone number like 555-123-4567."),
+  ).toBeVisible();
+
+  // No password needed for the phone.
+  await page.getByLabel("Phone (optional)").fill("(555) 010-2030");
+  await page.getByRole("button", { name: "Save contact details" }).click();
+  await expect(page.getByText("Contact details saved.")).toBeVisible();
+  await expect(page.getByLabel("Phone (optional)")).toHaveValue(
+    "(555) 010-2030",
+  );
+  const [entry] = await sql()`
+    select a.after from audit_log a join member m on m.id = a.entity_id
+    where m.email = ${me.email} and a.action = 'member.update'
+  `;
+  expect(entry.after).toEqual({ phone: "(555) 010-2030" });
+
+  // Another member finds it in the directory.
+  const context = await browser.newContext();
+  const other = await context.newPage();
+  await signUpPilot(other, testInfo);
+  await other.goto("/");
+  await other.getByRole("button", { name: "Account" }).click();
+  await other.getByRole("link", { name: "Member directory" }).click();
+  const listing = other.getByRole("listitem", { name: me.name });
+  await expect(listing.getByRole("link", { name: me.email })).toHaveAttribute(
+    "href",
+    `mailto:${me.email}`,
+  );
+  await expect(
+    listing.getByRole("link", { name: "(555) 010-2030" }),
+  ).toHaveAttribute("href", "tel:5550102030");
+  await context.close();
+});
+
+test("changing email takes the password, and changes the sign-in", async ({
+  page,
+}, testInfo) => {
+  const me = await signUpPilot(page, testInfo);
+  const email = `new-${me.email}`;
+  await openSettings(page);
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  const save = page.getByRole("button", { name: "Save contact details" });
+  await save.click();
+  await expect(
+    page.getByText("Enter your password to change your email."),
+  ).toBeVisible();
+  await page.getByLabel("Password, to change your email").fill("not it");
+  await save.click();
+  await expect(page.getByText("That isn't your password.")).toBeVisible();
+
+  await page.getByLabel("Password, to change your email").fill(me.password);
+  await save.click();
+  await expect(page.getByText("Contact details saved.")).toBeVisible();
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(email);
+
+  await signOut(page);
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(me.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+});
+
 test("a member pins the theme on their device", async ({
   browser,
 }, testInfo) => {

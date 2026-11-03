@@ -1,6 +1,6 @@
 "use client";
 
-import { IdCard, LogOut, Megaphone, Settings } from "lucide-react";
+import { BookUser, IdCard, LogOut, Megaphone, Settings } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -28,11 +28,14 @@ export function AccountMenu({
   name,
   email,
   roles,
+  active,
   pilot,
 }: {
   name: string;
   email: string;
   roles: string[];
+  // Approved, so they can see the other members.
+  active: boolean;
   pilot: boolean;
 }) {
   // Controlled, so following a link closes it: the layout, and with it
@@ -67,6 +70,16 @@ export function AccountMenu({
           >
             <IdCard aria-hidden className="size-4 text-muted-foreground" />
             My qualifications
+          </Link>
+        )}
+        {active && (
+          <Link
+            href="/directory"
+            className={item}
+            onClick={() => setOpen(false)}
+          >
+            <BookUser aria-hidden className="size-4 text-muted-foreground" />
+            Member directory
           </Link>
         )}
         <Link href="/settings" className={item} onClick={() => setOpen(false)}>

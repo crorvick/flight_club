@@ -109,8 +109,12 @@ try {
       const memberIds: string[] = [];
       for (const m of members) {
         const [row] = await tx`
-          insert into member (name, email, roles, active)
-          values (${m.name}, ${m.email}, ${m.roles}::text[], true)
+          insert into member (name, email, phone, roles, active)
+          values (
+            ${m.name}, ${m.email},
+            ${`555-01${String(memberIds.length).padStart(2, "0")}`},
+            ${m.roles}::text[], true
+          )
           returning id
         `;
         memberIds.push(row.id);
