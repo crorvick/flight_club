@@ -97,6 +97,7 @@ async function CheckOut({
           action={checkOut.bind(null, plane.id)}
           tailNumber={plane.tailNumber}
           meters={plane.meters}
+          totalizers={plane.totalizers}
           squawks={plane.squawks}
           vfrOnly={plane.alerts.vfrOnly}
         />

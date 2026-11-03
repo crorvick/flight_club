@@ -64,7 +64,7 @@ Environment rules:
 - id, name, email, role tags, active flag, auth fields (managed by Better Auth)
 
 ### Aircraft
-- id, tail number, make/model, active flag, whether it has a fuel totalizer, number of engines (single or twin; a twin's oil is recorded per engine, left and right)
+- id, tail number, make/model, active flag, number of engines (single or twin; a twin's oil is recorded per engine, left and right), fuel totalizers (none, one, or on a twin one per engine)
 - `billingMeterId` → references one of this aircraft's meters
 - `logbookMeterId` → the meter that is its time in the maintenance logs (usually tach); hours intervals count on it
 - Plane captains: the members assigned to look after it (an AircraftCaptain row per member)
@@ -83,7 +83,8 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### Flight
 - id, aircraftId, pilotId, date, notes
-- Fuel added (gallons) and oil added (quarts), required (0 if none); for aircraft with a fuel totalizer, the fuel remaining it shows at the end of the flight, also required
+- Fuel added (gallons) and oil added (quarts, per engine): the totals of what was added while it was checked out
+- For aircraft with fuel totalizers, per totalizer: the fuel remaining it shows at the end of the flight (required), and the fuel it counted as used, across any resets (blank where it couldn't be counted)
 - Landings aren't recorded (see PilotQualification).
 - Snapshot at time of logging: `billingMeterKind`, `billedHours` (so changing an aircraft's billing meter later never re-bills past flights)
 - createdAt, updatedAt, lockedAt (see rules)
@@ -134,6 +135,11 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - Unusually large values (e.g., > 10 hours) produce a "did you mean…?" warning, not a block.
 - **Concurrency:** save the flight in a DB transaction that verifies each meter's `out` still equals the meter's `currentReading`. If not, reject with "This aircraft was just updated — please review" rather than corrupting totals.
 
+**Fuel and oil**
+- While an aircraft is checked out, its pilot (or an officer) adds fuel and oil as often as they put some in, each an entry on the check-out. A typo is removed and added again.
+- On aircraft with totalizers, the pilot confirms what each shows at check-out (pre-filled from the last flight's end), and each fueling records what it showed before and what it was reset to. A totalizer only counts down between resets, so a reading higher than the last is refused.
+- Checking in asks only for each totalizer's fuel remaining. The flight records the entries' totals, the final readings, and the fuel used: the drop from check-out or each reset to the next reading.
+
 **Editing flights**
 - A pilot may edit their own flight **until the next flight is logged on that aircraft**; then it locks.
 - Officers can edit locked flights, and an aircraft's plane captains can edit its flights; every such edit writes to the AuditLog.
@@ -161,7 +167,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 2. Pre-flight warnings displayed up front.
 3. Meter inputs: `out` pre-filled, pilot enters only `in` values (number pad). Only the meters this aircraft has are shown.
 4. Live computed duration per meter, so typos stand out.
-5. Fuel and oil added (0 if none), and the totalizer's fuel remaining if the aircraft has one.
+5. Fuel and oil added while it was out, totalled, with a form above to add more; and each totalizer's fuel remaining if the aircraft has them.
 6. Optional toggle: "Report a squawk" → continues into the squawk flow with aircraft pre-selected.
 7. Clear confirmation on submit.
 

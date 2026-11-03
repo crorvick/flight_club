@@ -7,7 +7,7 @@ import { flight, flightMeterReading, meter } from "@/db/schema";
 import { toHours } from "@/lib/hours";
 import type { MeterKind } from "@/lib/meters";
 
-import type { MeterOut } from "./form-data";
+import type { FlightDetails, MeterOut } from "./form-data";
 
 // Record a flight inside the caller's transaction, which must already hold
 // locks on the aircraft's meters.  The latest flight (the usual case, for
@@ -23,14 +23,7 @@ export async function recordFlight(
     billingMeter: { id: string; kind: MeterKind };
     outs: MeterOut[];
     ins: Map<string, number>;
-    details: {
-      date: string;
-      notes: string | null;
-      fuelAdded: string | null;
-      oilAdded: string | null;
-      oilAdded2: string | null;
-      totalizerFuel: string | null;
-    };
+    details: FlightDetails;
     latest?: boolean;
   },
 ) {

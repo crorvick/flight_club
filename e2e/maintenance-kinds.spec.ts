@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import {
+  addFluid,
+  checkIn,
   checkOut,
   closeSql,
   createAircraft,
@@ -112,29 +114,25 @@ test("an oil change on a twin records each engine's oil", async ({ page }) => {
   await expect(page.getByLabel("Oil used")).toHaveValue("AeroShell W100");
 });
 
-test("checking in a twin asks for each engine's oil", async ({ page }) => {
+test("adding oil to a twin asks for each engine's", async ({ page }) => {
   await twin();
   await checkOut(page, aircraft);
-  await page.getByLabel("Hobbs in").fill("501.5");
-  await page.getByLabel("Tach in").fill("401.2");
-  await page.getByLabel("Fuel added (gal)").fill("20");
-  await page.getByLabel("Oil added, left (qt)").fill("1");
-  await page
-    .getByRole("button", { name: `Check in ${aircraft.tailNumber}` })
-    .click();
+  await addFluid(page, {
+    "Fuel added (gal)": "20",
+    "Oil added, left (qt)": "1",
+    "Oil added, right (qt)": "0.5",
+  });
   await expect(
-    page.getByText("Enter the oil added, or 0 if none."),
+    page.getByText(
+      "20.0 gal fuel, 1.0 qt oil (left), 0.5 qt oil (right) added.",
+    ),
   ).toBeVisible();
-
-  await page.getByLabel("Oil added, right (qt)").fill("0.5");
-  await page
-    .getByRole("button", { name: `Check in ${aircraft.tailNumber}` })
-    .click();
+  await checkIn(page, aircraft, { Hobbs: "501.5", Tach: "401.2" });
   await expect(page.getByText("Flight logged.")).toBeVisible();
   await expect(
     page.getByText("Oil added, right", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("0.5 qt")).toBeVisible();
+  await expect(page.getByText("0.5 qt", { exact: true })).toBeVisible();
 });
 
 test("only a general item needs a name", async ({ page }) => {

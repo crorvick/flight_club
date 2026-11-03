@@ -60,7 +60,7 @@ export async function updateFlight(
     where: eq(flight.id, flightId),
     with: {
       readings: { with: { meter: true } },
-      aircraft: { columns: { hasFuelTotalizer: true, engineCount: true } },
+      aircraft: { columns: { fuelTotalizers: true, engineCount: true } },
     },
   });
   if (!existing) notFound();
@@ -163,7 +163,7 @@ export async function officerUpdateFlight(
     where: eq(flight.id, flightId),
     with: {
       readings: { with: { meter: true } },
-      aircraft: { columns: { hasFuelTotalizer: true, engineCount: true } },
+      aircraft: { columns: { fuelTotalizers: true, engineCount: true } },
     },
   });
   if (!existing) notFound();
@@ -288,6 +288,9 @@ export async function officerUpdateFlight(
           oilAdded: row.oilAdded,
           oilAdded2: row.oilAdded2,
           totalizerFuel: row.totalizerFuel,
+          totalizerFuel2: row.totalizerFuel2,
+          fuelUsed: row.fuelUsed,
+          fuelUsed2: row.fuelUsed2,
           pilotId: row.pilotId,
           billedHours: row.billedHours,
           ...readingsBefore,
@@ -356,7 +359,7 @@ export async function addPastFlight(
     }
   }
   const parsed = parseFlightForm(formData, outs, {
-    totalizer: plane.hasFuelTotalizer,
+    totalizers: plane.fuelTotalizers,
     engines: plane.engineCount,
   });
   if (parsed.fieldErrors) Object.assign(fieldErrors, parsed.fieldErrors);

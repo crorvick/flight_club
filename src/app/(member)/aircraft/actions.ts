@@ -71,6 +71,15 @@ function engineCount(formData: FormData) {
   return formData.get("engineCount") === "2" ? 2 : 1;
 }
 
+// None unless the form says otherwise; one per engine only on a twin.
+function fuelTotalizers(formData: FormData) {
+  const count = Number(formData.get("fuelTotalizers") ?? 0);
+  if (![0, 1, 2].includes(count)) return { count: 0 };
+  return count > engineCount(formData)
+    ? { count, error: "Only a twin can have one per engine." }
+    : { count };
+}
+
 function reading(typed: string) {
   const hundredths = parseHours(typed);
   return hundredths === null ? null : toHours(hundredths);
@@ -86,7 +95,7 @@ export async function createAircraft(
     "makeModel",
     "billing",
     "logbook",
-    "hasFuelTotalizer",
+    "fuelTotalizers",
     "engineCount",
     ...METER_KINDS.map(readingField),
   ]);
@@ -131,20 +140,24 @@ export async function createAircraft(
       "Choose which of its meters is its time in the maintenance logs.",
     ];
   }
+  const totalizers = fuelTotalizers(formData);
+  if (totalizers.error) fieldErrors.fuelTotalizers = [totalizers.error];
   if (!details.success || Object.keys(fieldErrors).length > 0) {
     return { fieldErrors, values };
   }
+  // hasFuelTotalizer is still written for the previous release.
+  const fluids = {
+    fuelTotalizers: totalizers.count,
+    hasFuelTotalizer: totalizers.count > 0,
+    engineCount: engineCount(formData),
+  };
 
   let id: string;
   try {
     id = await db().transaction(async (tx) => {
       const [created] = await tx
         .insert(aircraft)
-        .values({
-          ...details.data,
-          hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
-          engineCount: engineCount(formData),
-        })
+        .values({ ...details.data, ...fluids })
         .returning({ id: aircraft.id });
       const rows = await tx
         .insert(meter)
@@ -173,8 +186,8 @@ export async function createAircraft(
         before: null,
         after: {
           ...details.data,
-          hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
-          engineCount: engineCount(formData),
+          fuelTotalizers: fluids.fuelTotalizers,
+          engineCount: fluids.engineCount,
           meters: Object.fromEntries(meters.map((m) => [m.kind, m.reading])),
           billing: values.billing,
           logbook,
@@ -208,8 +221,14 @@ export async function updateAircraft(
     "makeModel",
     "billing",
     "logbook",
+    "fuelTotalizers",
+    "engineCount",
   ]);
 
+  const totalizers = fuelTotalizers(formData);
+  if (totalizers.error) {
+    return { fieldErrors: { fuelTotalizers: [totalizers.error] }, values };
+  }
   const parsed = z
     .object({
       tailNumber,
@@ -239,7 +258,7 @@ export async function updateAircraft(
   const next = {
     ...parsed.data,
     active: formData.get("active") === "on",
-    hasFuelTotalizer: formData.get("hasFuelTotalizer") === "on",
+    fuelTotalizers: totalizers.count,
     engineCount: engineCount(formData),
   };
 
@@ -252,7 +271,7 @@ export async function updateAircraft(
           billingMeterId: aircraft.billingMeterId,
           logbookMeterId: aircraft.logbookMeterId,
           active: aircraft.active,
-          hasFuelTotalizer: aircraft.hasFuelTotalizer,
+          fuelTotalizers: aircraft.fuelTotalizers,
           engineCount: aircraft.engineCount,
         })
         .from(aircraft)
@@ -279,7 +298,11 @@ export async function updateAircraft(
 
       const diff = changedFields(current, next);
       if (!diff.changed) return;
-      await tx.update(aircraft).set(next).where(eq(aircraft.id, aircraftId));
+      // hasFuelTotalizer is still written for the previous release.
+      await tx
+        .update(aircraft)
+        .set({ ...next, hasFuelTotalizer: next.fuelTotalizers > 0 })
+        .where(eq(aircraft.id, aircraftId));
       // An aircraft without a logbook meter has no hours items to move.
       if (
         current.logbookMeterId !== null &&

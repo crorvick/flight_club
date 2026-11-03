@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, arrayContains, asc, desc, eq, ne, or } from "drizzle-orm";
+import { and, arrayContains, asc, desc, eq, isNull, ne, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aircraft, flight, member, squawk } from "@/db/schema";
@@ -36,9 +36,19 @@ export async function getAircraftForCheckOut(id: string) {
   });
   if (!plane) return undefined;
   const alerts = (await aircraftAlerts([plane.id])).get(plane.id)!;
+  // What its totalizers showed at the end of its latest flight, for the
+  // pilot to confirm.
+  const [latest] = await db()
+    .select({ one: flight.totalizerFuel, two: flight.totalizerFuel2 })
+    .from(flight)
+    .where(and(eq(flight.aircraftId, plane.id), isNull(flight.lockedAt)));
   return {
     id: plane.id,
     tailNumber: plane.tailNumber,
+    totalizers: [latest?.one ?? null, latest?.two ?? null].slice(
+      0,
+      plane.fuelTotalizers,
+    ),
     meters: plane.meters
       .map((m) => ({
         id: m.id,
@@ -66,7 +76,7 @@ export async function getFlight(id: string) {
         columns: {
           id: true,
           tailNumber: true,
-          hasFuelTotalizer: true,
+          fuelTotalizers: true,
           engineCount: true,
         },
       },
@@ -111,6 +121,9 @@ type StoredFluids = {
   oilAdded: string | null;
   oilAdded2: string | null;
   totalizerFuel: string | null;
+  totalizerFuel2: string | null;
+  fuelUsed: string | null;
+  fuelUsed2: string | null;
 };
 
 // A flight's fuel and oil as a form shows them: a tenth, or blank.
@@ -122,6 +135,9 @@ export function fluidValues(flight: StoredFluids) {
     oilAdded: show(flight.oilAdded),
     oilAdded2: show(flight.oilAdded2),
     totalizerFuel: show(flight.totalizerFuel),
+    totalizerFuel2: show(flight.totalizerFuel2),
+    fuelUsed: show(flight.fuelUsed),
+    fuelUsed2: show(flight.fuelUsed2),
   };
 }
 
@@ -130,10 +146,13 @@ export function fluidValues(flight: StoredFluids) {
 // since removed, a twin's second engine).
 export const fluidSetup = (
   flight: StoredFluids & {
-    aircraft: { hasFuelTotalizer: boolean; engineCount: number };
+    aircraft: { fuelTotalizers: number; engineCount: number };
   },
 ): FluidSetup => ({
-  totalizer: flight.aircraft.hasFuelTotalizer || flight.totalizerFuel !== null,
+  totalizers: Math.max(
+    flight.aircraft.fuelTotalizers,
+    flight.totalizerFuel2 !== null ? 2 : flight.totalizerFuel !== null ? 1 : 0,
+  ),
   engines: flight.oilAdded2 !== null ? 2 : flight.aircraft.engineCount,
 });
 

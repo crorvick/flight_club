@@ -1,13 +1,14 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { forbidden, notFound, redirect } from "next/navigation";
 
 import { db } from "@/db";
-import { writeAudit } from "@/db/audit";
+import { type Transaction, writeAudit } from "@/db/audit";
 import {
   aircraft,
   dispatch,
+  dispatchFluid,
   dispatchMeterReading,
   dispatchSquawkAck,
   meter,
@@ -16,18 +17,52 @@ import {
 import { hasRole } from "@/lib/access";
 import { checkOutReading } from "@/lib/dispatch-rules";
 import { aircraftAlerts } from "@/lib/fleet";
+import {
+  checkTotalizer,
+  fromTenths,
+  fuelUsed,
+  MAX_FUEL_GALLONS,
+  parseAmount,
+  toTenths,
+} from "@/lib/fluids";
 import { type FormState, formValues } from "@/lib/form-state";
 import { parseHours, toHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { requireMember } from "@/lib/session";
 
-import { outField } from "../flights/fields";
+import { outField, TOTALIZER_FIELDS } from "../flights/fields";
 import { echo, parseFlightForm } from "../flights/form-data";
 import { recordFlight } from "../flights/record";
-import { ACK_FIELD, expectedField, VFR_ONLY_FIELD } from "./fields";
+import {
+  ACK_FIELD,
+  ADD_REMAINING_FIELDS,
+  expectedField,
+  TOTALIZER_OUT_FIELDS,
+  VFR_ONLY_FIELD,
+} from "./fields";
+import {
+  ENTRY_FIELDS,
+  fluidTotals,
+  parseFluidEntry,
+  totalizerLogs,
+} from "./fluid-entry";
 
-// Thrown inside a transaction to roll it back with a message.
-class Rejected extends Error {}
+// Thrown inside a transaction to roll it back with a message, for the
+// form or for one of its fields.
+class Rejected extends Error {
+  constructor(
+    message: string,
+    readonly field?: string,
+  ) {
+    super(message);
+  }
+}
+
+function rejection(error: Rejected, values: Record<string, string>) {
+  return error.field
+    ? { fieldErrors: { [error.field]: [error.message] }, values }
+    : { error: error.message, values };
+}
 
 const CHANGED =
   "This aircraft changed since the page loaded. Review it and check out again.";
@@ -54,10 +89,11 @@ export async function checkOut(
     with: { meters: true },
   });
   if (!plane) notFound();
-  const values = formValues(
-    formData,
-    plane.meters.map((m) => outField(m.id)),
-  );
+  const totalizerNames = TOTALIZER_OUT_FIELDS.slice(0, plane.fuelTotalizers);
+  const values = formValues(formData, [
+    ...plane.meters.map((m) => outField(m.id)),
+    ...totalizerNames,
+  ]);
 
   // Grounded aircraft can't go: that's what an officer's resolution is for.
   const alerts = (await aircraftAlerts([plane.id])).get(plane.id)!;
@@ -98,6 +134,17 @@ export async function checkOut(
       readings.push({ meterId: m.id, expected, out: expected + result.gap });
     }
   }
+  // What the totalizers show, which the flight's fuel used counts from.
+  const totalizers = totalizerNames.map((name) => {
+    const result = parseAmount(values[name], {
+      max: MAX_FUEL_GALLONS,
+      unit: "gallons",
+      missing: "Enter the fuel remaining it shows.",
+    });
+    if (result.status === "ok") return result.value;
+    fieldErrors[name] = [result.message];
+    return null;
+  });
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors, values };
   const acked = new Set(formData.getAll(ACK_FIELD).map(String));
 
@@ -134,7 +181,13 @@ export async function checkOut(
 
       const [created] = await tx
         .insert(dispatch)
-        .values({ aircraftId, pilotId: pilot.id, vfrOnly: alerts.vfrOnly })
+        .values({
+          aircraftId,
+          pilotId: pilot.id,
+          vfrOnly: alerts.vfrOnly,
+          totalizerOut: totalizers[0] ?? null,
+          totalizerOut2: totalizers[1] ?? null,
+        })
         .returning({ id: dispatch.id });
       await tx.insert(dispatchMeterReading).values(
         readings.map((r) => ({
@@ -178,7 +231,7 @@ export async function checkOut(
       return created.id;
     });
   } catch (error) {
-    if (error instanceof Rejected) return { error: error.message, values };
+    if (error instanceof Rejected) return rejection(error, values);
     const constraint = constraintOf(error);
     if (constraint === "dispatch_one_out_per_aircraft") {
       return {
@@ -258,17 +311,14 @@ export async function checkIn(
     id: r.meterId,
     out: parseHours(r.out)!,
   }));
-  const [plane] = await db()
+  const [setup] = await db()
     .select({
-      hasFuelTotalizer: aircraft.hasFuelTotalizer,
-      engineCount: aircraft.engineCount,
+      totalizers: aircraft.fuelTotalizers,
+      engines: aircraft.engineCount,
     })
     .from(aircraft)
     .where(eq(aircraft.id, row.aircraftId));
-  const parsed = parseFlightForm(formData, outs, {
-    totalizer: plane.hasFuelTotalizer,
-    engines: plane.engineCount,
-  });
+  const parsed = parseFlightForm(formData, outs, setup, { checkIn: true });
   if (parsed.fieldErrors) return { fieldErrors: parsed.fieldErrors, values };
   const { details, ins } = parsed;
 
@@ -283,11 +333,36 @@ export async function checkIn(
         .where(eq(meter.aircraftId, row.aircraftId))
         .for("update");
       const [locked] = await tx
-        .select({ status: dispatch.status })
+        .select()
         .from(dispatch)
         .where(eq(dispatch.id, dispatchId))
         .for("update");
       if (locked.status !== "out") throw new Rejected(NOT_OUT);
+
+      // The flight's fuel and oil are what was added while it was out,
+      // and the fuel each totalizer counted from check-out to now.
+      const entries = await fluidEntries(tx, dispatchId);
+      const totals = fluidTotals(entries);
+      const finals = [details.totalizerFuel, details.totalizerFuel2];
+      const used = totalizerLogs(
+        [locked.totalizerOut, locked.totalizerOut2],
+        entries,
+        setup.totalizers,
+      ).map((log, i) => {
+        if (!log) return null;
+        const final = toTenths(finals[i]!);
+        const check = checkTotalizer(log, final);
+        if (check.status === "invalid") {
+          throw new Rejected(check.message, TOTALIZER_FIELDS[i]);
+        }
+        const gallons = fuelUsed(log, final);
+        if (gallons === null) {
+          throw new Rejected(
+            "The totalizer readings in the fuel added don't add up. Remove the wrong entry and add it again.",
+          );
+        }
+        return fromTenths(gallons);
+      });
 
       // Nobody else can fly it while it's out, so only an officer's meter
       // correction could have moved these.
@@ -318,7 +393,14 @@ export async function checkIn(
         billingMeter: { id: billing.meterId, kind: billing.meter.kind },
         outs,
         ins,
-        details,
+        details: {
+          ...details,
+          fuelAdded: totals.fuel,
+          oilAdded: totals.oil[0],
+          oilAdded2: setup.engines === 2 ? totals.oil[1] : null,
+          fuelUsed: used[0] ?? null,
+          fuelUsed2: used[1] ?? null,
+        },
       });
       await tx
         .update(dispatch)
@@ -332,7 +414,7 @@ export async function checkIn(
       return id;
     });
   } catch (error) {
-    if (error instanceof Rejected) return { error: error.message, values };
+    if (error instanceof Rejected) return rejection(error, values);
     throw error;
   }
 
@@ -340,6 +422,109 @@ export async function checkIn(
     redirect(`/squawks/new?aircraft=${row.aircraftId}&flight=${flightId}`);
   }
   redirect(`/flights/${flightId}?saved=logged`);
+}
+
+// Oldest first, the order the totalizer was reset in.
+function fluidEntries(tx: Transaction, dispatchId: string) {
+  return tx
+    .select()
+    .from(dispatchFluid)
+    .where(eq(dispatchFluid.dispatchId, dispatchId))
+    .orderBy(asc(dispatchFluid.createdAt), asc(dispatchFluid.id));
+}
+
+// Fuel or oil added while the aircraft is out, by its pilot or an
+// officer, as many times as it's added.  A totalizer reading is checked
+// against the one before it, from check-out or the last reset, so a typo
+// is caught while the pilot is still at the pump.
+export async function addFluid(
+  dispatchId: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const { member, row } = await closable(dispatchId);
+  const values = formValues(formData, ENTRY_FIELDS);
+  const [setup] = await db()
+    .select({
+      totalizers: aircraft.fuelTotalizers,
+      engines: aircraft.engineCount,
+    })
+    .from(aircraft)
+    .where(eq(aircraft.id, row.aircraftId));
+  const parsed = parseFluidEntry(formData, setup);
+  if (parsed.fieldErrors) return { fieldErrors: parsed.fieldErrors, values };
+  const { entry } = parsed;
+
+  try {
+    await db().transaction(async (tx) => {
+      // Locked so checking in can't total the entries while this adds one.
+      const [locked] = await tx
+        .select()
+        .from(dispatch)
+        .where(eq(dispatch.id, dispatchId))
+        .for("update");
+      if (locked.status !== "out") throw new Rejected(NOT_OUT);
+
+      const logs = totalizerLogs(
+        [locked.totalizerOut, locked.totalizerOut2],
+        await fluidEntries(tx, dispatchId),
+        setup.totalizers,
+      );
+      entry.resets.forEach((reset, i) => {
+        const log = logs[i];
+        if (!reset || !log) return;
+        const check = checkTotalizer(log, toTenths(reset.remaining));
+        if (check.status === "invalid") {
+          throw new Rejected(check.message, ADD_REMAINING_FIELDS[i]);
+        }
+      });
+
+      const [one, two] = entry.resets;
+      await tx.insert(dispatchFluid).values({
+        dispatchId,
+        recordedById: member.id,
+        fuelAdded: entry.fuelAdded,
+        oilAdded: entry.oilAdded,
+        oilAdded2: entry.oilAdded2,
+        totalizerRemaining: one?.remaining ?? null,
+        totalizerReset: one?.reset ?? null,
+        totalizerRemaining2: two?.remaining ?? null,
+        totalizerReset2: two?.reset ?? null,
+      });
+    });
+  } catch (error) {
+    if (error instanceof Rejected) return rejection(error, values);
+    throw error;
+  }
+  redirect(`/dispatches/${dispatchId}?saved=added`);
+}
+
+// For a typo: remove it and add it again.
+export async function removeFluid(
+  dispatchId: string,
+  entryId: string,
+): Promise<FormState> {
+  await closable(dispatchId);
+  if (!isUuid(entryId)) notFound();
+  const removed = await db().transaction(async (tx) => {
+    const [locked] = await tx
+      .select({ status: dispatch.status })
+      .from(dispatch)
+      .where(eq(dispatch.id, dispatchId))
+      .for("update");
+    if (locked.status !== "out") return false;
+    await tx
+      .delete(dispatchFluid)
+      .where(
+        and(
+          eq(dispatchFluid.id, entryId),
+          eq(dispatchFluid.dispatchId, dispatchId),
+        ),
+      );
+    return true;
+  });
+  if (!removed) return { error: NOT_OUT };
+  redirect(`/dispatches/${dispatchId}?saved=removed`);
 }
 
 export async function reviewGap(dispatchId: string): Promise<FormState> {

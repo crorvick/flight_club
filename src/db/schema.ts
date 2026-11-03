@@ -171,10 +171,15 @@ export const aircraft = pgTable(
     tailNumber: text("tail_number").notNull().unique(),
     makeModel: text("make_model").notNull(),
     active: boolean("active").default(true).notNull(),
-    // Pilots record its fuel remaining at the end of each flight.
+    // Superseded by fuelTotalizers, and still written from it so the
+    // previous release works during a deploy.  A later migration drops it.
     hasFuelTotalizer: boolean("has_fuel_totalizer").default(false).notNull(),
     // 1, or 2 for a twin, whose oil is recorded per engine.
     engineCount: integer("engine_count").default(1).notNull(),
+    // How many fuel totalizers it has: none, one, or on a twin one per
+    // engine.  Pilots record what each shows at check-out, whenever they
+    // reset it after fueling, and at check-in.
+    fuelTotalizers: integer("fuel_totalizers").default(0).notNull(),
     // Which meter flights are billed by.  Nullable only because an
     // aircraft has to exist before its meters can.
     billingMeterId: uuid("billing_meter_id"),
@@ -201,6 +206,10 @@ export const aircraft = pgTable(
     check(
       "aircraft_engine_count",
       sql`${table.engineCount} between 1 and ${sql.raw(String(MAX_ENGINES))}`,
+    ),
+    check(
+      "aircraft_fuel_totalizers",
+      sql`${table.fuelTotalizers} between 0 and ${table.engineCount}`,
     ),
   ],
 );
@@ -243,14 +252,22 @@ export const flight = pgTable(
     date: date("date").notNull(),
     notes: text("notes"),
     // To a tenth: fuel (gallons) and oil (quarts) added for the flight,
-    // and the fuel remaining the totalizer showed at the end, for aircraft
-    // that have one.  Required when logging; null on flights from before
-    // they were recorded.  Oil is per engine: oilAdded is a single's one
-    // engine or a twin's left, oilAdded2 a twin's right.
+    // the totals of what was added while it was checked out.  Null on
+    // flights from before they were recorded.  Oil is per engine:
+    // oilAdded is a single's one engine or a twin's left, oilAdded2 a
+    // twin's right.
     fuelAdded: numeric("fuel_added", { precision: 4, scale: 1 }),
     oilAdded: numeric("oil_added", { precision: 3, scale: 1 }),
     oilAdded2: numeric("oil_added_2", { precision: 3, scale: 1 }),
+    // For aircraft with totalizers, what each showed at the end and the
+    // fuel it counted over the flight, across any resets.  The second is
+    // a twin's right engine when it has one per engine.  Fuel used is
+    // null where it couldn't be counted, as on flights from before it
+    // was.
     totalizerFuel: numeric("totalizer_fuel", { precision: 4, scale: 1 }),
+    totalizerFuel2: numeric("totalizer_fuel_2", { precision: 4, scale: 1 }),
+    fuelUsed: numeric("fuel_used", { precision: 4, scale: 1 }),
+    fuelUsed2: numeric("fuel_used_2", { precision: 4, scale: 1 }),
     // Copied from the aircraft when the flight is logged, so changing an
     // aircraft's billing meter later never re-bills past flights.
     billingMeterKind: meterKind("billing_meter_kind").notNull(),
@@ -270,7 +287,10 @@ export const flight = pgTable(
       sql`coalesce(${table.fuelAdded}, 0) >= 0
         and coalesce(${table.oilAdded}, 0) >= 0
         and coalesce(${table.oilAdded2}, 0) >= 0
-        and coalesce(${table.totalizerFuel}, 0) >= 0`,
+        and coalesce(${table.totalizerFuel}, 0) >= 0
+        and coalesce(${table.totalizerFuel2}, 0) >= 0
+        and coalesce(${table.fuelUsed}, 0) >= 0
+        and coalesce(${table.fuelUsed2}, 0) >= 0`,
     ),
   ],
 );
@@ -390,6 +410,12 @@ export const dispatch = pgTable(
     // marks it reviewed once the missing time is accounted for.
     gapReviewedAt: timestamptz("gap_reviewed_at"),
     gapReviewedById: uuid("gap_reviewed_by_id").references(() => member.id),
+    // What each fuel totalizer showed at check-out, as the pilot
+    // confirmed it: where the flight's fuel used counts from.  Null on
+    // aircraft without them, and on dispatches from before they were
+    // recorded.
+    totalizerOut: numeric("totalizer_out", { precision: 4, scale: 1 }),
+    totalizerOut2: numeric("totalizer_out_2", { precision: 4, scale: 1 }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -427,6 +453,55 @@ export const dispatchMeterReading = pgTable(
   (table) => [
     primaryKey({ columns: [table.dispatchId, table.meterId] }),
     check("dispatch_meter_reading_nonnegative", sql`${table.out} >= 0`),
+  ],
+);
+
+// Fuel or oil added while an aircraft is checked out, as often as the
+// pilot adds some; checking in totals them onto the flight.  Fueling an
+// aircraft with totalizers records what each showed beforehand and what
+// it was reset to (the second is a twin's right engine, as on flights),
+// so fuel used can be counted across the resets.
+export const dispatchFluid = pgTable(
+  "dispatch_fluid",
+  {
+    id: id(),
+    dispatchId: uuid("dispatch_id")
+      .notNull()
+      .references(() => dispatch.id, { onDelete: "cascade" }),
+    recordedById: uuid("recorded_by_id").references(() => member.id),
+    fuelAdded: numeric("fuel_added", { precision: 4, scale: 1 }).notNull(),
+    oilAdded: numeric("oil_added", { precision: 3, scale: 1 }).notNull(),
+    oilAdded2: numeric("oil_added_2", { precision: 3, scale: 1 }),
+    totalizerRemaining: numeric("totalizer_remaining", {
+      precision: 4,
+      scale: 1,
+    }),
+    totalizerReset: numeric("totalizer_reset", { precision: 4, scale: 1 }),
+    totalizerRemaining2: numeric("totalizer_remaining_2", {
+      precision: 4,
+      scale: 1,
+    }),
+    totalizerReset2: numeric("totalizer_reset_2", { precision: 4, scale: 1 }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("dispatch_fluid_dispatch_idx").on(table.dispatchId, table.createdAt),
+    check(
+      "dispatch_fluid_nonnegative",
+      sql`${table.fuelAdded} >= 0
+        and ${table.oilAdded} >= 0
+        and coalesce(${table.oilAdded2}, 0) >= 0
+        and coalesce(${table.totalizerRemaining}, 0) >= 0
+        and coalesce(${table.totalizerReset}, 0) >= 0
+        and coalesce(${table.totalizerRemaining2}, 0) >= 0
+        and coalesce(${table.totalizerReset2}, 0) >= 0`,
+    ),
+    // A reset records both readings, before and after.
+    check(
+      "dispatch_fluid_reset_complete",
+      sql`(${table.totalizerRemaining} is null) = (${table.totalizerReset} is null)
+        and (${table.totalizerRemaining2} is null) = (${table.totalizerReset2} is null)`,
+    ),
   ],
 );
 
@@ -769,6 +844,14 @@ export const dispatchRelations = relations(dispatch, ({ one, many }) => ({
   flight: one(flight, { fields: [dispatch.flightId], references: [flight.id] }),
   readings: many(dispatchMeterReading),
   acks: many(dispatchSquawkAck),
+  fluids: many(dispatchFluid),
+}));
+
+export const dispatchFluidRelations = relations(dispatchFluid, ({ one }) => ({
+  dispatch: one(dispatch, {
+    fields: [dispatchFluid.dispatchId],
+    references: [dispatch.id],
+  }),
 }));
 
 export const dispatchMeterReadingRelations = relations(

@@ -21,9 +21,11 @@ import type { FormState } from "@/lib/form-state";
 export function CancelCheckOut({
   action,
   tailNumber,
+  fluidsAdded,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   tailNumber: string;
+  fluidsAdded: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   return (
@@ -45,6 +47,8 @@ export function CancelCheckOut({
             <AlertDialogDescription>
               No flight will be recorded, and {tailNumber} will be free for
               someone else to check out.
+              {fluidsAdded &&
+                " The fuel and oil you added are kept with the check-out, not on any flight."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <form action={formAction} className="flex flex-col gap-4">

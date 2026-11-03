@@ -188,20 +188,43 @@ test("meters can be added, and removed until a flight records them", async ({
   );
 });
 
-test("an officer marks an aircraft as having a fuel totalizer", async ({
+test("an officer sets how many fuel totalizers an aircraft has", async ({
   page,
 }, testInfo) => {
   const plane = await createAircraft(testInfo, { tach: "400.00" }, "tach");
   created.push(plane.id);
+  const totalizers = page.getByRole("group", { name: "Fuel totalizers" });
 
   await page.goto(`/aircraft/${plane.id}`);
-  await page.getByLabel(/Has a fuel totalizer/).check();
+  await expect(totalizers.getByLabel("None")).toBeChecked();
+  // One per engine is for twins.
+  await totalizers.getByLabel("One per engine").check();
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(
+    page.getByText("Only a twin can have one per engine."),
+  ).toBeVisible();
+
+  await totalizers.getByLabel("One", { exact: true }).check();
   await page.getByRole("button", { name: "Save details" }).click();
   await expect(page.getByText("Details saved.")).toBeVisible();
-  await expect(page.getByLabel(/Has a fuel totalizer/)).toBeChecked();
+  await expect(totalizers.getByLabel("One", { exact: true })).toBeChecked();
 
-  await checkOut(page, plane);
+  await openCheckOut(page, plane);
   await expect(page.getByLabel("Totalizer fuel remaining (gal)")).toBeVisible();
+
+  // A twin's can be one per engine, each confirmed at check-out.
+  await page.goto(`/aircraft/${plane.id}`);
+  await page.getByRole("group", { name: "Engines" }).getByLabel("Twin").check();
+  await totalizers.getByLabel("One per engine").check();
+  await page.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Details saved.")).toBeVisible();
+  await openCheckOut(page, plane);
+  await expect(
+    page.getByLabel("Totalizer fuel remaining, left (gal)"),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Totalizer fuel remaining, right (gal)"),
+  ).toBeVisible();
 });
 
 test("an inactive aircraft can't be picked", async ({ page }, testInfo) => {

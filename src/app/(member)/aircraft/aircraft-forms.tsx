@@ -70,6 +70,49 @@ function EnginesField({ defaultValue }: { defaultValue: number }) {
   );
 }
 
+// None, one, or on a twin one per engine.
+function TotalizersField({
+  defaultValue,
+  errors,
+}: {
+  defaultValue: number;
+  errors?: string[];
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 font-medium">Fuel totalizers</legend>
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            [0, "None"],
+            [1, "One"],
+            [2, "One per engine"],
+          ] as const
+        ).map(([count, label]) => (
+          <label
+            key={count}
+            className="flex h-11 cursor-pointer items-center gap-2 rounded-lg border px-3"
+          >
+            <input
+              type="radio"
+              name="fuelTotalizers"
+              value={count}
+              defaultChecked={defaultValue === count}
+              className="size-5 accent-primary"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Pilots record what each shows at check-out, when they reset it after
+        fueling, and at check-in. One per engine is for twins.
+      </p>
+      <ErrorText errors={errors} />
+    </fieldset>
+  );
+}
+
 function ErrorText({ errors }: { errors?: string[] }) {
   if (!errors) return null;
   return <p className="text-sm text-destructive">{errors[0]}</p>;
@@ -155,20 +198,10 @@ export function NewAircraftForm({
 
       <EnginesField defaultValue={values?.engineCount === "2" ? 2 : 1} />
 
-      <label className="flex min-h-11 cursor-pointer items-center gap-3">
-        <input
-          type="checkbox"
-          name="hasFuelTotalizer"
-          defaultChecked={values?.hasFuelTotalizer === "on"}
-          className="size-5 accent-primary"
-        />
-        <span>
-          Has a fuel totalizer{" "}
-          <span className="text-sm text-muted-foreground">
-            (pilots record its fuel remaining at check-in)
-          </span>
-        </span>
-      </label>
+      <TotalizersField
+        defaultValue={Number(values?.fuelTotalizers ?? 0)}
+        errors={errors.fuelTotalizers}
+      />
 
       <Saving pending={pending} label="Add aircraft" />
     </form>
@@ -185,7 +218,7 @@ export function DetailsForm({
     tailNumber: string;
     makeModel: string;
     active: boolean;
-    hasFuelTotalizer: boolean;
+    fuelTotalizers: number;
     engineCount: number;
     billingMeterId: string | null;
     logbookMeterId: string | null;
@@ -279,20 +312,10 @@ export function DetailsForm({
         </span>
       </label>
       <EnginesField defaultValue={aircraft.engineCount} />
-      <label className="flex min-h-11 cursor-pointer items-center gap-3">
-        <input
-          type="checkbox"
-          name="hasFuelTotalizer"
-          defaultChecked={aircraft.hasFuelTotalizer}
-          className="size-5 accent-primary"
-        />
-        <span>
-          Has a fuel totalizer{" "}
-          <span className="text-sm text-muted-foreground">
-            (pilots record its fuel remaining at check-in)
-          </span>
-        </span>
-      </label>
+      <TotalizersField
+        defaultValue={Number(values?.fuelTotalizers ?? aircraft.fuelTotalizers)}
+        errors={errors.fuelTotalizers}
+      />
       <Saving pending={pending} label="Save details" />
     </form>
   );

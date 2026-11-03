@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { forbidden, notFound } from "next/navigation";
@@ -9,17 +9,32 @@ import { Flash } from "@/components/flash";
 import { LocalTime } from "@/components/local-time";
 import { FormSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
-import { dispatch } from "@/db/schema";
+import { dispatch, dispatchFluid } from "@/db/schema";
 import { hasRole } from "@/lib/access";
+import { fromTenths, lastTotalizer } from "@/lib/fluids";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { byMeterOrder } from "@/lib/meters";
 import { requireMember } from "@/lib/session";
 
 import { FlightForm } from "../../flights/flight-form";
-import { cancelDispatch, checkIn, reviewGap } from "../actions";
+import {
+  addFluid,
+  cancelDispatch,
+  checkIn,
+  removeFluid,
+  reviewGap,
+} from "../actions";
+import { describeEntry, fluidTotals, totalizerLogs } from "../fluid-entry";
 import { ActionButton } from "./action-button";
 import { CancelCheckOut } from "./cancel-check-out";
+import { AddFluidForm, RemoveEntry } from "./fluid-entries";
+
+const CONFIRMATIONS: Record<string, string> = {
+  reviewed: "Marked reviewed.",
+  added: "Added.",
+  removed: "Removed.",
+};
 
 export const metadata: Metadata = { title: "Checked out · Flight Club" };
 
@@ -50,9 +65,12 @@ async function Dispatch({
         columns: {
           tailNumber: true,
           billingMeterId: true,
-          hasFuelTotalizer: true,
+          fuelTotalizers: true,
           engineCount: true,
         },
+      },
+      fluids: {
+        orderBy: [asc(dispatchFluid.createdAt), asc(dispatchFluid.id)],
       },
       pilot: { columns: { name: true } },
       readings: { with: { meter: { columns: { label: true, kind: true } } } },
@@ -76,6 +94,18 @@ async function Dispatch({
     }))
     .sort(byMeterOrder);
   const gaps = readings.filter((r) => r.gap > 0);
+
+  const fluids = {
+    totalizers: row.aircraft.fuelTotalizers,
+    engines: row.aircraft.engineCount,
+  };
+  const totals = fluidTotals(row.fluids);
+  // What each totalizer should show now, from check-out and any resets.
+  const expected = totalizerLogs(
+    [row.totalizerOut, row.totalizerOut2],
+    row.fluids,
+    fluids.totalizers,
+  ).map((log) => (log ? fromTenths(lastTotalizer(log)) : null));
 
   return (
     <>
@@ -137,10 +167,47 @@ async function Dispatch({
         </section>
       )}
 
-      <Flash message={saved === "reviewed" && "Marked reviewed."} />
+      <Flash message={typeof saved === "string" && CONFIRMATIONS[saved]} />
+
+      {row.fluids.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h2 className="font-semibold">Fuel and oil added</h2>
+          <ul className="divide-y rounded-lg border">
+            {row.fluids.map((entry) => {
+              const description = describeEntry(entry, fluids);
+              return (
+                <li
+                  key={entry.id}
+                  className="flex items-center justify-between gap-2 py-1 pr-1 pl-3"
+                >
+                  <span>
+                    {description}
+                    <span className="block text-sm text-muted-foreground">
+                      <LocalTime at={entry.createdAt} format="time" />
+                    </span>
+                  </span>
+                  {row.status === "out" && (
+                    <RemoveEntry
+                      action={removeFluid.bind(null, row.id, entry.id)}
+                      description={description}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {row.status === "out" ? (
         <>
+          <AddFluidForm
+            // Fresh fields after each one added.
+            key={row.fluids.length}
+            action={addFluid.bind(null, row.id)}
+            fluids={fluids}
+            expected={expected}
+          />
           <FlightForm
             action={checkIn.bind(null, row.id)}
             meters={readings.map((r) => ({
@@ -149,9 +216,12 @@ async function Dispatch({
               out: r.out,
               billing: r.meterId === row.aircraft.billingMeterId,
             }))}
-            fluids={{
-              totalizer: row.aircraft.hasFuelTotalizer,
-              engines: row.aircraft.engineCount,
+            fluids={fluids}
+            added={{
+              count: row.fluids.length,
+              fuel: totals.fuel,
+              oil: totals.oil,
+              totalizers: expected,
             }}
             submitLabel={`Check in ${tail}`}
             pendingLabel="Checking in…"
@@ -160,6 +230,7 @@ async function Dispatch({
           <CancelCheckOut
             action={cancelDispatch.bind(null, row.id)}
             tailNumber={tail}
+            fluidsAdded={row.fluids.length > 0}
           />
         </>
       ) : (

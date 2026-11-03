@@ -21,6 +21,22 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 2,
+    date: "2026-11-02",
+    highlights: [
+      {
+        text: "Add fuel and oil each time you put some in while an aircraft is checked out. Checking in totals them for you.",
+      },
+      {
+        text: "On aircraft with a fuel totalizer, confirm it at check-out and note what you reset it to when fueling; the flight shows the fuel used.",
+      },
+      {
+        text: "An aircraft's settings say how many fuel totalizers it has: none, one, or one per engine on a twin.",
+        for: ["officer"],
+      },
+    ],
+  },
+  {
     id: 1,
     date: "2026-11-01",
     highlights: [

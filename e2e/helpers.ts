@@ -203,22 +203,46 @@ export async function checkOut(
   ).toBeVisible();
 }
 
-// On the check-in page: fill the in readings (by meter label), the fuel
-// and oil added (none unless given), the totalizer if given, and submit.
+// On the check-in page: add fuel or oil, filling its fields by label,
+// and wait for the entry to show.
+export async function addFluid(
+  page: Page,
+  fields: Record<string, string | undefined>,
+) {
+  const entries = page.getByRole("button", { name: /^Remove / });
+  const before = await entries.count();
+  for (const [label, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      await page.getByRole("textbox", { name: label, exact: true }).fill(value);
+    }
+  }
+  await page.getByRole("button", { name: "Add fuel or oil" }).click();
+  await expect(entries).toHaveCount(before + 1);
+}
+
+// On the check-in page: add any fuel and oil given, as one entry, fill
+// the in readings (by meter label) and the totalizer if given, and
+// submit.
 export async function checkIn(
   page: Page,
   plane: Plane,
   ins: Record<string, string>,
   fluids: { fuel?: string; oil?: string; totalizer?: string } = {},
 ) {
+  if (fluids.fuel !== undefined || fluids.oil !== undefined) {
+    await addFluid(page, {
+      "Fuel added (gal)": fluids.fuel,
+      "Oil added (qt)": fluids.oil,
+    });
+  }
   for (const [label, value] of Object.entries(ins)) {
     await page.getByLabel(`${label} in`).fill(value);
   }
-  await page.getByLabel("Fuel added (gal)").fill(fluids.fuel ?? "0");
-  await page.getByLabel("Oil added (qt)").fill(fluids.oil ?? "0");
   if (fluids.totalizer !== undefined) {
+    // By role: the check-out page, still in the DOM but hidden, has a
+    // field labelled the same.
     await page
-      .getByLabel("Totalizer fuel remaining (gal)")
+      .getByRole("textbox", { name: "Totalizer fuel remaining (gal)" })
       .fill(fluids.totalizer);
   }
   await page

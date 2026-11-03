@@ -58,6 +58,31 @@ async function FlightDetails({
   const maintainer = await canMaintainAircraft(member, flight.aircraft.id);
   const officer = hasRole(member, "officer");
 
+  // What it recorded of each, labelled per engine (or per totalizer) on
+  // a twin.
+  const twin = flight.oilAdded2 !== null;
+  const perTotalizer = flight.totalizerFuel2 !== null;
+  const show = (value: string | null, unit: "gal" | "qt", after = "") =>
+    value === null ? null : `${formatAmount(value, unit)}${after}`;
+  const fluids = [
+    ["Fuel added", show(flight.fuelAdded, "gal")],
+    [twin ? "Oil added, left" : "Oil added", show(flight.oilAdded, "qt")],
+    ["Oil added, right", show(flight.oilAdded2, "qt")],
+    [
+      perTotalizer ? "Fuel used, left" : "Fuel used",
+      show(flight.fuelUsed, "gal"),
+    ],
+    ["Fuel used, right", show(flight.fuelUsed2, "gal")],
+    [
+      perTotalizer ? "Totalizer at end, left" : "Totalizer at end",
+      show(flight.totalizerFuel, "gal", " remaining"),
+    ],
+    [
+      "Totalizer at end, right",
+      show(flight.totalizerFuel2, "gal", " remaining"),
+    ],
+  ].filter(([, value]) => value !== null);
+
   // Officers' corrections, newest first.
   const corrections = await db()
     .select({
@@ -126,48 +151,14 @@ async function FlightDetails({
           </tbody>
         </table>
 
-        {(flight.fuelAdded !== null ||
-          flight.oilAdded !== null ||
-          flight.totalizerFuel !== null) && (
+        {fluids.length > 0 && (
           <dl className="grid grid-cols-2 gap-4 border-t px-5 py-4 sm:grid-cols-3">
-            {flight.fuelAdded !== null && (
-              <div>
-                <dt className="text-sm text-muted-foreground">Fuel added</dt>
-                <dd className="font-medium tabular-nums">
-                  {formatAmount(flight.fuelAdded, "gal")}
-                </dd>
+            {fluids.map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-sm text-muted-foreground">{label}</dt>
+                <dd className="font-medium tabular-nums">{value}</dd>
               </div>
-            )}
-            {flight.oilAdded !== null && (
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  {flight.oilAdded2 === null ? "Oil added" : "Oil added, left"}
-                </dt>
-                <dd className="font-medium tabular-nums">
-                  {formatAmount(flight.oilAdded, "qt")}
-                </dd>
-              </div>
-            )}
-            {flight.oilAdded2 !== null && (
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Oil added, right
-                </dt>
-                <dd className="font-medium tabular-nums">
-                  {formatAmount(flight.oilAdded2, "qt")}
-                </dd>
-              </div>
-            )}
-            {flight.totalizerFuel !== null && (
-              <div>
-                <dt className="text-sm text-muted-foreground">
-                  Totalizer at end
-                </dt>
-                <dd className="font-medium tabular-nums">
-                  {formatAmount(flight.totalizerFuel, "gal")} remaining
-                </dd>
-              </div>
-            )}
+            ))}
           </dl>
         )}
 

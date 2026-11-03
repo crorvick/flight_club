@@ -9,7 +9,9 @@ import { inField } from "./fields";
 import type { FluidSetup } from "./fluid-fields";
 
 // Parsing a flight form, shared by checking in (which records a flight),
-// a pilot's edit and an officer's correction.
+// a pilot's edit and an officer's correction.  Checking in asks only for
+// the totalizers' fuel remaining; the other fuel and oil come from what
+// was added while the aircraft was out.
 
 // Allows tomorrow's date: the server runs on UTC, which is already
 // tomorrow for an evening flight in the Americas.
@@ -28,6 +30,27 @@ const amount = (max: number, unit: string, missing: string) =>
     return result.value;
   });
 
+// Blank when it isn't known.
+const optionalAmount = (max: number, unit: string) =>
+  z.string().transform((typed, ctx) => {
+    if (typed.trim() === "") return null;
+    const result = parseAmount(typed, { max, unit, missing: "" });
+    if (result.status === "invalid") {
+      ctx.addIssue({ code: "custom", message: result.message });
+      return z.NEVER;
+    }
+    return result.value;
+  });
+
+const oil = () =>
+  amount(MAX_OIL_QUARTS, "quarts", "Enter the oil added, or 0 if none.");
+const remaining = () =>
+  amount(
+    MAX_FUEL_GALLONS,
+    "gallons",
+    "Enter the fuel remaining on the totalizer.",
+  );
+
 const detailsSchema = z.object({
   date: z.iso
     .date("Enter the date of the flight.")
@@ -37,29 +60,23 @@ const detailsSchema = z.object({
     .trim()
     .max(2000, "Keep notes under 2000 characters.")
     .transform((notes) => notes || null),
+  // Null wherever the form doesn't ask: on a twin's right engine only
+  // for twins, the totalizers only on aircraft with them, and the totals
+  // not at check-in.
   fuelAdded: amount(
     MAX_FUEL_GALLONS,
     "gallons",
     "Enter the fuel added, or 0 if none.",
-  ),
-  oilAdded: amount(
-    MAX_OIL_QUARTS,
-    "quarts",
-    "Enter the oil added, or 0 if none.",
-  ),
-  // A twin's right engine; only asked for on twins.
-  oilAdded2: amount(
-    MAX_OIL_QUARTS,
-    "quarts",
-    "Enter the oil added, or 0 if none.",
   ).nullable(),
-  // Only asked for, and so only required, on aircraft with a totalizer.
-  totalizerFuel: amount(
-    MAX_FUEL_GALLONS,
-    "gallons",
-    "Enter the fuel remaining on the totalizer.",
-  ).nullable(),
+  oilAdded: oil().nullable(),
+  oilAdded2: oil().nullable(),
+  totalizerFuel: remaining().nullable(),
+  totalizerFuel2: remaining().nullable(),
+  fuelUsed: optionalAmount(MAX_FUEL_GALLONS, "gallons").nullable(),
+  fuelUsed2: optionalAmount(MAX_FUEL_GALLONS, "gallons").nullable(),
 });
+
+export type FlightDetails = z.infer<typeof detailsSchema>;
 
 export const DETAIL_FIELDS = [
   "date",
@@ -68,6 +85,9 @@ export const DETAIL_FIELDS = [
   "oilAdded",
   "oilAdded2",
   "totalizerFuel",
+  "totalizerFuel2",
+  "fuelUsed",
+  "fuelUsed2",
   "reportSquawk",
 ];
 
@@ -79,16 +99,22 @@ export type MeterOut = { id: string; out: number };
 export function parseFlightForm(
   formData: FormData,
   meters: MeterOut[],
-  { totalizer, engines }: FluidSetup,
+  { totalizers, engines }: FluidSetup,
+  { checkIn = false } = {},
 ) {
   const fieldErrors: Record<string, string[]> = {};
+  const asked = (name: string, when: boolean) =>
+    when ? String(formData.get(name) ?? "") : null;
   const details = detailsSchema.safeParse({
     date: formData.get("date") ?? "",
     notes: formData.get("notes") ?? "",
-    fuelAdded: formData.get("fuelAdded") ?? "",
-    oilAdded: formData.get("oilAdded") ?? "",
-    oilAdded2: engines === 2 ? (formData.get("oilAdded2") ?? "") : null,
-    totalizerFuel: totalizer ? (formData.get("totalizerFuel") ?? "") : null,
+    fuelAdded: asked("fuelAdded", !checkIn),
+    oilAdded: asked("oilAdded", !checkIn),
+    oilAdded2: asked("oilAdded2", !checkIn && engines === 2),
+    totalizerFuel: asked("totalizerFuel", totalizers >= 1),
+    totalizerFuel2: asked("totalizerFuel2", totalizers === 2),
+    fuelUsed: asked("fuelUsed", !checkIn && totalizers >= 1),
+    fuelUsed2: asked("fuelUsed2", !checkIn && totalizers === 2),
   });
   if (!details.success) {
     Object.assign(fieldErrors, z.flattenError(details.error).fieldErrors);

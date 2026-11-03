@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import {
+  addFluid,
   checkIn,
   checkOut,
   closeSql,
@@ -53,8 +54,6 @@ test("checks out from the current readings and checks in a flight", async ({
   await page.getByLabel("Hobbs in").fill("101.5");
   await expect(page.getByText("1.5 hours")).toBeVisible();
   await page.getByLabel("Tach in").fill("81.2");
-  await page.getByLabel("Fuel added (gal)").fill("0");
-  await page.getByLabel("Oil added (qt)").fill("0");
   await checkInButton(page).click();
 
   await expect(page.getByText("Flight logged.")).toBeVisible();
@@ -271,68 +270,128 @@ test("a flight is editable until the next one is checked in", async ({
   await expect(page.getByText("This flight was locked")).toBeVisible();
 });
 
-test("fuel and oil added must be entered, even if none", async ({ page }) => {
+test("fuel and oil are added while out and totalled at check-in", async ({
+  page,
+}) => {
   await checkOut(page, aircraft);
+  await expect(page.getByText("No fuel or oil added.")).toBeVisible();
+  // No totalizer on this aircraft, so it isn't asked for.
+  await expect(page.getByLabel(/Totalizer/)).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add fuel or oil" }).click();
+  await expect(page.getByText("Enter the fuel or oil added.")).toBeVisible();
+
+  await addFluid(page, { "Fuel added (gal)": "18.5" });
+  await addFluid(page, { "Fuel added (gal)": "5", "Oil added (qt)": "1" });
+  await expect(
+    page.getByText("23.5 gal fuel, 1.0 qt oil added."),
+  ).toBeVisible();
+  // A typo is removed and added again.
+  await page
+    .getByRole("button", { name: "Remove 5.0 gal fuel · 1.0 qt oil" })
+    .click();
+  await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(1);
+  await addFluid(page, { "Oil added (qt)": "1" });
+  await expect(
+    page.getByText("18.5 gal fuel, 1.0 qt oil added."),
+  ).toBeVisible();
+
+  await checkIn(page, aircraft, { Hobbs: "101.5", Tach: "81.2" });
+  await expect(page.getByText("Flight logged.")).toBeVisible();
+  await expect(page.getByText("18.5 gal", { exact: true })).toBeVisible();
+  await expect(page.getByText("1.0 qt", { exact: true })).toBeVisible();
+
+  // The pilot can still correct the totals until the next flight.
+  await page.getByRole("link", { name: "Edit flight" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Fuel added (gal)" }),
+  ).toHaveValue("18.5");
+  await page.getByRole("textbox", { name: "Fuel added (gal)" }).fill("20");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("20.0 gal", { exact: true })).toBeVisible();
+});
+
+test("a flight with nothing added records none", async ({ page }) => {
+  await logFlight(page, aircraft, { Hobbs: "101.5", Tach: "81.2" });
+  await expect(page.getByText("0.0 gal", { exact: true })).toBeVisible();
+  await expect(page.getByText("0.0 qt", { exact: true })).toBeVisible();
+});
+
+test("counts fuel used on the totalizer across resets", async ({ page }) => {
+  await sql()`update aircraft set fuel_totalizers = 1 where id = ${aircraft.id}`;
+
+  // Confirmed at check-out; nothing to start from on a first flight.
+  await openCheckOut(page, aircraft);
+  const out = page.getByRole("textbox", {
+    name: "Totalizer fuel remaining (gal)",
+  });
+  await expect(out).toHaveValue("");
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByText("Enter the fuel remaining it shows."),
+  ).toBeVisible();
+  await out.fill("30");
+  await page
+    .getByRole("button", { name: `Check out ${aircraft.tailNumber}` })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: `You have ${aircraft.tailNumber}` }),
+  ).toBeVisible();
+
+  // Fueling asks what it showed and what it was reset to, and catches a
+  // reading higher than it can be.
+  await page.getByRole("textbox", { name: "Fuel added (gal)" }).fill("20");
+  await page.getByRole("button", { name: "Add fuel or oil" }).click();
+  await expect(
+    page.getByText("Enter what it showed before fueling."),
+  ).toBeVisible();
+  await expect(page.getByText("Enter what you reset it to.")).toBeVisible();
+  await page.getByLabel("Totalizer before fueling (gal)").fill("35");
+  await page.getByLabel("Totalizer reset to (gal)").fill("45");
+  await page.getByRole("button", { name: "Add fuel or oil" }).click();
+  await expect(
+    page.getByText(
+      "It showed 30.0 gal at check-out, so it can't show more now.",
+    ),
+  ).toBeVisible();
+  await addFluid(page, {
+    "Totalizer before fueling (gal)": "25",
+    "Totalizer reset to (gal)": "45",
+  });
+  await expect(
+    page.getByText("The totalizer should show 45.0 gal or less."),
+  ).toBeVisible();
+
   await page.getByLabel("Hobbs in").fill("101.5");
   await page.getByLabel("Tach in").fill("81.2");
+  await page
+    .getByRole("textbox", { name: "Totalizer fuel remaining (gal)" })
+    .fill("300");
   await checkInButton(page).click();
-  await expect(
-    page.getByText("Enter the fuel added, or 0 if none."),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Enter the oil added, or 0 if none."),
-  ).toBeVisible();
-
-  await checkIn(page, aircraft, {});
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-  await expect(page.getByText("0.0 gal")).toBeVisible();
-});
-
-test("check-in records fuel and oil added", async ({ page }) => {
-  await checkOut(page, aircraft);
-  // No totalizer on this aircraft, so it isn't asked for.
-  await expect(page.getByLabel("Totalizer fuel remaining (gal)")).toHaveCount(
-    0,
-  );
-  await checkIn(
-    page,
-    aircraft,
-    { Hobbs: "101.5", Tach: "81.2" },
-    { fuel: "18.5", oil: "1" },
-  );
-
-  await expect(page.getByText("Flight logged.")).toBeVisible();
-  await expect(page.getByText("18.5 gal")).toBeVisible();
-  await expect(page.getByText("1.0 qt")).toBeVisible();
-
-  // The pilot can still correct it until the next flight.
-  await page.getByRole("link", { name: "Edit flight" }).click();
-  await expect(page.getByLabel("Fuel added (gal)")).toHaveValue("18.5");
-  await page.getByLabel("Fuel added (gal)").fill("20");
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByText("20.0 gal")).toBeVisible();
-});
-
-test("records the totalizer on aircraft that have one", async ({ page }) => {
-  await sql()`update aircraft set has_fuel_totalizer = true where id = ${aircraft.id}`;
-  await checkOut(page, aircraft);
-  // Required when the aircraft has one.
-  await checkIn(page, aircraft, { Hobbs: "101.5", Tach: "81.2" });
-  await expect(
-    page.getByText("Enter the fuel remaining on the totalizer."),
-  ).toBeVisible();
-
-  await checkIn(
-    page,
-    aircraft,
-    { Hobbs: "101.5", Tach: "81.2" },
-    { totalizer: "300" },
-  );
   await expect(page.getByText("That's more than 200 gallons.")).toBeVisible();
   await expect(page.getByLabel("Hobbs in")).toHaveValue("101.5");
+  await page
+    .getByRole("textbox", { name: "Totalizer fuel remaining (gal)" })
+    .fill("50");
+  await checkInButton(page).click();
+  await expect(
+    page.getByText(
+      "It showed 45.0 gal after the last reset, so it can't show more now.",
+    ),
+  ).toBeVisible();
 
-  await page.getByLabel("Totalizer fuel remaining (gal)").fill("42.3");
+  await page
+    .getByRole("textbox", { name: "Totalizer fuel remaining (gal)" })
+    .fill("33.5");
   await checkInButton(page).click();
   await expect(page.getByText("Flight logged.")).toBeVisible();
-  await expect(page.getByText("42.3 gal remaining")).toBeVisible();
+  await expect(page.getByText("33.5 gal remaining")).toBeVisible();
+  // 30.0 down to 25.0, then 45.0 down to 33.5.
+  await expect(page.getByText("16.5 gal", { exact: true })).toBeVisible();
+
+  // The next check-out starts from where it ended.
+  await openCheckOut(page, aircraft);
+  await expect(out).toHaveValue("33.5");
 });

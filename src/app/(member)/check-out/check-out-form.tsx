@@ -2,16 +2,22 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
-import { FormError } from "@/components/field";
+import { Field, FormError } from "@/components/field";
 import { FormSection } from "@/components/form-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { checkOutReading } from "@/lib/dispatch-rules";
+import { perEngine } from "@/lib/engines";
 import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
-import { ACK_FIELD, expectedField, VFR_ONLY_FIELD } from "../dispatches/fields";
+import {
+  ACK_FIELD,
+  expectedField,
+  TOTALIZER_OUT_FIELDS,
+  VFR_ONLY_FIELD,
+} from "../dispatches/fields";
 import { outField } from "../flights/fields";
 
 type Meter = { id: string; label: string; reading: string; billing: boolean };
@@ -21,12 +27,16 @@ export function CheckOutForm({
   action,
   tailNumber,
   meters,
+  totalizers,
   squawks,
   vfrOnly,
 }: {
   action: (prev: FormState, formData: FormData) => Promise<FormState>;
   tailNumber: string;
   meters: Meter[];
+  // What each of its fuel totalizers showed at the end of its latest
+  // flight, if known; empty for an aircraft without one.
+  totalizers: (string | null)[];
   squawks: Squawk[];
   // Limited to VFR by a squawk or overdue maintenance.
   vfrOnly: boolean;
@@ -118,9 +128,40 @@ export function CheckOutForm({
         })}
       </FormSection>
 
-      {squawks.length > 0 && (
+      {totalizers.length > 0 && (
         <FormSection
           step={2}
+          title={
+            totalizers.length === 1
+              ? "Confirm the totalizer"
+              : "Confirm the totalizers"
+          }
+          description="The fuel remaining it shows now. Fuel used is counted from it."
+        >
+          {totalizers.map((last, i) => {
+            const name = TOTALIZER_OUT_FIELDS[i];
+            return (
+              <Field
+                key={name}
+                name={name}
+                label={`${perEngine("Totalizer fuel remaining", totalizers.length, i)} (gal)`}
+                inputMode="decimal"
+                autoComplete="off"
+                required
+                defaultValue={
+                  values?.[name] ??
+                  (last === null ? "" : Number(last).toFixed(1))
+                }
+                errors={state.fieldErrors?.[name]}
+              />
+            );
+          })}
+        </FormSection>
+      )}
+
+      {squawks.length > 0 && (
+        <FormSection
+          step={totalizers.length > 0 ? 3 : 2}
           title="Open squawks"
           description="Read each one before you fly."
         >

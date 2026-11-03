@@ -13,7 +13,12 @@ import type { FormState } from "@/lib/form-state";
 import { formatHours, parseHours } from "@/lib/hours";
 
 import { inField } from "./fields";
-import { FluidFields, type FluidSetup, type FluidValues } from "./fluid-fields";
+import {
+  type AddedFluids,
+  FluidFields,
+  type FluidSetup,
+  type FluidValues,
+} from "./fluid-fields";
 
 export type FormMeter = {
   id: string;
@@ -28,6 +33,8 @@ type FlightFormProps = {
   meters: FormMeter[];
   // The aircraft's fuel and oil fields.
   fluids: FluidSetup;
+  // Checking in: what was added while it was out.
+  added?: AddedFluids;
   initial?: {
     date: string;
     notes: string;
@@ -50,6 +57,7 @@ export function FlightForm({
   action,
   meters,
   fluids,
+  added,
   initial,
   submitLabel,
   pendingLabel,
@@ -118,6 +126,7 @@ export function FlightForm({
       <FluidFields
         step={2}
         fluids={fluids}
+        added={added}
         values={values}
         initial={initial}
         errors={state.fieldErrors ?? {}}

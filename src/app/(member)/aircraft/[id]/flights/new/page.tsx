@@ -42,7 +42,7 @@ async function NewPastFlight({
     columns: {
       id: true,
       tailNumber: true,
-      hasFuelTotalizer: true,
+      fuelTotalizers: true,
       engineCount: true,
     },
     with: { meters: true },
@@ -75,9 +75,12 @@ async function NewPastFlight({
           oilAdded: "",
           oilAdded2: "",
           totalizerFuel: "",
+          totalizerFuel2: "",
+          fuelUsed: "",
+          fuelUsed2: "",
         }}
         fluids={{
-          totalizer: plane.hasFuelTotalizer,
+          totalizers: plane.fuelTotalizers,
           engines: plane.engineCount,
         }}
         readings={meters.map((m) => ({

@@ -8,3 +8,10 @@ export const MAX_ENGINES = 2;
 export function engineLabels(count: number): string[] {
   return count === 2 ? ["Left", "Right"] : [""];
 }
+
+// "Oil added" on a single, "Oil added, left" on a twin; the same for fuel
+// totalizers, when a twin has one per engine.
+export function perEngine(label: string, count: number, index: number) {
+  const which = engineLabels(count)[index].toLowerCase();
+  return which ? `${label}, ${which}` : label;
+}
