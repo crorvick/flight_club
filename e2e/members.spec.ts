@@ -73,10 +73,8 @@ test("an officer changes a member's roles and deactivates them", async ({
   await expect(page.getByLabel(/Officer/)).toBeChecked();
 
   // Now an officer, they're offered the officer pages.
-  await theirPage.reload();
-  await expect(
-    theirPage.getByRole("link", { name: "Members", exact: true }),
-  ).toBeVisible();
+  await theirPage.goto("/manage");
+  await expect(theirPage.getByRole("link", { name: /^Members/ })).toBeVisible();
 
   // Deactivated, they keep their roles but can do nothing.  ("Saved." is
   // still showing from the first save, so wait for the database.)

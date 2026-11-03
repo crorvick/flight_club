@@ -2,20 +2,21 @@
 
 import { cn } from "cn";
 import {
-  FileText,
   House,
   Megaphone,
   Plane,
   type LucideIcon,
   UserRound,
-  Users,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavKey =
-  "home" | "fleet" | "squawk" | "profile" | "aircraft" | "members" | "reports";
+import type { ManageMenu } from "@/lib/manage";
+
+import { ManageDropdown } from "./manage-menu";
+
+export type NavKey = "home" | "fleet" | "squawk" | "profile" | "manage";
 
 type NavItem = {
   href: string;
@@ -24,9 +25,6 @@ type NavItem = {
   // The pages that count as this section, as path prefixes.  The longest
   // match wins, so /squawks/new is Squawk while /squawks/<id> is Fleet.
   sections: string[];
-  // Left out of the tab bar on phones, for pages too wide for them.  A
-  // tablet narrow enough to get the tab bar still gets it.
-  notOnPhones?: boolean;
 };
 
 const ITEMS: Record<NavKey, NavItem> = {
@@ -54,24 +52,13 @@ const ITEMS: Record<NavKey, NavItem> = {
     icon: UserRound,
     sections: ["/qualifications"],
   },
-  aircraft: {
-    href: "/aircraft",
-    label: "Aircraft",
+  // Everything officers and plane captains look after, as a menu in the
+  // header and a page of its own on phones.
+  manage: {
+    href: "/manage",
+    label: "Manage",
     icon: Wrench,
-    sections: ["/aircraft", "/maintenance"],
-  },
-  members: {
-    href: "/members",
-    label: "Members",
-    icon: Users,
-    sections: ["/members"],
-  },
-  reports: {
-    href: "/reports",
-    label: "Reports",
-    icon: FileText,
-    sections: ["/reports"],
-    notOnPhones: true,
+    sections: ["/manage", "/aircraft", "/maintenance", "/members", "/reports"],
   },
 };
 
@@ -95,9 +82,12 @@ function currentSection(pathname: string, keys: NavKey[]) {
 export function NavLinks({
   keys,
   variant,
+  manage,
 }: {
   keys: NavKey[];
   variant: "header" | "tabs";
+  // What the Manage menu offers, for the header's dropdown.
+  manage?: ManageMenu | null;
 }) {
   const current = currentSection(usePathname(), keys);
   return (
@@ -109,27 +99,34 @@ export function NavLinks({
       )}
     >
       {keys.map((key) => {
-        const { href, label, icon: Icon, notOnPhones } = ITEMS[key];
+        const { href, label, icon: Icon } = ITEMS[key];
         const active = key === current;
+        const className = cn(
+          variant === "header"
+            ? "flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            : "flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground",
+          active &&
+            (variant === "header"
+              ? "bg-secondary text-secondary-foreground"
+              : "text-primary"),
+        );
+        if (key === "manage" && variant === "header" && manage) {
+          return (
+            <li key={key}>
+              <ManageDropdown
+                menu={manage}
+                active={active}
+                className={className}
+              />
+            </li>
+          );
+        }
         return (
-          <li
-            key={key}
-            className={cn(
-              notOnPhones && variant === "tabs" && "hidden sm:block",
-            )}
-          >
+          <li key={key}>
             <Link
               href={href}
               aria-current={active ? "page" : undefined}
-              className={cn(
-                variant === "header"
-                  ? "flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  : "flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground",
-                active &&
-                  (variant === "header"
-                    ? "bg-secondary text-secondary-foreground"
-                    : "text-primary"),
-              )}
+              className={className}
             >
               <Icon
                 aria-hidden

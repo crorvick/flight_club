@@ -34,6 +34,14 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "An aircraft's settings say how many fuel totalizers it has: none, one, or one per engine on a twin.",
         for: ["officer"],
       },
+      {
+        text: "Aircraft, Members and Reports are now under Manage, with your profile back in its own tab.",
+        for: ["officer"],
+      },
+      {
+        text: "Manage takes you straight to your aircraft's maintenance and flights, and to reports.",
+        for: ["captain"],
+      },
     ],
   },
   {

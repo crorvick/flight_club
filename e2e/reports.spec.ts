@@ -141,9 +141,8 @@ test("reports are offered on tablets and desktops, not phones", async ({
   page,
 }, testInfo) => {
   await signUpPilot(page, testInfo, ["officer", "pilot"]);
-  await page.goto("/");
-  // In the header or, on a narrow tablet, the tab bar.
-  const reports = page.getByRole("link", { name: "Reports" });
+  await page.goto("/manage");
+  const reports = page.getByRole("link", { name: /^Reports/ });
   const phone = ["iphone", "android"].includes(testInfo.project.name);
   if (phone) await expect(reports).toHaveCount(0);
   else await expect(reports).toBeVisible();

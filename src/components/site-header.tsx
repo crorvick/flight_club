@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { hasRole } from "@/lib/access";
-import { maintainedAircraft } from "@/lib/captains";
+import { manageMenu } from "@/lib/manage";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { AccountMenu } from "./account-menu";
@@ -10,21 +10,16 @@ import { BrandMark } from "./brand-mark";
 import { type NavKey, NavLinks } from "./nav-links";
 
 // What a member can reach from anywhere: everyone sees the fleet, pilots
-// fly and report squawks, officers manage the aircraft and members, and
-// officers and plane captains get reports.  The pages check permissions
-// themselves; this only decides what to offer.
+// fly, report squawks and keep their profile, and officers and plane
+// captains get Manage for everything they look after.  Five at most, as
+// many as a phone fits.  The pages check permissions themselves; this
+// only decides what to offer.
 async function navKeys(member: Member | null): Promise<NavKey[]> {
   if (!member?.active) return [];
   const pilot = hasRole(member, "pilot");
-  const officer = hasRole(member, "officer");
   const keys: NavKey[] = ["home", "fleet"];
-  if (pilot) keys.push("squawk");
-  if (officer) keys.push("aircraft", "members");
-  // Five tabs is as many as a phone fits; officers reach their profile
-  // from the account menu instead.
-  else if (pilot) keys.push("profile");
-  const maintained = await maintainedAircraft(member);
-  if (maintained === "all" || maintained.length > 0) keys.push("reports");
+  if (pilot) keys.push("squawk", "profile");
+  if (await manageMenu(member)) keys.push("manage");
   return keys;
 }
 
@@ -51,10 +46,11 @@ export function SiteHeader() {
 async function HeaderNav() {
   const member = await getCurrentMember();
   const keys = await navKeys(member);
+  const manage = member && (await manageMenu(member));
   return (
     <>
       <nav aria-label="Main" className="hidden md:block">
-        <NavLinks keys={keys} variant="header" />
+        <NavLinks keys={keys} variant="header" manage={manage} />
       </nav>
       {/* Signed out, the page itself offers to sign in. */}
       {member && (

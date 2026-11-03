@@ -241,8 +241,9 @@ iPhone's home indicator with `pb-[env(safe-area-inset-bottom)]`.
 **Wide content scrolls sideways.** A report table with eight columns
 can't fit on a phone. Rather than squash it, it scrolls horizontally
 inside its card (`overflow-x-auto`). Some pages, like Reports, aren't
-offered in the phone tab bar at all (`hidden sm:block`); they're still
-reachable, just not promoted where they'd be awkward.
+offered on phones at all: the Manage page hides its link there
+(`hidden sm:block`). They're still reachable, just not promoted where
+they'd be awkward.
 
 **Test on real devices.** Chapter 12 runs every test at iPhone, Android,
 iPad and desktop sizes. Before releasing, open staging on an actual
