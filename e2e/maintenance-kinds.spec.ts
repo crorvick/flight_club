@@ -87,6 +87,26 @@ test("a VOR check records how, where and the bearing errors", async ({
   ).toBeVisible();
 });
 
+test("a refused check keeps the method chosen", async ({ page }) => {
+  await addItem(page, { name: "VOR check", kind: "VOR check", days: "30" });
+
+  await page.getByLabel("Checked against").selectOption("airborne");
+  await page.getByLabel("Where").fill("Over the GEP VOR");
+  await page.getByLabel("NAV 1 error (°)").fill("7");
+  await logCompletion(page);
+  await expect(
+    page.getByText("More than the ±6° allowed for this check."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Checked against")).toHaveValue("airborne");
+
+  await page.getByLabel("NAV 1 error (°)").fill("5");
+  await logCompletion(page);
+  await expect(page.getByText("Completion logged.")).toBeVisible();
+  await expect(
+    page.getByText("Airborne checkpoint at Over the GEP VOR: NAV 1 +5°"),
+  ).toBeVisible();
+});
+
 test("an oil change on a twin records each engine's oil", async ({ page }) => {
   await twin();
   await addItem(page, { name: "Oil change", kind: "Oil change", hours: "50" });

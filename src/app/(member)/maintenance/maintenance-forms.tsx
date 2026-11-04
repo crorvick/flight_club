@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
@@ -24,6 +30,18 @@ type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
 const display = (hours: string | null) =>
   hours === null ? "" : formatHours(parseHours(hours)!);
+
+// Submitted by hand rather than through <form action>: React resets a
+// form after its action runs, which puts a controlled select (the kind, a
+// VOR check's method) back to its first option while the page still shows
+// the one chosen, so the next save would send the wrong one.
+function submitWithoutReset(formAction: (formData: FormData) => void) {
+  return (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(() => formAction(formData));
+  };
+}
 
 function ErrorText({ errors }: { errors?: string[] }) {
   if (!errors) return null;
@@ -68,7 +86,11 @@ export function ItemForm({
       : item?.name;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form
+      onSubmit={submitWithoutReset(formAction)}
+      className="flex flex-col gap-4"
+      noValidate
+    >
       <FormError message={state.error} />
       <div className="flex flex-col gap-2">
         <Label htmlFor="kind">Kind</Label>
@@ -284,7 +306,7 @@ export function CompletionForm({
 
   return (
     <form
-      action={formAction}
+      onSubmit={submitWithoutReset(formAction)}
       className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5"
       noValidate
     >
