@@ -63,6 +63,7 @@ Environment rules:
 ### Member
 - id, name, email, phone (optional), role tags, active flag, auth fields (managed by Better Auth)
 - Members change their own name, email and phone in Settings; changing the email, which is also the sign-in, takes their password. Every active member can see every other's email and phone in the member directory, and the phone of whoever has an aircraft out.
+- A member's picture is their Gravatar, looked up by email, shown on their account menu, in the directory and in Settings; without one, their initials. The browser fetches it from Gravatar directly, so Gravatar sees a hash of each address shown, as it would on any site using it.
 
 ### Aircraft
 - id, tail number, make/model, active flag, number of engines (single or twin; a twin's oil is recorded per engine, left and right), fuel totalizers (none, one, or on a twin one per engine)

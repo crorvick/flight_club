@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { hasRole } from "@/lib/access";
 import { manageMenu } from "@/lib/manage";
+import { gravatarUrl } from "@/lib/gravatar";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { AccountMenu } from "./account-menu";
@@ -58,6 +59,7 @@ async function HeaderNav() {
           <AccountMenu
             name={member.name}
             email={member.email}
+            avatar={gravatarUrl(member.email, 36)}
             roles={member.roles}
             active={member.active}
             pilot={hasRole(member, "pilot")}

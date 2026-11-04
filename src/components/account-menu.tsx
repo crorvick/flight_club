@@ -5,19 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { signOut } from "@/app/(auth)/actions";
+import { Avatar } from "@/components/avatar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join("");
 
 const ROLE_LABELS: Record<string, string> = {
   officer: "Officer",
@@ -27,12 +20,15 @@ const ROLE_LABELS: Record<string, string> = {
 export function AccountMenu({
   name,
   email,
+  avatar,
   roles,
   active,
   pilot,
 }: {
   name: string;
   email: string;
+  // Their Gravatar, if they have one.
+  avatar: string;
   roles: string[];
   // Approved, so they can see the other members.
   active: boolean;
@@ -47,9 +43,9 @@ export function AccountMenu({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label="Account"
-        className="flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
-        {initials(name) || "?"}
+        <Avatar name={name} src={avatar} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 gap-1 p-1.5">
         <div className="px-2 py-1.5">

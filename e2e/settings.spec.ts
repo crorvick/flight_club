@@ -1,4 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import { createHash } from "node:crypto";
+
+import { expect, type Page, test } from "./fixtures";
 
 import { closeSql, signOut, signUpPilot, sql } from "./helpers";
 
@@ -159,4 +161,37 @@ test("a member pins the theme on their device", async ({
 
   await choose("Match device", (b) => expect(b).toBeGreaterThan(230));
   await context.close();
+});
+
+// A 1×1 PNG, standing in for a Gravatar picture.
+const PICTURE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test("a member's Gravatar stands in for their initials", async ({
+  page,
+}, testInfo) => {
+  const me = await signUpPilot(page, testInfo);
+  const account = page.getByRole("button", { name: "Account" });
+  // Without one, the initials stay.
+  const [first, last] = me.name.split(" ");
+  await expect(account).toHaveText(`${first[0]}${last[0]}`.toUpperCase());
+  await expect(account.locator("img")).toHaveCount(0);
+
+  const hash = createHash("sha256").update(me.email).digest("hex");
+  await page.route(`https://gravatar.com/avatar/${hash}?**`, (route) =>
+    route.fulfill({ contentType: "image/png", body: PICTURE }),
+  );
+  await openSettings(page);
+  await expect(account.locator("img")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Gravatar" })).toHaveAttribute(
+    "href",
+    "https://gravatar.com",
+  );
+
+  await page.goto("/directory");
+  await expect(
+    page.getByRole("listitem", { name: me.name }).locator("img"),
+  ).toBeVisible();
 });

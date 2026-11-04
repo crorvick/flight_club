@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 import { LATEST_RELEASE_NOTE } from "../src/lib/release-notes";
 import { closeSql, signUpPilot, sql } from "./helpers";

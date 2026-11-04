@@ -6,9 +6,11 @@ import { Suspense } from "react";
 import { Flash } from "@/components/flash";
 import { FormSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
+import { Avatar } from "@/components/avatar";
 import { db } from "@/db";
 import { member } from "@/db/schema";
 import { serverEnv } from "@/lib/env";
+import { gravatarUrl } from "@/lib/gravatar";
 import { getCurrentMember } from "@/lib/session";
 import { signInAccounts } from "@/lib/sign-in-accounts";
 import {
@@ -106,6 +108,25 @@ async function Settings({
         description="Your name is what officers and other pilots see."
       >
         <NameForm key={me.name} action={updateName} name={me.name} />
+        <div className="flex items-center gap-3 border-t pt-4">
+          <Avatar
+            name={me.name}
+            src={gravatarUrl(me.email, 48)}
+            className="size-12 text-base"
+          />
+          <p className="text-sm text-muted-foreground">
+            Your picture comes from{" "}
+            <a
+              href="https://gravatar.com"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-foreground underline"
+            >
+              Gravatar
+            </a>
+            , by your email. Without one, your initials show instead.
+          </p>
+        </div>
       </SectionCard>
 
       <SectionCard

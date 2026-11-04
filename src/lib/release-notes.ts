@@ -28,6 +28,9 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "Sign in with Google or Apple: link either in Settings, then use it instead of your password.",
       },
       {
+        text: "If you have a Gravatar for your email, it now shows in place of your initials, and beside your name in the member directory.",
+      },
+      {
         text: "The flight report can count hours on the Hobbs, tach or air time instead of billed hours.",
         for: ["officer", "captain"],
       },

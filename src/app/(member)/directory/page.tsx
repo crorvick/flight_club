@@ -3,10 +3,12 @@ import { Mail, Phone } from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { ListSkeleton } from "@/components/page-skeleton";
 import { db } from "@/db";
 import { member } from "@/db/schema";
 import { telHref } from "@/lib/contact";
+import { gravatarUrl } from "@/lib/gravatar";
 import { requireMember } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Member directory · Flight Club" };
@@ -50,25 +52,33 @@ async function Directory() {
         <li
           key={m.id}
           aria-label={m.name}
-          className="flex flex-col gap-1 px-4 py-3"
+          className="flex items-start gap-3 px-4 py-3"
         >
-          <span className="font-medium">{m.name}</span>
-          <a
-            href={`mailto:${m.email}`}
-            className="flex min-h-8 items-center gap-2 text-sm break-all text-primary"
-          >
-            <Mail aria-hidden className="size-4 shrink-0" />
-            {m.email}
-          </a>
-          {m.phone && (
+          <Avatar
+            name={m.name}
+            src={gravatarUrl(m.email, 40)}
+            lazy
+            className="mt-0.5 size-10"
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="font-medium">{m.name}</span>
             <a
-              href={telHref(m.phone)}
-              className="flex min-h-8 items-center gap-2 text-sm text-primary"
+              href={`mailto:${m.email}`}
+              className="flex min-h-8 items-center gap-2 text-sm break-all text-primary"
             >
-              <Phone aria-hidden className="size-4 shrink-0" />
-              {m.phone}
+              <Mail aria-hidden className="size-4 shrink-0" />
+              {m.email}
             </a>
-          )}
+            {m.phone && (
+              <a
+                href={telHref(m.phone)}
+                className="flex min-h-8 items-center gap-2 text-sm text-primary"
+              >
+                <Phone aria-hidden className="size-4 shrink-0" />
+                {m.phone}
+              </a>
+            )}
+          </div>
         </li>
       ))}
     </ul>
