@@ -19,6 +19,11 @@ export const MAINTENANCE_KINDS = [
   "airworthiness_directive",
   "service_bulletin",
   "nav_database",
+  "transponder_check",
+  "altimeter_check",
+  "elt_inspection",
+  "elt_battery",
+  "registration",
 ] as const;
 export type MaintenanceKind = (typeof MAINTENANCE_KINDS)[number];
 
@@ -32,6 +37,11 @@ export const KIND_LABELS: Record<MaintenanceKind, string> = {
   airworthiness_directive: "Airworthiness directive",
   service_bulletin: "Service bulletin",
   nav_database: "Navigation database",
+  transponder_check: "Transponder check",
+  altimeter_check: "Altimeter and static system check",
+  elt_inspection: "ELT inspection",
+  elt_battery: "ELT battery",
+  registration: "Aircraft registration",
 };
 
 // How an item comes due: again and again after each time it's done,
@@ -42,8 +52,9 @@ export type Schedule = (typeof SCHEDULES)[number];
 
 // What each kind can be, its default first.  ADs and SBs are mostly
 // done once; a recurring one ends with its terminating action.  A 100-
-// hour inspection is always 100 hours, and a navigation database
-// expires with its AIRAC cycle.
+// hour inspection is always 100 hours, a navigation database expires
+// with its AIRAC cycle, and an ELT battery and the registration on the
+// dates marked on them.
 export const KIND_SCHEDULES: Record<MaintenanceKind, readonly Schedule[]> = {
   general: ["recurring", "once", "expires"],
   annual: ["recurring"],
@@ -53,6 +64,11 @@ export const KIND_SCHEDULES: Record<MaintenanceKind, readonly Schedule[]> = {
   airworthiness_directive: ["once", "recurring"],
   service_bulletin: ["once", "recurring"],
   nav_database: ["expires"],
+  transponder_check: ["recurring"],
+  altimeter_check: ["recurring"],
+  elt_inspection: ["recurring"],
+  elt_battery: ["expires"],
+  registration: ["expires"],
 };
 
 export function scheduleFor(kind: MaintenanceKind, asked: string) {
@@ -61,8 +77,10 @@ export function scheduleFor(kind: MaintenanceKind, asked: string) {
 }
 
 // What a new item of each kind does when overdue, until changed: ADs are
-// mandatory and SBs advisory under Part 91, and an expired database only
-// rules out IFR.
+// mandatory and SBs advisory under Part 91, and an expired database or
+// altimeter check only rules out IFR.  A lapsed transponder check rules
+// out the airspace that needs one, which can't be said here, so it
+// grounds until an officer says otherwise.
 export const KIND_GROUNDING: Record<MaintenanceKind, Grounding> = {
   general: "all",
   annual: "all",
@@ -72,6 +90,11 @@ export const KIND_GROUNDING: Record<MaintenanceKind, Grounding> = {
   airworthiness_directive: "all",
   service_bulletin: "none",
   nav_database: "ifr",
+  transponder_check: "all",
+  altimeter_check: "ifr",
+  elt_inspection: "all",
+  elt_battery: "all",
+  registration: "all",
 };
 
 // The rule behind each kind that has one, as cited and on eCFR.  An AD
@@ -92,6 +115,17 @@ export const KIND_REGULATIONS: Partial<
     url: `${ECFR}/section-91.409#p-91.409(b)`,
   },
   vor_check: { cite: "14 CFR 91.171", url: `${ECFR}/section-91.171` },
+  transponder_check: { cite: "14 CFR 91.413", url: `${ECFR}/section-91.413` },
+  altimeter_check: { cite: "14 CFR 91.411", url: `${ECFR}/section-91.411` },
+  elt_inspection: {
+    cite: "14 CFR 91.207(d)",
+    url: `${ECFR}/section-91.207#p-91.207(d)`,
+  },
+  elt_battery: {
+    cite: "14 CFR 91.207(c)",
+    url: `${ECFR}/section-91.207#p-91.207(c)`,
+  },
+  registration: { cite: "14 CFR 47.40", url: `${ECFR}/section-47.40` },
 };
 
 export const HUNDRED_HOURS = "100.00";
@@ -188,8 +222,19 @@ export type NavDatabaseDetails = {
   cycle: string;
 };
 
+export type AltimeterCheckDetails = {
+  kind: "altimeter_check";
+  // Feet: the highest altitude the altimeter was tested to, which 91.411
+  // has the record show, and above which the aircraft can't fly IFR.
+  testedTo: number;
+};
+
 export type CompletionDetails =
-  VorCheckDetails | OilChangeDetails | DirectiveDetails | NavDatabaseDetails;
+  | VorCheckDetails
+  | OilChangeDetails
+  | DirectiveDetails
+  | NavDatabaseDetails
+  | AltimeterCheckDetails;
 
 // Form field names.
 export const FIELDS = {
@@ -205,6 +250,7 @@ export const FIELDS = {
   directiveMethod: "directiveMethod",
   directiveTerminating: "directiveTerminating",
   navCycle: "navCycle",
+  altimeterTestedTo: "altimeterTestedTo",
 } as const;
 
 const DEGREES = /^[+\-]?\d{1,2}(?:\.\d)?$/;
@@ -221,7 +267,7 @@ type Parsed =
   | { fieldErrors: Record<string, string[]> };
 
 // What the completion form sends for an item of this kind, checked.
-// General items and inspections have no details.
+// General items, inspections and expiring documents have no details.
 export function parseCompletionDetails(
   kind: MaintenanceKind,
   get: Get,
@@ -260,6 +306,22 @@ export function parseCompletionDetails(
       };
     }
     return { details: { kind, cycle: cycle.id } };
+  }
+  if (kind === "altimeter_check") {
+    const typed = get(FIELDS.altimeterTestedTo).trim().replace(/,/g, "");
+    const feet = /^\d{1,5}$/.test(typed) ? Number(typed) : NaN;
+    if (!(feet >= 1000 && feet <= 60000)) {
+      return {
+        fieldErrors: {
+          [FIELDS.altimeterTestedTo]: [
+            typed
+              ? "Enter feet between 1,000 and 60,000."
+              : "Enter the altitude it was tested to, e.g. 20,000.",
+          ],
+        },
+      };
+    }
+    return { details: { kind, testedTo: feet } };
   }
   return { details: null };
 }
@@ -358,6 +420,9 @@ const signed = (degrees: number) =>
 // "Left 6.0 qt, right 6.0 qt of AeroShell W100; filter replaced".
 export function describeDetails(details: CompletionDetails): string {
   if (details.kind === "nav_database") return `Cycle ${details.cycle}`;
+  if (details.kind === "altimeter_check") {
+    return `Altimeter tested to ${details.testedTo.toLocaleString("en-US")} ft`;
+  }
   if ("terminating" in details) {
     return details.terminating
       ? `${details.method}; terminating action`

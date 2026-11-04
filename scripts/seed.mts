@@ -37,6 +37,16 @@ const pick = <T,>(items: readonly T[]) => items[between(0, items.length - 1)];
 // into decimal strings for the database, so no float error creeps in.
 const toHours = (hundredths: number) => (hundredths / 100).toFixed(2);
 
+// The kind of each seeded maintenance item that has one.
+const KINDS_BY_NAME: Record<string, string> = {
+  "Annual inspection": "annual",
+  "ELT inspection": "elt_inspection",
+  "Transponder check": "transponder_check",
+  "Altimeter and static system check": "altimeter_check",
+  "VOR check": "vor_check",
+  "Oil change": "oil_change",
+};
+
 const members = [
   {
     name: "Dana Whitfield",
@@ -236,8 +246,9 @@ try {
             lastDaysAgo: plane.tailNumber === "N172FC" ? 340 : 120,
           },
           { name: "ELT inspection", months: 12, lastDaysAgo: 200 },
+          { name: "Transponder check", months: 24, lastDaysAgo: 400 },
           {
-            name: "Transponder and pitot-static",
+            name: "Altimeter and static system check",
             months: 24,
             lastDaysAgo: 400,
             grounding: "ifr",
@@ -273,7 +284,7 @@ try {
             )
             values (
               ${aircraftId}, ${item.name},
-              ${{ "Annual inspection": "annual", "VOR check": "vor_check", "Oil change": "oil_change" }[item.name] ?? "general"},
+              ${KINDS_BY_NAME[item.name] ?? "general"},
               ${item.months ?? null},
               ${item.days ?? null},
               ${item.hours === undefined ? null : toHours(item.hours)},

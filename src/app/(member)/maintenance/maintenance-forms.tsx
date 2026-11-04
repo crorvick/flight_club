@@ -166,8 +166,8 @@ export function ItemForm({
         </select>
         <p className="text-sm text-muted-foreground">
           What logging it asks for: a VOR check its bearing errors, an oil
-          change the oil put in, an AD how it was complied with. General is a
-          date and a note.
+          change the oil put in, an altimeter check the altitude it was tested
+          to, an AD how it was complied with. General is a date and a note.
           {regulation && (
             <>
               {" "}
@@ -384,13 +384,22 @@ export function ItemForm({
                 errors={errors.itemCycle}
               />
             ) : (
-              <Field
-                name="dueOn"
-                label="Expires on"
-                type="date"
-                defaultValue={value("dueOn", item?.dueOn)}
-                errors={errors.dueOn}
-              />
+              <div className="flex flex-col gap-2">
+                <Field
+                  name="dueOn"
+                  label="Expires on"
+                  type="date"
+                  defaultValue={value("dueOn", item?.dueOn)}
+                  errors={errors.dueOn}
+                />
+                {kind === "elt_battery" && (
+                  <p className="text-sm text-muted-foreground">
+                    The date marked on the battery. It&apos;s also due after an
+                    hour&apos;s cumulative use of the transmitter, so log a
+                    replacement then too.
+                  </p>
+                )}
+              </div>
             ))}
 
           <fieldset className="flex flex-col gap-2">
@@ -675,6 +684,21 @@ export function CompletionForm({
           defaultValue={values?.[FIELDS.navCycle] ?? cycles.suggested}
           errors={errors[FIELDS.navCycle]}
         />
+      )}
+      {kind === "altimeter_check" && (
+        <div className="flex flex-col gap-2">
+          <Field
+            name={FIELDS.altimeterTestedTo}
+            label="Altimeter tested to (ft)"
+            inputMode="numeric"
+            placeholder="20,000"
+            defaultValue={values?.[FIELDS.altimeterTestedTo]}
+            errors={errors[FIELDS.altimeterTestedTo]}
+          />
+          <p className="text-sm text-muted-foreground">
+            The aircraft can&apos;t fly IFR above it.
+          </p>
+        </div>
       )}
       {schedule === "expires" && kind !== "nav_database" && (
         <Field

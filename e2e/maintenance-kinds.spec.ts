@@ -197,3 +197,45 @@ test("a kind with a rule behind it cites it", async ({ page }) => {
     page.getByRole("link", { name: "14 CFR 91.171" }).first(),
   ).toBeVisible();
 });
+
+test("an altimeter check records the altitude it was tested to", async ({
+  page,
+}) => {
+  await addItem(page, {
+    name: "Altimeter and static system check",
+    kind: "Altimeter and static system check",
+    days: "720",
+  });
+  await expect(
+    page.getByRole("link", { name: "14 CFR 91.411" }).first(),
+  ).toBeVisible();
+
+  await page.getByLabel("Altimeter tested to (ft)").fill("70000");
+  await logCompletion(page);
+  await expect(
+    page.getByText("Enter feet between 1,000 and 60,000."),
+  ).toBeVisible();
+  await page.getByLabel("Altimeter tested to (ft)").fill("20,000");
+  await logCompletion(page);
+  await expect(page.getByText("Completion logged.")).toBeVisible();
+  await expect(page.getByText("Altimeter tested to 20,000 ft")).toBeVisible();
+});
+
+test("an ELT battery expires on the date marked on it", async ({ page }) => {
+  await page.goto(`/aircraft/${aircraft.id}/maintenance`);
+  await page.getByLabel("Kind").selectOption({ label: "ELT battery" });
+  // It can only expire, so there's no schedule to choose.
+  await expect(
+    page.getByRole("radio", { name: /^When it expires/ }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/an hour's cumulative use/)).toBeVisible();
+  await page.getByLabel("Expires on").fill("2026-01-31");
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByText("Item added.")).toBeVisible();
+  await expect(
+    page.getByText("Overdue: the aircraft is grounded"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "14 CFR 91.207(c)" }).first(),
+  ).toBeVisible();
+});

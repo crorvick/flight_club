@@ -253,6 +253,34 @@ describe("navigation databases", () => {
   });
 });
 
+describe("altimeter checks", () => {
+  it("record the altitude tested to", () => {
+    const parse = (feet: string) =>
+      parseCompletionDetails(
+        "altimeter_check",
+        form({ [FIELDS.altimeterTestedTo]: feet }),
+        { engines: 1, schedule: "recurring" },
+      );
+    const details = { kind: "altimeter_check", testedTo: 20000 } as const;
+    expect(parse("20,000")).toEqual({ details });
+    expect(describeDetails(details)).toBe("Altimeter tested to 20,000 ft");
+    expect(parse("")).toEqual({
+      fieldErrors: {
+        [FIELDS.altimeterTestedTo]: [
+          "Enter the altitude it was tested to, e.g. 20,000.",
+        ],
+      },
+    });
+    for (const typed of ["500", "70000", "20k"]) {
+      expect(parse(typed)).toEqual({
+        fieldErrors: {
+          [FIELDS.altimeterTestedTo]: ["Enter feet between 1,000 and 60,000."],
+        },
+      });
+    }
+  });
+});
+
 describe("scheduleFor", () => {
   it("keeps a schedule the kind can have, else uses its default", () => {
     expect(scheduleFor("general", "expires")).toBe("expires");
@@ -261,5 +289,6 @@ describe("scheduleFor", () => {
     );
     expect(scheduleFor("airworthiness_directive", "expires")).toBe("once");
     expect(scheduleFor("nav_database", "recurring")).toBe("expires");
+    expect(scheduleFor("elt_battery", "recurring")).toBe("expires");
   });
 });
