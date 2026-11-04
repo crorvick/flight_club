@@ -141,6 +141,13 @@
       "when": 1793795108947,
       "tag": "0019_more_maintenance_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793796747010,
+      "tag": "0020_fixed_kind_intervals",
+      "breakpoints": true
     }
   ]
 }

@@ -19,11 +19,13 @@ import type { Grounding } from "@/lib/grounding";
 import { formatHours, parseHours } from "@/lib/hours";
 import {
   defaultName,
+  describeInterval,
   DIRECTIVE_SCOPES,
   type DirectiveScope,
   FIELDS,
   isDirective,
   KIND_GROUNDING,
+  KIND_INTERVALS,
   KIND_LABELS,
   KIND_REGULATIONS,
   KIND_SCHEDULES,
@@ -138,6 +140,7 @@ export function ItemForm({
   const directive = isDirective(kind);
   const ad = kind === "airworthiness_directive";
   const regulation = KIND_REGULATIONS[kind];
+  const fixed = KIND_INTERVALS[kind];
   const choices = KIND_SCHEDULES[kind];
   const value = (name: string, stored?: string | null) =>
     values?.[name] ?? stored ?? "";
@@ -164,26 +167,26 @@ export function ItemForm({
             </option>
           ))}
         </select>
-        <p className="text-sm text-muted-foreground">
-          What logging it asks for: a VOR check its bearing errors, an oil
-          change the oil put in, an altimeter check the altitude it was tested
-          to, an AD how it was complied with. General is a date and a note.
-          {regulation && (
-            <>
-              {" "}
-              The rule:{" "}
-              <a
-                href={regulation.url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                {regulation.cite}
-              </a>
-              .
-            </>
-          )}
-        </p>
+        {kind === "general" && (
+          <p className="text-sm text-muted-foreground">
+            Logged with a date and a note. Other kinds ask for what theirs
+            needs.
+          </p>
+        )}
+        {regulation && (
+          <p className="text-sm text-muted-foreground">
+            The rule:{" "}
+            <a
+              href={regulation.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              {regulation.cite}
+            </a>
+            .
+          </p>
+        )}
         <ErrorText errors={errors.kind} />
       </div>
 
@@ -296,7 +299,7 @@ export function ItemForm({
             <input type="hidden" name="schedule" value={schedule} />
           )}
 
-          {schedule === "recurring" && kind !== "hundred_hour" && (
+          {schedule === "recurring" && !fixed && (
             <IntervalFields
               logbookMeter={logbookMeter}
               item={item}
@@ -304,13 +307,19 @@ export function ItemForm({
               errors={errors}
             />
           )}
-          {kind === "hundred_hour" && (
+          {kind === "hundred_hour" ? (
             <p className="text-sm text-muted-foreground">
               Every 100 hours on the{" "}
               {logbookMeter?.toLowerCase() ?? "logbook meter"}. It may run up to
               10 hours over to reach a place where it can be done, but that time
               counts toward the next one.
             </p>
+          ) : (
+            fixed && (
+              <p className="text-sm text-muted-foreground">
+                {describeInterval(fixed)}
+              </p>
+            )
           )}
           {schedule === "recurring" && (
             <fieldset className="flex flex-col gap-3">
@@ -323,17 +332,20 @@ export function ItemForm({
                   defaultValue={value("lastCompletedOn", item?.lastCompletedOn)}
                   errors={errors.lastCompletedOn}
                 />
-                <Field
-                  name="lastCompletedReading"
-                  label="Logbook reading"
-                  inputMode="decimal"
-                  placeholder="For an hours interval"
-                  defaultValue={
-                    values?.lastCompletedReading ??
-                    display(item?.lastCompletedReading ?? null)
-                  }
-                  errors={errors.lastCompletedReading}
-                />
+                {/* Only an hours interval counts from a reading. */}
+                {(!fixed || "hours" in fixed) && (
+                  <Field
+                    name="lastCompletedReading"
+                    label="Logbook reading"
+                    inputMode="decimal"
+                    placeholder="For an hours interval"
+                    defaultValue={
+                      values?.lastCompletedReading ??
+                      display(item?.lastCompletedReading ?? null)
+                    }
+                    errors={errors.lastCompletedReading}
+                  />
+                )}
               </div>
             </fieldset>
           )}

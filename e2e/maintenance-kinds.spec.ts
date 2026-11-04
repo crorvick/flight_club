@@ -33,18 +33,15 @@ test.afterAll(async () => {
 const twin = () =>
   sql()`update aircraft set engine_count = 2 where id = ${aircraft.id}`;
 
-// Add an item of a kind, done a few days ago, and open it.
+// Add an item of a kind, done a few days ago, and open it.  A kind whose
+// rule doesn't set its interval is given hours.
 async function addItem(
   page: Page,
-  item: { name: string; kind: string; days?: string; hours?: string },
+  item: { name: string; kind: string; hours?: string },
 ) {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Name").fill(item.name);
   await page.getByLabel("Kind").selectOption({ label: item.kind });
-  if (item.days) {
-    await page.getByLabel("Calendar time").fill(item.days);
-    await page.getByLabel("In", { exact: true }).selectOption("days");
-  }
   if (item.hours) {
     await page.getByLabel("Hours", { exact: true }).fill(item.hours);
     await page.getByLabel("Logbook reading").fill("380.0");
@@ -61,7 +58,7 @@ const logCompletion = (page: Page) =>
 test("a VOR check records how, where and the bearing errors", async ({
   page,
 }) => {
-  await addItem(page, { name: "VOR check", kind: "VOR check", days: "30" });
+  await addItem(page, { name: "VOR check", kind: "VOR check" });
 
   await page.getByLabel("Checked against").selectOption("vot");
   await page.getByLabel("Where").fill("KMSP VOT");
@@ -88,7 +85,7 @@ test("a VOR check records how, where and the bearing errors", async ({
 });
 
 test("a refused check keeps the method chosen", async ({ page }) => {
-  await addItem(page, { name: "VOR check", kind: "VOR check", days: "30" });
+  await addItem(page, { name: "VOR check", kind: "VOR check" });
 
   await page.getByLabel("Checked against").selectOption("airborne");
   await page.getByLabel("Where").fill("Over the GEP VOR");
@@ -179,6 +176,25 @@ test("only a general item needs a name", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: /^Name/ })).toHaveValue("");
 });
 
+test("a kind whose rule sets its interval doesn't ask for one", async ({
+  page,
+}) => {
+  await page.goto(`/aircraft/${aircraft.id}/maintenance`);
+  await page.getByLabel("Kind").selectOption({ label: "Annual inspection" });
+  await expect(
+    page.getByText("Every 12 calendar months, by the end of the month."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Calendar time")).toHaveCount(0);
+  await expect(page.getByLabel("Logbook reading")).toHaveCount(0);
+  await page.getByLabel("Last done on").fill("2026-10-20");
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(page.getByText("Item added.")).toBeVisible();
+  await expect(page.getByText(/Oct 31, 2027/).first()).toBeVisible();
+
+  await addItem(page, { name: "VOR check", kind: "VOR check" });
+  await expect(page.getByText(/Nov 19, 2026/).first()).toBeVisible();
+});
+
 test("a kind with a rule behind it cites it", async ({ page }) => {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Kind").selectOption({ label: "Annual inspection" });
@@ -191,7 +207,7 @@ test("a kind with a rule behind it cites it", async ({ page }) => {
   await page.getByLabel("Kind").selectOption({ label: "Oil change" });
   await expect(page.getByRole("link", { name: /14 CFR/ })).toHaveCount(0);
 
-  await addItem(page, { name: "VOR check", kind: "VOR check", days: "30" });
+  await addItem(page, { name: "VOR check", kind: "VOR check" });
   // Under the heading, and again in the form to edit it.
   await expect(
     page.getByRole("link", { name: "14 CFR 91.171" }).first(),
@@ -204,7 +220,6 @@ test("an altimeter check records the altitude it was tested to", async ({
   await addItem(page, {
     name: "Altimeter and static system check",
     kind: "Altimeter and static system check",
-    days: "720",
   });
   await expect(
     page.getByRole("link", { name: "14 CFR 91.411" }).first(),

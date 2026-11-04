@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   defaultName,
   describeDetails,
+  describeInterval,
   FIELDS,
   itemTitle,
+  KIND_INTERVALS,
   parseCompletionDetails,
   scheduleFor,
 } from "./maintenance-kinds";
@@ -278,6 +280,20 @@ describe("altimeter checks", () => {
         },
       });
     }
+  });
+});
+
+describe("describeInterval", () => {
+  it("says what the rule sets", () => {
+    expect(describeInterval(KIND_INTERVALS.annual!)).toBe(
+      "Every 12 calendar months, by the end of the month.",
+    );
+    expect(describeInterval(KIND_INTERVALS.vor_check!)).toBe(
+      "Every 30 days, to the day.",
+    );
+    expect(describeInterval(KIND_INTERVALS.hundred_hour!)).toBe(
+      "Every 100 hours.",
+    );
   });
 });
 

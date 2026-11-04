@@ -130,6 +130,30 @@ export const KIND_REGULATIONS: Partial<
 
 export const HUNDRED_HOURS = "100.00";
 
+// The interval a kind's rule sets, so it isn't asked for: calendar
+// months running to the end of the month, as the FAA counts them; days
+// to the day, as 91.171's "preceding 30 days"; or hours.
+export type FixedInterval =
+  { months: number } | { days: number } | { hours: string };
+
+export const KIND_INTERVALS: Partial<Record<MaintenanceKind, FixedInterval>> = {
+  annual: { months: 12 },
+  hundred_hour: { hours: HUNDRED_HOURS },
+  vor_check: { days: 30 },
+  transponder_check: { months: 24 },
+  altimeter_check: { months: 24 },
+  elt_inspection: { months: 12 },
+};
+
+// "Every 12 calendar months, by the end of the month."
+export function describeInterval(interval: FixedInterval) {
+  if ("months" in interval) {
+    return `Every ${interval.months} calendar months, by the end of the month.`;
+  }
+  if ("days" in interval) return `Every ${interval.days} days, to the day.`;
+  return `Every ${Number(interval.hours)} hours.`;
+}
+
 export const isDirective = (kind: MaintenanceKind) =>
   kind === "airworthiness_directive" || kind === "service_bulletin";
 

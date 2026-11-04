@@ -19,8 +19,8 @@ import {
   defaultName,
   DIRECTIVE_SCOPES,
   FIELDS,
-  HUNDRED_HOURS,
   isDirective,
+  KIND_INTERVALS,
   MAINTENANCE_KINDS,
   type MaintenanceKind,
   parseCompletionDetails,
@@ -158,9 +158,10 @@ const itemSchema = z
       }
     }
     if (schedule === "recurring") {
-      const hours = item.kind === "hundred_hour" || item.intervalHours !== null;
+      const fixed = KIND_INTERVALS[item.kind];
+      const hours = fixed ? "hours" in fixed : item.intervalHours !== null;
       if (
-        item.kind !== "hundred_hour" &&
+        !fixed &&
         item.calendarInterval === null &&
         item.intervalHours === null
       ) {
@@ -227,18 +228,28 @@ const itemSchema = z
             : item.dueOn,
       };
     }
-    const intervalHours =
-      item.kind === "hundred_hour" ? HUNDRED_HOURS : item.intervalHours;
-    const calendar =
-      item.kind === "hundred_hour" ? null : item.calendarInterval;
+    // A kind whose rule sets the interval ignores what was sent.
+    const fixed = KIND_INTERVALS[item.kind];
+    const calendar = fixed ? null : item.calendarInterval;
+    const intervals = fixed
+      ? {
+          intervalMonths: "months" in fixed ? fixed.months : null,
+          intervalDays: "days" in fixed ? fixed.days : null,
+          dueEndOfMonth: "months" in fixed,
+          intervalHours: "hours" in fixed ? fixed.hours : null,
+        }
+      : {
+          intervalMonths: item.calendarUnit === "months" ? calendar : null,
+          intervalDays: item.calendarUnit === "days" ? calendar : null,
+          dueEndOfMonth:
+            item.calendarUnit === "months" &&
+            item.calendarDeadline === "end-of-month",
+          intervalHours: item.intervalHours,
+        };
+    const { intervalHours } = intervals;
     return {
       ...row,
-      intervalMonths: item.calendarUnit === "months" ? calendar : null,
-      intervalDays: item.calendarUnit === "days" ? calendar : null,
-      dueEndOfMonth:
-        item.calendarUnit === "months" &&
-        item.calendarDeadline === "end-of-month",
-      intervalHours,
+      ...intervals,
       // Only a recurring item counts from when it was last done; the
       // others keep what their completions set.
       lastCompletedOn: item.lastCompletedOn,
