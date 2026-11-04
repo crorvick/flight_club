@@ -60,6 +60,48 @@ The release containing 0010 still had the old column, so rolling back
 from it was safe. Only after that release was in production did 0011
 remove it.
 
+### Writing Both, and When "Unused" Isn't
+
+A second change shows two more wrinkles. Aircraft had a yes-or-no
+`has_fuel_totalizer`; twins needed one totalizer per engine, so it
+became a count, `fuel_totalizers`. The expand step added the count and
+backfilled it, and then the new code had to keep **writing the old
+column too**: during the deploy, and after any rollback, the previous
+release reads `has_fuel_totalizer`, and an aircraft edited by the new
+code would otherwise look to it as if its totalizer had vanished.
+
+```ts
+// src/app/(member)/aircraft/actions.ts, in the expand release
+// hasFuelTotalizer is still written for the previous release.
+.set({ ...next, hasFuelTotalizer: next.fuelTotalizers > 0 })
+```
+
+Once that release was in production, the obvious contract step was to
+stop writing the column and drop it, together. That would have broken
+the very deploy that shipped it. Render migrates before switching
+traffic, so for a minute or two the release then live runs against a
+schema without the column. That release's code didn't _use_ the column
+any more, but its queries still named it: an ORM selects the columns
+its schema declares, so `SELECT ... "has_fuel_totalizer" ...` fails on
+every aircraft read, and the fleet page and check-outs with it.
+
+So the contract took two releases: one that stops writing the column
+but leaves it in the schema, and a later one that drops it. The schema
+says which is which:
+
+```ts
+// src/db/schema.ts (excerpt)
+// Superseded by fuelTotalizers and no longer written.  Kept until the
+// release that stopped writing it is in production, since the one
+// before still reads it; drop it after that.
+hasFuelTotalizer: boolean("has_fuel_totalizer").default(false).notNull(),
+```
+
+> [!IMPORTANT]
+> "Nothing reads the old column" means nothing the _running release_
+> sends to the database names it, not "our code doesn't look at it."
+> With an ORM, every column in the schema file counts as read.
+
 A few rules follow from this:
 
 - **Never rename a column in one step.** Add the new one, copy, switch
@@ -190,6 +232,15 @@ the latest number. Small design choices make it pleasant:
 
 Because the notes are in the repository, writing them is part of the
 release checklist, reviewed like code.
+
+One rule follows from storing each member's place by number: **a note
+that has shipped is finished.** After note 2 went out, the next few
+changes added their bullets to note 2, which was still at the top of
+the file. Any member who had already seen it would never have been
+shown them. Those bullets moved to a new note 3, and note 2 went back
+to exactly what was released. When you add a highlight, check whether
+the note at the top is already in production; if it is, start the next
+one.
 
 ## Keeping It Understandable
 

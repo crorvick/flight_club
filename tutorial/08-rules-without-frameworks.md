@@ -137,6 +137,27 @@ export function dueDate(lastCompletedOn: string, months: number) {
 `Date.UTC` builds an instant from UTC parts, and `toISOString` reads it
 back in UTC, so the server's zone never enters into it.
 
+Some aviation dates aren't calendar arithmetic at all. Navigation
+databases are published on the **AIRAC cycle**: a new one every 28
+days, forever, starting from a fixed date. So "when does this database
+expire?" is a count of 28-day steps from an epoch, which makes a nice
+small pure module:
+
+```ts
+// src/lib/airac.ts (excerpt)
+// Cycle 2001 took effect on 2 January 2020; each is named for the
+// year it takes effect in and its place in that year, so most years have
+// 13 and a few, like 2020, have 14.
+const EPOCH = Date.UTC(2020, 0, 2);
+
+const indexOn = (isoDate: string) =>
+  Math.floor((Date.parse(`${isoDate}T00:00:00Z`) - EPOCH) / (CYCLE_DAYS * DAY));
+```
+
+The naming rule (cycle "2014" exists; "2614" doesn't) is exactly the
+kind of thing to pin down with a few unit tests taken from published
+cycle dates, before any page depends on it.
+
 Times that a _person_ reads, like "reported at 3:42 PM," are a different
 matter: those should be shown in the _viewer's_ time zone, which only
 the browser knows. Chapter 9 handles that with a small Client Component.

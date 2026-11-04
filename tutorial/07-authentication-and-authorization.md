@@ -353,6 +353,22 @@ node scripts/approve-member.mts you@example.com officer pilot
 Keeping this out of the web UI entirely means there's no "make me an
 admin" endpoint to attack.
 
+The same goes for a member who's locked out. With no email to send a
+reset link, the escape hatch is another script, run from the same
+shell:
+
+```sh
+node scripts/reset-password.mts member@example.com
+```
+
+It asks for the new password twice without echoing it. It hashes it
+the way Better Auth does, so that sign-in accepts it: scrypt with a
+random salt, stored as `salt:key`. And it deletes the member's
+sessions, in case the reason for the reset is that someone else knew
+the old password. Copying a library's hashing parameters into a
+script is a small debt: if Better Auth ever changes them, the script
+must follow. The comment beside them says where they came from.
+
 ## Defense in Depth for Roles
 
 Roles are stored as a text array on `member`. Two more layers make sure
@@ -421,6 +437,113 @@ Two principles:
 - **Only what changed.** `before` and `after` hold just the changed
   fields, so the log reads as a diff.
 
+## Signing In with Google and Apple
+
+Many members would rather not have another password. Better Auth can
+let them sign in with an account they already have, through **OAuth**
+(strictly, OpenID Connect, which builds sign-in on top of OAuth). The
+dance goes like this:
+
+1. The member presses "Continue with Google." A Server Action asks
+   Better Auth for Google's sign-in URL, which carries the app's
+   **client ID**, the URL to come back to, and a random **state** value
+   that Better Auth also saves in a cookie.
+2. The browser goes to Google. The member signs in there, and the app
+   never sees their Google password.
+3. Google sends the browser back to the **callback URL**,
+   `/api/auth/callback/google`, with a one-time **code** and the
+   state.
+4. Better Auth checks the state against the cookie, which proves this
+   browser started the sign-in. It then trades the code with Google,
+   server to server and with the **client secret**, for who the member
+   is: an ID, an email, a name.
+5. It finds or creates the member, and their link to Google, as a row
+   in the same `account` table that holds password hashes, with
+   `provider_id = 'google'` instead of `'credential'`.
+
+The Server Action is all the app writes:
+
+```ts
+// src/app/(auth)/actions.ts (excerpt)
+export async function continueWith(provider: SocialProvider) {
+  if (!SOCIAL_PROVIDERS.includes(provider)) redirect("/sign-in");
+  const { url } = await auth().api.signInSocial({
+    body: { provider, callbackURL: "/", errorCallbackURL: "/sign-in" },
+    headers: await headers(),
+  });
+  redirect(url!);
+}
+```
+
+A member who signs in with Google for the first time gets a new
+account, inactive and without roles, waiting for an officer like any
+other. Nothing about approval changes.
+
+### Don't Join Accounts by Email
+
+The interesting question is what happens when someone signs in with a
+Google account whose email matches an existing member. Joining the two
+automatically sounds friendly, and it's a security hole. Flight Club
+never verifies email addresses: it sends no email. So the existing
+account proves nothing about who owns that address. Picture someone
+creating a password account under a member's email before that member
+joins. An officer approves it, since the name looks right. When the real
+member later signs in with Google, an automatic join would hand the
+impostor's account their Google identity, and the impostor still has
+the password.
+
+Better Auth refuses that join by default for exactly this reason, and
+sends the browser back with `?error=account_not_linked`. The sign-in
+page turns the code into words:
+
+```ts
+// src/lib/sign-in-methods.ts (excerpt)
+// An existing member's email isn't verified (the app sends no email),
+// so Better Auth won't join a Google or Apple account to theirs on its
+// own: whoever made the account might not own the address.
+account_not_linked:
+  "You already have an account with that email. Sign in with your password, then link Google or Apple in Settings.",
+```
+
+**Linking** happens in Settings instead, while signed in: being signed
+in to the account and to the Google account at once is the proof that
+one person owns both. Unlinking asks for a sign-in within the last day,
+a check Better Auth calls a **fresh session**. That's sensible for a
+change to how someone gets in, and the app says so when it applies,
+because members here stay signed in for months.
+
+A member who has only ever used Google has no password, which ripples
+outward: changing their email used to need their password, so Settings
+offers "Set a password" first, and the reset script gives them a
+password if they have none.
+
+### Apple's Particulars
+
+Apple supports the same flow, with differences you plan around:
+
+- **The client secret isn't a fixed string.** It's a JWT, a signed
+  token, that the club signs with a private key from Apple, and Apple
+  accepts one for at most six months. `scripts/apple-client-secret.mts`
+  makes one. Someone has to make the next before it lapses, so put it in
+  a calendar.
+- **Hide My Email.** A member can share a relay address like
+  `x7k2q9@privaterelay.appleid.com` instead of their own. The app
+  notices those and asks for a real one in Settings, since other
+  members can't use it to reach them.
+- **The name comes once, if at all.** Apple sends it only on the first
+  sign-in, and only if the member agrees. The home page asks a member
+  with no name for one before anything else, because officers approve
+  people by name.
+- **Apple posts its answer** back rather than redirecting, from its own
+  origin, so `https://appleid.apple.com` is listed in Better Auth's
+  `trustedOrigins`.
+- **No localhost.** Apple only returns to HTTPS URLs on real domains, so
+  it's tried on staging.
+
+Both providers are configured only by environment variables. Without
+them the buttons simply don't appear (Chapter 13 explains why that has
+to be decided at request time).
+
 ## Things We Haven't Built
 
 A production authentication system for a larger audience would add:
@@ -430,7 +553,6 @@ A production authentication system for a larger audience would add:
 - **Email verification and password reset**, which need an email
   provider.
 - **Multi-factor authentication** or **passkeys**.
-- **Single sign-on** with Google or Microsoft accounts (OAuth).
 
 Better Auth supports all of these through configuration and plugins.
 A small club, whose officers approve every member by hand, can start
@@ -449,6 +571,10 @@ without them.
   the record, not from the request.
 - Hiding UI is a courtesy, never a check.
 - Write audit entries in the same transaction as the change.
+- Signing in with Google or Apple is OAuth: a round trip through the
+  provider that ends with a code your server trades for who the member
+  is. Never join it to an existing account by an email address you
+  haven't verified; let the member link it while signed in.
 
 ## Exercises
 

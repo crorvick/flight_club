@@ -27,12 +27,12 @@ debug it when it misbehaves.
 | **II. Data**          | [4. Thinking in Tables](04-thinking-in-tables.md)                              | Relational modeling, PostgreSQL, keys and constraints, Docker Compose                      |
 |                       | [5. Talking to the Database](05-talking-to-the-database.md)                    | Drizzle ORM, migrations, queries, transactions, locking, seed data                         |
 |                       | [6. Forms and Server Actions](06-forms-and-server-actions.md)                  | FormData, validation with Zod, Server Actions, redirects, errors                           |
-| **III. People**       | [7. Who Are You, and What May You Do?](07-authentication-and-authorization.md) | Passwords, sessions, cookies, Better Auth, roles, audit logs                               |
+| **III. People**       | [7. Who Are You, and What May You Do?](07-authentication-and-authorization.md) | Passwords, sessions, cookies, Better Auth, Google and Apple sign-in, roles, audit logs     |
 |                       | [8. Rules Without Frameworks](08-rules-without-frameworks.md)                  | Pure domain logic, derived state, money-safe arithmetic, Vitest                            |
 | **IV. The Interface** | [9. Interactive Interfaces](09-interactive-interfaces.md)                      | Client Components, hydration, state, accessible UI, responsive and print design, dark mode |
 |                       | [10. Files and Object Storage](10-files-and-object-storage.md)                 | Why not the disk, S3 and its compatibles, uploads, private downloads                       |
 |                       | [11. Rendering, Streaming and Caching](11-rendering-streaming-and-caching.md)  | Prerendering, Suspense, streaming, what to cache and what never to                         |
-| **V. Shipping**       | [12. Testing It Like a User](12-testing-it-like-a-user.md)                     | Playwright, multiple devices, test isolation                                               |
+| **V. Shipping**       | [12. Testing It Like a User](12-testing-it-like-a-user.md)                     | Playwright, multiple devices, test isolation, third parties                                |
 |                       | [13. Containers and Configuration](13-containers-and-configuration.md)         | Docker images, multi-stage builds, environment variables, health checks                    |
 |                       | [14. Continuous Delivery](14-continuous-delivery.md)                           | GitHub Actions, build once and promote, staging and production, rollbacks                  |
 |                       | [15. Living With It](15-living-with-it.md)                                     | Evolving schemas safely, backups and restores, release notes, what's next                  |

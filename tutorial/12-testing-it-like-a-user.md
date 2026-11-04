@@ -237,6 +237,83 @@ Write one for every boundary: anonymous versus member, pending versus
 active, pilot versus officer, captain of this aircraft versus captain of
 another.
 
+## Third Parties
+
+Some pages reach beyond the app: a member's picture comes from
+Gravatar, and signing in with Google leaves for Google's site. Tests
+shouldn't depend on those services being up or reachable, and they
+shouldn't send them made-up members' email addresses either.
+Playwright can answer any request itself, with `route`. A **fixture**
+is where to do it for every test at once. Fixtures are the values
+Playwright hands each test, like `page`, and a project can extend
+them:
+
+```ts
+// e2e/fixtures.ts (simplified)
+export const test = base.extend<object, { noGravatar: void }>({
+  // The context every test's page lives in.
+  context: async ({ context }, provide) => {
+    await noGravatar(context); // route gravatar.com to a 404
+    await provide(context);
+  },
+  // ...and any context a test opens itself, for a second member.
+  noGravatar: [
+    async ({ browser }, provide) => {
+      const newContext = browser.newContext.bind(browser);
+      browser.newContext = async (options) => {
+        const context = await newContext(options);
+        await noGravatar(context);
+        return context;
+      };
+      await provide();
+    },
+    { scope: "worker", auto: true },
+  ],
+});
+```
+
+Specs import `test` from `./fixtures` instead of `@playwright/test`.
+(Playwright calls the second argument `use`; it's renamed here only
+because the React hooks lint rule mistakes anything called `use` for
+React's.) A test that wants a picture routes the URL again, and the
+later route wins:
+
+```ts
+await page.route(`https://gravatar.com/avatar/${hash}?**`, (route) =>
+  route.fulfill({ contentType: "image/png", body: PICTURE }),
+);
+```
+
+Sign-in with Google can't be finished in a test at all: that would
+need a real Google account. So the test stops at the hand-off and
+checks what the app controls, where it sent the browser. The action's
+redirect comes back in a response header, and the browser's trip to
+Google is answered with a stub page:
+
+```ts
+await page.route("https://accounts.google.com/**", (route) =>
+  route.fulfill({ body: "Stopped at the provider" }),
+);
+// ...press "Continue with Google", then read the redirect:
+expect(toGoogle.searchParams.get("redirect_uri")).toBe(
+  "http://localhost:3100/api/auth/callback/google",
+);
+```
+
+Everything after the hand-off that lives in the app, such as linking,
+unlinking and the error messages a failed sign-in comes back with, is
+tested by setting up the database as the callback would have left it.
+The first sign-in with a real Google account happens on staging, by
+hand.
+
+> [!NOTE]
+> The same test for Apple is skipped in WebKit. WebKit, Safari's engine,
+> can hand `appleid.apple.com` to the operating system's own Sign in
+> with Apple, and in the test browser that now and then left the page
+> unable to close. A test that's skipped for a stated reason is better
+> than one that fails one run in ten; the server's redirect is the same
+> whichever browser asked for it, and Chromium still checks it.
+
 ## Taming Flakiness
 
 A **flaky** test passes sometimes and fails sometimes, without the code
@@ -247,7 +324,13 @@ failures. The usual causes, and their cures:
 long or too short. Use auto-waiting assertions instead.
 
 **Ambiguous locators.** `getByLabel("Name")` might match "Name" and
-"Name (optional)." Use `{ exact: true }`, or a more specific role. And
+"Name (optional)." Use `{ exact: true }`, or a more specific role. A
+radio button's label includes its description, too: once the
+maintenance form offered "Once: by a date, a logbook reading, or
+both," every test's `getByLabel("Date")` and
+`getByLabel("Logbook reading")` matched it as well. The tests weren't
+the only ones confused, so the fix went in the form: the field labelled
+just "Date" became "Last done on," and the description was reworded. And
 remember from Chapter 11 that the router keeps recently visited pages
 in the DOM, hidden: `getByRole` ignores hidden elements, which avoids
 matching a field on the previous page.
@@ -320,6 +403,8 @@ because that's what will be deployed.
 - Run every test at phone, tablet and desktop sizes, in Chromium and
   WebKit.
 - Each test creates and cleans up its own uniquely named data.
+- Answer third-party requests in a fixture, and test up to the hand-off
+  to services a test can't use for real.
 - Treat flakiness as a bug. Traces show exactly what happened.
 
 ## Exercises

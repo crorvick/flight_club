@@ -159,6 +159,8 @@ all requests.
 
 **Expand and contract** (15). Changing a schema in two releases (add
 the new, then later remove the old) so running code always works.
+Removing something the live release still names can take a release
+of its own.
 
 **Point-in-time recovery** (15). Restoring a database to its state at a
 chosen moment, from continuous backups.
@@ -195,6 +197,14 @@ own role. Prevented by marking fields server-owned.
 **Audit log** (7). A record of who changed what and when, written in the
 same transaction as the change.
 
+**OAuth, OpenID Connect** (7). Signing in through another service, such
+as Google: the browser visits it and returns with a one-time code the
+server trades for who the user is.
+
+**Account linking** (7). Attaching a Google or Apple sign-in to an
+existing account. Safe while signed in to both; unsafe by matching an
+email address nobody has verified.
+
 ## Testing
 
 **Unit test** (8). A fast test of one function's behavior. Vitest here.
@@ -208,6 +218,10 @@ as users do.
 **Flaky test** (12). One that sometimes fails without any code change.
 
 **Trace** (12). Playwright's step-by-step recording of a test run.
+
+**Fixture** (12). A value Playwright prepares for each test, like
+`page`. Extending them sets things up for every test at once, such as
+answering requests to third-party services.
 
 ## Shipping
 

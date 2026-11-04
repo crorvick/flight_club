@@ -190,6 +190,31 @@ top of a module.
 > exposes it to every visitor. Flight Club uses none. Keep secrets
 > without that prefix, and read them only on the server.
 
+The same trap has a subtler form. The sign-in page shows "Continue with
+Google" only where Google's credentials are set (Chapter 7). The page
+is otherwise static, so Next.js prerenders it at build time
+(Chapter 11), and a component that merely read the environment would
+be prerendered with it too: built where no credentials exist, every
+environment would show no buttons forever. The component has to say
+that it depends on the request:
+
+```tsx
+// src/app/(auth)/social-sign-in.tsx (excerpt)
+export async function SocialSignIn({ error }: { error?: string }) {
+  // Which providers are set up is runtime configuration: the same image
+  // runs in every environment, so this can't be decided at build time.
+  await connection();
+  const providers = enabledProviders(serverEnv());
+  if (providers.length === 0) return null;
+  // ...
+}
+```
+
+`connection()` from `next/server` marks everything after it as
+request-time, so the buttons stream into the prerendered shell inside
+their `<Suspense>` boundary, decided by the running container's
+environment.
+
 ## Validating Configuration
 
 A missing or malformed environment variable should stop the app at
@@ -248,7 +273,9 @@ Notice:
 - **Optional features are validated separately.** The photo bucket
   settings have their own schema and are checked only when a photo is
   uploaded or viewed (Chapter 10), so the app can run before a bucket is
-  set up.
+  set up. Google and Apple sign-in are optional in a different way:
+  each turns on only when both its ID and secret are present, so an
+  environment can have one, both or neither.
 
 ## Health Checks
 

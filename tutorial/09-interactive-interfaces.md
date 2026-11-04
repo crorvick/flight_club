@@ -202,6 +202,30 @@ the edge of the airfield it can be seconds. That's another reason to
 prefer real forms with Server Actions, which work before hydration,
 over click handlers, for anything that matters.
 
+The same window catches events the browser fires on its own. A
+member's picture comes from Gravatar, over their initials, and an
+`onError` hides the image if they don't have one. But the image starts
+loading as soon as the HTML arrives, and if Gravatar answers "not
+found" before hydration, the error event can fire before React is
+listening, and then the broken image stays. So the component also
+checks once it's running:
+
+```tsx
+// src/components/avatar.tsx (excerpt)
+const [failed, setFailed] = useState(false);
+const image = useRef<HTMLImageElement>(null);
+// An image that failed before the page was interactive fired its error
+// with no one listening.
+useEffect(() => {
+  const img = image.current;
+  if (img?.complete && img.naturalWidth === 0) setFailed(true);
+}, [src]);
+```
+
+A loaded image with no width is one that failed. Whenever a component
+reacts to something the browser does by itself, ask what happens if it
+happened before hydration.
+
 ## Building for Phones First
 
 Most Flight Club use is on a phone, outdoors, sometimes with gloves.

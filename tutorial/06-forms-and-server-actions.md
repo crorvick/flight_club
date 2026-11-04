@@ -89,6 +89,23 @@ call it with any arguments. That has a crucial consequence:
 > someone with `curl`. Chapter 7 builds the permission checks; this
 > chapter builds the validation.
 
+That includes functions you never meant as actions. While adding Google
+sign-in (Chapter 7), a helper that answered "does this member have a
+password?" was first written in the settings actions file, next to the
+actions that used it:
+
+```ts
+// In a "use server" file, this is an endpoint, not a helper:
+export async function hasPassword(memberId: string) { ... }
+```
+
+Exported from there, it would have told anyone who called it, with any
+member's ID, whether that member could sign in with a password.
+Helpers that actions share belong in an ordinary module, marked
+`import "server-only"` so it can't end up in the browser either
+(`src/lib/sign-in-accounts.ts`). The rule of thumb: a `"use server"`
+file holds only the actions themselves.
+
 Next.js also protects actions against **cross-site request forgery**
 (CSRF), where a malicious site tricks a signed-in user's browser into
 submitting a form to yours: actions only accept `POST` requests whose
@@ -299,6 +316,64 @@ whose text is smaller than 16px.
 Form-level errors (`FormError`) use `role="alert"` so they're announced
 the moment they appear.
 
+### When React Resets the Form
+
+There's a wrinkle in "everything they typed still there." After an
+action passed to `<form action>` finishes, React **resets the form**,
+as a browser would after a plain submit. For fields given a
+`defaultValue`, that's harmless: the component re-renders with the
+returned `values` as their new defaults, and the reset restores those.
+
+A _controlled_ field is another story. The maintenance completion form
+keeps a VOR check's method in state, because the fields below it
+depend on it:
+
+```tsx
+const [method, setMethod] = useState<VorMethod>("vot");
+// ...
+<select name="vorMethod" value={method} onChange={(e) => setMethod(...)}>
+```
+
+Log an airborne check with a 7° error, which is outside its ±6° limit,
+and the server rightly refuses it. Then the reset puts the `<select>`
+back to its first option, VOT, while `method` in state, and with it
+every field and hint on the page, still says airborne. Correct the
+error, save again, and the form sends `vorMethod=vot`: the check is
+logged as the wrong kind, against the wrong limit. Nothing on the screen
+hints at it.
+
+The fix is to submit the form yourself, which React doesn't follow with
+a reset:
+
+```tsx
+// src/app/(member)/maintenance/maintenance-forms.tsx (excerpt)
+// Submitted by hand rather than through <form action>: React resets a
+// form after its action runs, which puts a controlled select (the kind, a
+// VOR check's method) back to its first option while the page still shows
+// the one chosen, so the next save would send the wrong one.
+function submitWithoutReset(formAction: (formData: FormData) => void) {
+  return (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startTransition(() => formAction(formData));
+  };
+}
+
+<form onSubmit={submitWithoutReset(formAction)}>
+```
+
+The cost is that the form no longer submits before the page's
+JavaScript has loaded; for forms whose fields depend on client state,
+that was never really possible anyway. The squawk form does the same,
+for a different reason: a reset would throw away the photos attached to
+it (Chapter 10).
+
+> [!TIP]
+> When a test for a refused-then-corrected save passes, check that it
+> changed something _between_ the two saves that a reset would undo.
+> The test that caught this one picks "airborne", fails once, and then
+> checks the select still says airborne.
+
 ## Redirect After Success
 
 When an action succeeds, it calls `redirect()`:
@@ -423,7 +498,10 @@ them all.
 - Zod declares valid input and parses untrusted data into typed data,
   with human-readable messages.
 - Return errors with the user's typed values so nothing is lost;
-  `useActionState` feeds them back into the form.
+  `useActionState` feeds them back into the form. React resets the form
+  after an action, so a form with controlled fields submits itself.
+- A `"use server"` file holds only actions: anything else it exports is
+  an endpoint too.
 - Redirect after a successful `POST` so refresh is safe. Use `GET`
   forms for choices that belong in the URL.
 

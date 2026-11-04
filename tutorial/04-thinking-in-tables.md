@@ -293,6 +293,29 @@ CONSTRAINT squawk_resolution_complete CHECK (
 )
 ```
 
+The same idea scales to rows whose required columns depend on a kind.
+A maintenance item can recur (an annual, every 12 months), be done
+once (most airworthiness directives), or expire on a date (an ELT
+battery). Each needs different columns filled in, and one constraint
+per case says so, in the form "either this isn't that case, or it has
+what that case needs":
+
+```sql
+CONSTRAINT maintenance_item_once_due CHECK (
+  schedule <> 'once' OR not_applicable IS NOT NULL
+  OR due_on IS NOT NULL OR due_reading IS NOT NULL
+),
+CONSTRAINT maintenance_item_intervals_recur CHECK (
+  schedule = 'recurring'
+  OR (interval_months IS NULL AND interval_days IS NULL
+      AND interval_hours IS NULL)
+)
+```
+
+Read them aloud and they're the rules from the club's maintenance
+logbook: something done once must say when it's due, unless it doesn't
+apply to this aircraft at all; only recurring items have intervals.
+
 ### Partial Unique Indexes
 
 Here's the constraint that stops two pilots taking the same aircraft at
