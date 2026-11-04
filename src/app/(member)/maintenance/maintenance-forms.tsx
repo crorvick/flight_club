@@ -25,6 +25,7 @@ import {
   isDirective,
   KIND_GROUNDING,
   KIND_LABELS,
+  KIND_REGULATIONS,
   KIND_SCHEDULES,
   MAINTENANCE_KINDS,
   type MaintenanceKind,
@@ -136,6 +137,7 @@ export function ItemForm({
       : item?.name;
   const directive = isDirective(kind);
   const ad = kind === "airworthiness_directive";
+  const regulation = KIND_REGULATIONS[kind];
   const choices = KIND_SCHEDULES[kind];
   const value = (name: string, stored?: string | null) =>
     values?.[name] ?? stored ?? "";
@@ -166,6 +168,21 @@ export function ItemForm({
           What logging it asks for: a VOR check its bearing errors, an oil
           change the oil put in, an AD how it was complied with. General is a
           date and a note.
+          {regulation && (
+            <>
+              {" "}
+              The rule:{" "}
+              <a
+                href={regulation.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                {regulation.cite}
+              </a>
+              .
+            </>
+          )}
         </p>
         <ErrorText errors={errors.kind} />
       </div>

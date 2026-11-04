@@ -74,6 +74,26 @@ export const KIND_GROUNDING: Record<MaintenanceKind, Grounding> = {
   nav_database: "ifr",
 };
 
+// The rule behind each kind that has one, as cited and on eCFR.  An AD
+// is a rule of its own, which its number already names.  An SB
+// doesn't bind a Part 91 operator, an oil change follows the engine
+// maker, and a database's currency the equipment's flight manual
+// supplement, so those cite none.
+const ECFR = "https://www.ecfr.gov/current/title-14";
+export const KIND_REGULATIONS: Partial<
+  Record<MaintenanceKind, { cite: string; url: string }>
+> = {
+  annual: {
+    cite: "14 CFR 91.409(a)",
+    url: `${ECFR}/section-91.409#p-91.409(a)`,
+  },
+  hundred_hour: {
+    cite: "14 CFR 91.409(b)",
+    url: `${ECFR}/section-91.409#p-91.409(b)`,
+  },
+  vor_check: { cite: "14 CFR 91.171", url: `${ECFR}/section-91.171` },
+};
+
 export const HUNDRED_HOURS = "100.00";
 
 export const isDirective = (kind: MaintenanceKind) =>

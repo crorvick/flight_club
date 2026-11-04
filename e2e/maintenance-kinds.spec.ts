@@ -178,3 +178,22 @@ test("only a general item needs a name", async ({ page }) => {
     .selectOption({ label: "Oil change" });
   await expect(page.getByRole("textbox", { name: /^Name/ })).toHaveValue("");
 });
+
+test("a kind with a rule behind it cites it", async ({ page }) => {
+  await page.goto(`/aircraft/${aircraft.id}/maintenance`);
+  await page.getByLabel("Kind").selectOption({ label: "Annual inspection" });
+  await expect(
+    page.getByRole("link", { name: "14 CFR 91.409(a)" }),
+  ).toHaveAttribute(
+    "href",
+    "https://www.ecfr.gov/current/title-14/section-91.409#p-91.409(a)",
+  );
+  await page.getByLabel("Kind").selectOption({ label: "Oil change" });
+  await expect(page.getByRole("link", { name: /14 CFR/ })).toHaveCount(0);
+
+  await addItem(page, { name: "VOR check", kind: "VOR check", days: "30" });
+  // Under the heading, and again in the form to edit it.
+  await expect(
+    page.getByRole("link", { name: "14 CFR 91.171" }).first(),
+  ).toBeVisible();
+});

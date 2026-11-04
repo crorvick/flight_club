@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 
 import { Flash } from "@/components/flash";
 import { DetailSkeleton } from "@/components/page-skeleton";
@@ -22,6 +22,7 @@ import {
   isDirective,
   itemTitle,
   KIND_LABELS,
+  KIND_REGULATIONS,
   SCOPE_LABELS,
 } from "@/lib/maintenance-kinds";
 import { requireMember } from "@/lib/session";
@@ -90,6 +91,23 @@ async function ItemDetails({
     item.kind === "oil_change"
       ? await lastOilTypeOn(item.aircraft.id)
       : undefined;
+  const regulation = KIND_REGULATIONS[item.kind];
+  const kindLine = [
+    item.kind !== "general" &&
+      KIND_LABELS[item.kind] !== item.name &&
+      KIND_LABELS[item.kind],
+    isDirective(item.kind) && item.appliesTo && SCOPE_LABELS[item.appliesTo],
+    regulation && (
+      <a
+        href={regulation.url}
+        target="_blank"
+        rel="noreferrer"
+        className="underline"
+      >
+        {regulation.cite}
+      </a>
+    ),
+  ].filter(Boolean);
 
   return (
     <>
@@ -98,13 +116,15 @@ async function ItemDetails({
         <h1 className="text-2xl font-semibold tracking-tight">
           {itemTitle(item)}
         </h1>
-        {/* The kind, unless the name already says it. */}
-        {item.kind !== "general" && KIND_LABELS[item.kind] !== item.name && (
+        {/* The kind, unless the name already says it, and its rule. */}
+        {kindLine.length > 0 && (
           <p className="text-muted-foreground">
-            {KIND_LABELS[item.kind]}
-            {isDirective(item.kind) &&
-              item.appliesTo &&
-              ` · ${SCOPE_LABELS[item.appliesTo]}`}
+            {kindLine.map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && " · "}
+                {part}
+              </Fragment>
+            ))}
           </p>
         )}
         <Link
