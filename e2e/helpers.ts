@@ -47,6 +47,13 @@ export function approve(email: string, ...roles: string[]) {
   });
 }
 
+export function resetPassword(email: string, password: string) {
+  execFileSync("pnpm", ["-s", "member:password", email], {
+    input: `${password}\n`,
+    stdio: "pipe",
+  });
+}
+
 // A signed-in, approved member of the test's own, a pilot unless other
 // roles are given.
 export async function signUpPilot(

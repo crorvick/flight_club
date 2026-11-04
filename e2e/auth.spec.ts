@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { approve, newMember, signOut, signUp } from "./helpers";
+import { approve, newMember, resetPassword, signOut, signUp } from "./helpers";
 
 test("a new member waits for approval", async ({ page }, testInfo) => {
   const member = newMember(testInfo);
@@ -53,6 +53,29 @@ test("a wrong password keeps the email filled in", async ({
   // that role.
   await expect(page.getByText("Incorrect email or password.")).toBeVisible();
   await expect(page.getByLabel("Email")).toHaveValue(member.email);
+});
+
+test("a reset password signs the member out and lets them back in", async ({
+  page,
+}, testInfo) => {
+  const member = newMember(testInfo);
+  await signUp(page, member);
+  await expect(page.getByRole("status")).toBeVisible();
+
+  resetPassword(member.email, "a brand new password");
+  await page.reload();
+  await page.getByRole("link", { name: "Sign in" }).click();
+
+  await page.getByLabel("Email").fill(member.email);
+  await page.getByLabel("Password").fill(member.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Incorrect email or password.")).toBeVisible();
+
+  await page.getByLabel("Password").fill("a brand new password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "waiting for an officer to approve it",
+  );
 });
 
 test("sign-up rejects a short password", async ({ page }, testInfo) => {

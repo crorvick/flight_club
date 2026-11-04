@@ -162,6 +162,19 @@ The roles given replace the member's current ones (`pilot`, `officer`);
 with none, their roles are left as they are.  Locally, it's
 `pnpm member:approve <email> [role...]`.
 
+## Resetting a password
+
+Members change their own passwords in Settings.  One who can't sign in
+has theirs set from the same Shell tab:
+
+```sh
+node scripts/reset-password.mts member@example.com
+```
+
+It asks for the new password twice without showing it, then signs the
+member out of every session.  Locally, it's `pnpm member:password
+<email>`.
+
 ## Promoting to production
 
 If members will notice anything new, add an entry at the top of

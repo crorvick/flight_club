@@ -36,21 +36,22 @@ copy the new lines into your `.env`.
 
 ## Common tasks
 
-| Command               | What it does                                   |
-| --------------------- | ---------------------------------------------- |
-| `pnpm typecheck`      | Generate route types and run `tsc`             |
-| `pnpm lint`           | ESLint                                         |
-| `pnpm format`         | Prettier (`format:check` to only check)        |
-| `pnpm test`           | Vitest unit tests (`test:watch` while working) |
-| `pnpm test:e2e`       | Playwright at phone, tablet and desktop sizes  |
-| `pnpm build`          | Production build                               |
-| `pnpm start`          | Run the production build as the image does     |
-| `pnpm db:generate`    | Write a migration from changes to the schema   |
-| `pnpm db:migrate`     | Apply pending migrations                       |
-| `pnpm db:seed`        | Fill an empty database with sample data        |
-| `pnpm db:studio`      | Browse the database in Drizzle Studio          |
-| `pnpm storage:init`   | Create the photo bucket if it's missing        |
-| `pnpm member:approve` | Activate a member and set their roles          |
+| Command                | What it does                                   |
+| ---------------------- | ---------------------------------------------- |
+| `pnpm typecheck`       | Generate route types and run `tsc`             |
+| `pnpm lint`            | ESLint                                         |
+| `pnpm format`          | Prettier (`format:check` to only check)        |
+| `pnpm test`            | Vitest unit tests (`test:watch` while working) |
+| `pnpm test:e2e`        | Playwright at phone, tablet and desktop sizes  |
+| `pnpm build`           | Production build                               |
+| `pnpm start`           | Run the production build as the image does     |
+| `pnpm db:generate`     | Write a migration from changes to the schema   |
+| `pnpm db:migrate`      | Apply pending migrations                       |
+| `pnpm db:seed`         | Fill an empty database with sample data        |
+| `pnpm db:studio`       | Browse the database in Drizzle Studio          |
+| `pnpm storage:init`    | Create the photo bucket if it's missing        |
+| `pnpm member:approve`  | Activate a member and set their roles          |
+| `pnpm member:password` | Set a member's password                        |
 
 Database changes: edit `src/db/schema.ts`, run `pnpm db:generate`,
 review the SQL it writes to `drizzle/`, then `pnpm db:migrate`. Commit
