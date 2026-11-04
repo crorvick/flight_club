@@ -21,6 +21,27 @@ export type ReleaseNote = {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 3,
+    date: "2026-11-03",
+    highlights: [
+      {
+        text: "Sign in with Google or Apple: link either in Settings, then use it instead of your password.",
+      },
+      {
+        text: "The flight report can count hours on the Hobbs, tach or air time instead of billed hours.",
+        for: ["officer", "captain"],
+      },
+      {
+        text: "Track airworthiness directives and service bulletins, including ones that don't apply. The mechanic's report lists each with how it was complied with.",
+        for: ["officer", "captain"],
+      },
+      {
+        text: "Maintenance items can be done once, or expire on a date and be renewed. New kinds cover 100-hour inspections and navigation database updates.",
+        for: ["officer", "captain"],
+      },
+    ],
+  },
+  {
     id: 2,
     date: "2026-11-02",
     highlights: [
@@ -34,9 +55,6 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "Add your phone number in Settings, where you can now change your email too. The member directory, in the account menu, shows how to reach everyone.",
       },
       {
-        text: "Sign in with Google or Apple: link either in Settings, then use it instead of your password.",
-      },
-      {
         text: "An aircraft's settings say how many fuel totalizers it has: none, one, or one per engine on a twin.",
         for: ["officer"],
       },
@@ -47,18 +65,6 @@ export const RELEASE_NOTES: ReleaseNote[] = [
       {
         text: "Manage takes you straight to your aircraft's maintenance and flights, and to reports.",
         for: ["captain"],
-      },
-      {
-        text: "The flight report can count hours on the Hobbs, tach or air time instead of billed hours.",
-        for: ["officer", "captain"],
-      },
-      {
-        text: "Track airworthiness directives and service bulletins, including ones that don't apply. The mechanic's report lists each with how it was complied with.",
-        for: ["officer", "captain"],
-      },
-      {
-        text: "Maintenance items can be done once, or expire on a date and be renewed. New kinds cover 100-hour inspections and navigation database updates.",
-        for: ["officer", "captain"],
       },
     ],
   },
