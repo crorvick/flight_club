@@ -26,8 +26,10 @@ import {
 import { MAX_ENGINES } from "@/lib/engines";
 import { GROUNDING_LEVELS } from "@/lib/grounding";
 import {
-  type CompletionDetails,
+  DIRECTIVE_SCOPES,
   MAINTENANCE_KINDS,
+  SCHEDULES,
+  type CompletionDetails,
 } from "@/lib/maintenance-kinds";
 import { METER_KINDS } from "@/lib/meters";
 import { MEDICAL_CLASSES } from "@/lib/qualifications";
@@ -152,6 +154,8 @@ export const squawkCategory = pgEnum("squawk_category", SQUAWK_CATEGORIES);
 export const grounding = pgEnum("grounding", GROUNDING_LEVELS);
 
 export const maintenanceKind = pgEnum("maintenance_kind", MAINTENANCE_KINDS);
+export const maintenanceSchedule = pgEnum("maintenance_schedule", SCHEDULES);
+export const directiveScope = pgEnum("directive_scope", DIRECTIVE_SCOPES);
 
 export const squawkStatus = pgEnum("squawk_status", [
   "open",
@@ -593,6 +597,9 @@ export const maintenanceItem = pgTable(
     name: text("name").notNull(),
     // What logging a completion asks for (lib/maintenance-kinds.ts).
     kind: maintenanceKind("kind").default("general").notNull(),
+    // Recurring items have intervals, counted from the last completion;
+    // the others say when they're due (dueOn, dueReading).
+    schedule: maintenanceSchedule("schedule").default("recurring").notNull(),
     intervalMonths: integer("interval_months"),
     intervalDays: integer("interval_days"),
     // Months run to the end of the month (annuals, ELTs) unless this is
@@ -602,6 +609,18 @@ export const maintenanceItem = pgTable(
     intervalHours: hours("interval_hours"),
     lastCompletedOn: date("last_completed_on"),
     lastCompletedReading: hours("last_completed_reading"),
+    // When one done once is due, by either or both, or when one that
+    // expires does; the reading is on the logbook meter.
+    dueOn: date("due_on"),
+    dueReading: hours("due_reading"),
+    // When it was done for good: one done once, or a recurring AD or SB's
+    // terminating action.  It's never due again.
+    closedOn: date("closed_on"),
+    // An AD or SB's number, what it covers, and if it was found not to
+    // apply to this aircraft (outside the serial range, say), why.
+    reference: text("reference"),
+    appliesTo: directiveScope("applies_to"),
+    notApplicable: text("not_applicable"),
     // Chosen per item: an overdue annual grounds the aircraft, an overdue
     // VOR check rules out only IFR, an overdue oil change might only warn.
     grounding: grounding("grounding").default("none").notNull(),
@@ -612,9 +631,35 @@ export const maintenanceItem = pgTable(
     index("maintenance_item_aircraft_idx").on(table.aircraftId),
     check(
       "maintenance_item_has_interval",
-      sql`${table.intervalMonths} is not null
+      sql`${table.schedule} <> 'recurring'
+        or ${table.notApplicable} is not null
+        or ${table.intervalMonths} is not null
         or ${table.intervalDays} is not null
         or ${table.intervalHours} is not null`,
+    ),
+    check(
+      "maintenance_item_intervals_recur",
+      sql`${table.schedule} = 'recurring'
+        or (${table.intervalMonths} is null
+          and ${table.intervalDays} is null
+          and ${table.intervalHours} is null)`,
+    ),
+    check(
+      "maintenance_item_once_due",
+      sql`${table.schedule} <> 'once'
+        or ${table.notApplicable} is not null
+        or ${table.dueOn} is not null
+        or ${table.dueReading} is not null`,
+    ),
+    check(
+      "maintenance_item_expires_due",
+      sql`${table.schedule} <> 'expires'
+        or ${table.notApplicable} is not null
+        or ${table.dueOn} is not null`,
+    ),
+    check(
+      "maintenance_item_due_reading_once",
+      sql`${table.dueReading} is null or ${table.schedule} = 'once'`,
     ),
     // A calendar interval is months or days, not both.
     check(
@@ -660,6 +705,8 @@ export const maintenanceCompletion = pgTable(
     // What the item's kind records beyond the date and reading, such as a
     // VOR check's bearing errors.  Null for general items.
     details: jsonb("details").$type<CompletionDetails>(),
+    // For an item that expires, the new expiration date.
+    expiresOn: date("expires_on"),
     recordedById: uuid("recorded_by_id").references(() => member.id, {
       onDelete: "set null",
     }),

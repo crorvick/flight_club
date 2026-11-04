@@ -102,15 +102,21 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 
 ### MaintenanceItem
 - id, aircraftId, name (annual, 100-hour, ELT, transponder, pitot-static, AD #…, etc.)
-- Recurring: due by **calendar time**, by **hours on the aircraft's logbook meter** (usually tach), or **whichever comes first**
-- Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days)
-- Last completed date/reading, interval, computed next due
+- A **schedule**, one of:
+  - **Recurring**: due by **calendar time**, by **hours on the aircraft's logbook meter** (usually tach), or **whichever comes first**, counted from the last completion. Calendar time is either months **to the end of the month** (annual, ELT, transponder: done any day in March, 12 months makes it due 31 March next year) or an **exact period** in months or days (a VOR check within the preceding 30 days).
+  - **Once**: due by a date, a logbook reading, or whichever comes first; logging it closes the item for good (a one-time AD).
+  - **Expires**: due on an expiration date; logging a renewal asks for the new one (ELT battery, fire extinguisher, registration, insurance).
+- Last completed date/reading, interval or due date/reading, computed next due
+- A closed item (done once, or a recurring AD or SB ended by its terminating action) or an AD or SB that doesn't apply is never due again, and is listed apart from the open ones
 - When overdue: grounds the aircraft, grounds it for IFR only, or only warns (chosen per item)
 - A **kind**, which sets what logging a completion records besides the date, reading and note:
   - **General**: nothing more.
   - **Annual inspection**: as General; the mechanic's report counts from its last completion.
   - **VOR check** (14 CFR 91.171): how it was checked (VOT, ground checkpoint, airborne checkpoint, or dual VOR), where, and the bearing error of each receiver (or the difference between them on a dual check). A check outside the limit for its method (±4°, or ±6° airborne) is refused: it doesn't count. The member logging it is recorded, standing in for the signature.
   - **Oil change**: quarts put in each engine, the oil used (suggested from the aircraft's last oil change), whether the filter was replaced and an oil sample sent.
+  - **100-hour inspection** (14 CFR 91.409(b)): always every 100 hours. It may be flown up to 10 hours over to reach a place where it can be done, but that time counts toward the next, so one done late counts from when it was due.
+  - **Airworthiness directive** and **Service bulletin**: the item records the AD or bulletin number, what it applies to (airframe, engine, propeller, appliance), and whether it's done once or recurs; or that it doesn't apply to this aircraft, and why. Logging it records the method of compliance, and for a recurring one, whether it was the terminating action. New ADs ground the aircraft when overdue and new SBs only warn, as SBs are advisory under Part 91.
+  - **Navigation database**: expires with its AIRAC cycle (every 28 days, starting from cycle 2001 on 2 January 2020). Logging an update records the cycle installed, suggesting the next one in the week before it takes effect, and the item is due when that cycle ends. New ones ground for IFR only when overdue.
 - Each completion keeps its kind's details, so the item's history reads like the logbook entry.
 
 ### PilotQualification
@@ -182,7 +188,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 ### Reports
 - For officers (every aircraft) and plane captains (their own), on a tablet or computer; not offered on phones, where the tables don't fit.
 - **Oil**: each oil change (the oil, quarts put in, filter), then the hours run on it, quarts added on flights until the next change, and hours per quart; the oil in it now so far.
-- **Mechanic's report**: from the last completion of the aircraft's **Annual** item: squawks reported since (and any older still open) with their status and resolution, maintenance logged since, and every recurring item's next due.
+- **Mechanic's report**: from the last completion of the aircraft's **Annual** item: squawks reported since (and any older still open) with their status and resolution, maintenance logged since, every open item's next due, and each AD and SB: its number, subject, what it applies to, status (complied with, recurring and next due, open, or not applicable) and method of compliance.
 - **Flights**: for a period and one or all aircraft, hours by aircraft and by pilot (with what each flew), and every flight.  Hours are billed hours, or those run on a chosen kind of meter (Hobbs, tach, air time); a flight with no reading on that meter counts as a flight but not toward the hours.
 - Each renders as a page and saves as a PDF through the browser's print dialog, with a print layout (no navigation, ink on white, letter pages).
 

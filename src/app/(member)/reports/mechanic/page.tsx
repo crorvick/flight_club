@@ -13,7 +13,11 @@ import { formatDate } from "@/lib/dates";
 import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
-import { describeDetails } from "@/lib/maintenance-kinds";
+import {
+  defaultName,
+  describeDetails,
+  SCOPE_LABELS,
+} from "@/lib/maintenance-kinds";
 import { mechanicReport, pickAircraft, requireReporter } from "@/lib/reports";
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/squawk-rules";
 
@@ -34,7 +38,12 @@ export default function MechanicReportPage({
 }
 
 const GROUNDING = { all: "Grounds", ifr: "No IFR", none: "—" } as const;
-const STATE = { ok: "OK", "due-soon": "Due soon", overdue: "Overdue" };
+const STATE = {
+  ok: "OK",
+  "due-soon": "Due soon",
+  overdue: "Overdue",
+  closed: "Done",
+};
 const reading = (hours: string | null) =>
   hours === null ? "—" : formatHours(parseHours(hours)!);
 
@@ -166,7 +175,7 @@ async function MechanicReport({
         )}
       </ReportSection>
 
-      <ReportSection title="Recurring maintenance">
+      <ReportSection title="Maintenance items">
         {report.items.length === 0 ? (
           <EmptyNote>No maintenance items set up.</EmptyNote>
         ) : (
@@ -191,6 +200,58 @@ async function MechanicReport({
                   </td>
                   <td>{describeDue(status, logbook?.label)}</td>
                   <td className="font-medium">{STATE[status.state]}</td>
+                </tr>
+              );
+            })}
+          </ReportTable>
+        )}
+      </ReportSection>
+
+      <ReportSection title="Airworthiness directives and service bulletins">
+        {report.directives.length === 0 ? (
+          <EmptyNote>None recorded.</EmptyNote>
+        ) : (
+          <ReportTable
+            head={[
+              "AD / SB",
+              "Subject",
+              "Applies to",
+              "Status",
+              "Method of compliance",
+            ]}
+          >
+            {report.directives.map((item) => {
+              const fallback = defaultName(item.kind, item.reference);
+              const status = maintenanceStatus(
+                {
+                  ...item,
+                  currentReading: logbook?.currentReading ?? null,
+                },
+                date,
+              );
+              const last = item.completions[0];
+              const method =
+                last?.details && "terminating" in last.details
+                  ? last.details.method
+                  : last?.note;
+              return (
+                <tr key={item.id}>
+                  <td className="font-medium whitespace-nowrap">{fallback}</td>
+                  <td>{item.name === fallback ? "—" : item.name}</td>
+                  <td>{item.appliesTo ? SCOPE_LABELS[item.appliesTo] : "—"}</td>
+                  <td className="min-w-40">
+                    {status.notApplicable
+                      ? "Not applicable"
+                      : status.closedOn
+                        ? `Complied with ${formatDate(status.closedOn)}`
+                        : `${item.schedule === "recurring" ? "Recurring" : STATE[status.state]}: ${describeDue(status, logbook?.label)}`}
+                  </td>
+                  <td className="min-w-48">
+                    {status.notApplicable ??
+                      (last
+                        ? `${method ?? "—"} (${formatDate(last.completedOn)}${last.reading ? ` at ${reading(last.reading)}` : ""})`
+                        : "—")}
+                  </td>
                 </tr>
               );
             })}

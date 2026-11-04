@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  defaultName,
   describeDetails,
   FIELDS,
+  itemTitle,
   parseCompletionDetails,
+  scheduleFor,
 } from "./maintenance-kinds";
 
 const form = (values: Record<string, string>) => (name: string) =>
@@ -11,7 +14,10 @@ const form = (values: Record<string, string>) => (name: string) =>
 
 describe("VOR checks", () => {
   const parse = (values: Record<string, string>) =>
-    parseCompletionDetails("vor_check", form(values), { engines: 1 });
+    parseCompletionDetails("vor_check", form(values), {
+      engines: 1,
+      schedule: "recurring",
+    });
 
   it("records each receiver's error", () => {
     expect(
@@ -100,7 +106,7 @@ describe("oil changes", () => {
         [FIELDS.oilType]: "AeroShell W100",
         [FIELDS.oilFilter]: "on",
       }),
-      { engines: 2 },
+      { engines: 2, schedule: "recurring" },
     );
     expect(result).toEqual({
       details: {
@@ -123,7 +129,7 @@ describe("oil changes", () => {
       parseCompletionDetails(
         "oil_change",
         form({ [FIELDS.oilQuarts(0)]: "0" }),
-        { engines: 2 },
+        { engines: 2, schedule: "recurring" },
       ),
     ).toEqual({
       fieldErrors: {
@@ -148,7 +154,112 @@ describe("oil changes", () => {
 });
 
 it("asks nothing more of a general item", () => {
-  expect(parseCompletionDetails("general", form({}), { engines: 1 })).toEqual({
+  expect(
+    parseCompletionDetails("general", form({}), {
+      engines: 1,
+      schedule: "recurring",
+    }),
+  ).toEqual({
     details: null,
+  });
+});
+
+describe("ADs and SBs", () => {
+  const parse = (
+    values: Record<string, string>,
+    schedule: "once" | "recurring" = "recurring",
+  ) =>
+    parseCompletionDetails("airworthiness_directive", form(values), {
+      engines: 1,
+      schedule,
+    });
+
+  it("record the method of compliance", () => {
+    expect(
+      parse({ [FIELDS.directiveMethod]: "Inspected per (g); no cracks" }),
+    ).toEqual({
+      details: {
+        kind: "airworthiness_directive",
+        method: "Inspected per (g); no cracks",
+        terminating: false,
+      },
+    });
+  });
+
+  it("can end a recurring one with its terminating action", () => {
+    const values = {
+      [FIELDS.directiveMethod]: "Replaced the adapter",
+      [FIELDS.directiveTerminating]: "on",
+    };
+    expect(parse(values)).toMatchObject({ details: { terminating: true } });
+    // One done once has nothing more to end.
+    expect(parse(values, "once")).toMatchObject({
+      details: { terminating: false },
+    });
+    expect(
+      describeDetails({
+        kind: "airworthiness_directive",
+        method: "Replaced the adapter",
+        terminating: true,
+      }),
+    ).toBe("Replaced the adapter; terminating action");
+  });
+
+  it("need a method", () => {
+    expect(parse({})).toEqual({
+      fieldErrors: {
+        [FIELDS.directiveMethod]: [
+          "Enter how it was complied with, e.g. inspected per paragraph (g).",
+        ],
+      },
+    });
+  });
+
+  it("are titled by number and subject", () => {
+    expect(defaultName("airworthiness_directive", "2020-12-05")).toBe(
+      "AD 2020-12-05",
+    );
+    expect(
+      itemTitle({
+        kind: "airworthiness_directive",
+        name: "Oil filter adapter",
+        reference: "2020-12-05",
+      }),
+    ).toBe("AD 2020-12-05: Oil filter adapter");
+    expect(
+      itemTitle({
+        kind: "service_bulletin",
+        name: "Lycoming SB 480F",
+        reference: "Lycoming SB 480F",
+      }),
+    ).toBe("Lycoming SB 480F");
+  });
+});
+
+describe("navigation databases", () => {
+  it("record the cycle installed", () => {
+    const parse = (cycle: string) =>
+      parseCompletionDetails(
+        "nav_database",
+        form({ [FIELDS.navCycle]: cycle }),
+        { engines: 1, schedule: "expires" },
+      );
+    expect(parse("2612")).toEqual({
+      details: { kind: "nav_database", cycle: "2612" },
+    });
+    expect(parse("2699")).toEqual({
+      fieldErrors: { [FIELDS.navCycle]: ["Choose the cycle installed."] },
+    });
+  });
+});
+
+describe("scheduleFor", () => {
+  it("keeps a schedule the kind can have, else uses its default", () => {
+    expect(scheduleFor("general", "expires")).toBe("expires");
+    expect(scheduleFor("airworthiness_directive", "recurring")).toBe(
+      "recurring",
+    );
+    expect(scheduleFor("airworthiness_directive", "expires")).toBe("once");
+    expect(scheduleFor("nav_database", "recurring")).toBe("expires");
   });
 });

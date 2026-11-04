@@ -1,16 +1,19 @@
-// When maintenance comes due, and whether it's due soon or overdue.  The
-// next due date and reading are always computed from the last completion,
-// never stored, so they can't drift from it.
+// When maintenance comes due, and whether it's due soon or overdue.  A
+// recurring item's next due date and reading are always computed from
+// the last completion, never stored, so they can't drift from it.  One
+// done once, or that expires, is due when it says.
 
 import { formatDate } from "./dates";
 import { parseHours, toHours } from "./hours";
+import type { MaintenanceKind, Schedule } from "./maintenance-kinds";
 
 // Early enough to book the shop, but never more than a quarter of the
 // interval: a 30-day VOR check would otherwise always be "due soon".
 export const DUE_SOON_DAYS = 30;
 export const DUE_SOON_HUNDREDTHS = 10 * 100;
 
-export type MaintenanceState = "ok" | "due-soon" | "overdue";
+// Closed: done once and for all, or an AD or SB that doesn't apply.
+export type MaintenanceState = "ok" | "due-soon" | "overdue" | "closed";
 
 export type MaintenanceInput = {
   // A calendar interval is months or days, not both.  Months run to the
@@ -23,6 +26,15 @@ export type MaintenanceInput = {
   lastCompletedReading: string | null;
   // The interval meter's current reading, when it has an hours interval.
   currentReading: string | null;
+  // Recurring unless given.
+  schedule?: Schedule;
+  kind?: MaintenanceKind;
+  // When one done once, or that expires, is due.
+  dueOn?: string | null;
+  dueReading?: string | null;
+  closedOn?: string | null;
+  // Why an AD or SB doesn't apply.
+  notApplicable?: string | null;
 };
 
 export type MaintenanceStatus = {
@@ -33,6 +45,9 @@ export type MaintenanceStatus = {
   // Due at this meter reading, in hundredths.
   dueAt?: number;
   hoursLeft?: number;
+  // Why it's closed.
+  closedOn?: string;
+  notApplicable?: string;
 };
 
 // Calendar months, as the FAA counts them for annuals, ELTs, transponders
@@ -64,9 +79,20 @@ export function addDays(isoDate: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-// When a calendar interval falls due, counted from the last completion,
-// with roughly how many days it spans for sizing the due-soon window.
-function calendarDue(item: MaintenanceInput, last: string) {
+// When the calendar says it's due, with roughly how many days its
+// interval spans for sizing the due-soon window.  A recurring item counts
+// from its last completion; anything else has no interval, so gets the
+// full window, except a navigation database, which only lasts a cycle.
+function calendarDue(item: MaintenanceInput) {
+  if ((item.schedule ?? "recurring") !== "recurring") {
+    if (!item.dueOn) return undefined;
+    return {
+      dueOn: item.dueOn,
+      spanDays: item.kind === "nav_database" ? 28 : Infinity,
+    };
+  }
+  if (item.lastCompletedOn === null) return undefined;
+  const last = item.lastCompletedOn;
   if (item.intervalMonths !== null) {
     return {
       dueOn: item.dueEndOfMonth
@@ -98,18 +124,31 @@ const SEVERITY: MaintenanceState[] = ["ok", "due-soon", "overdue"];
 const worst = (a: MaintenanceState, b: MaintenanceState) =>
   SEVERITY.indexOf(a) >= SEVERITY.indexOf(b) ? a : b;
 
+// The reading it's due at, in hundredths, with the interval it spans.
+function hoursDue(item: MaintenanceInput) {
+  if ((item.schedule ?? "recurring") !== "recurring") {
+    const due = hundredths(item.dueReading ?? null);
+    return due === null ? undefined : { dueAt: due, span: Infinity };
+  }
+  const interval = hundredths(item.intervalHours);
+  const last = hundredths(item.lastCompletedReading);
+  if (interval === null || last === null) return undefined;
+  return { dueAt: last + interval, span: interval };
+}
+
 // `today` is an ISO date.  With both intervals, whichever comes first
 // decides.
 export function maintenanceStatus(
   item: MaintenanceInput,
   today: string,
 ): MaintenanceStatus {
+  if (item.notApplicable) {
+    return { state: "closed", notApplicable: item.notApplicable };
+  }
+  if (item.closedOn) return { state: "closed", closedOn: item.closedOn };
   const status: MaintenanceStatus = { state: "ok" };
 
-  const calendar =
-    item.lastCompletedOn === null
-      ? undefined
-      : calendarDue(item, item.lastCompletedOn);
+  const calendar = calendarDue(item);
   if (calendar) {
     status.dueOn = calendar.dueOn;
     status.daysLeft = daysBetween(today, status.dueOn);
@@ -126,24 +165,40 @@ export function maintenanceStatus(
     status.state = worst(status.state, state);
   }
 
-  const interval = hundredths(item.intervalHours);
-  const last = hundredths(item.lastCompletedReading);
+  const hours = hoursDue(item);
   const current = hundredths(item.currentReading);
-  if (interval !== null && last !== null && current !== null) {
-    status.dueAt = last + interval;
+  if (hours && current !== null) {
+    status.dueAt = hours.dueAt;
     status.hoursLeft = status.dueAt - current;
     // Due at the reading itself; flying past it is overdue.
     const state =
       status.hoursLeft < 0
         ? "overdue"
         : status.hoursLeft <=
-            Math.min(DUE_SOON_HUNDREDTHS, Math.floor(interval / 4))
+            Math.min(DUE_SOON_HUNDREDTHS, Math.floor(hours.span / 4))
           ? "due-soon"
           : "ok";
     status.state = worst(status.state, state);
   }
 
   return status;
+}
+
+// The reading a 100-hour inspection's next one counts from.  It may run
+// up to 10 hours past due to reach a place where it can be done, but
+// that time counts toward the next one (14 CFR 91.409(b)): done late, the
+// next counts from when it was due; done early, from when it was done.
+export function hundredHourFrom(
+  reading: string,
+  lastFrom: string,
+  interval: string,
+) {
+  return toHours(
+    Math.min(
+      parseHours(reading)!,
+      parseHours(lastFrom)! + parseHours(interval)!,
+    ),
+  );
 }
 
 // The last-done reading of an hours item moving from one meter to
@@ -171,6 +226,8 @@ const daysText = (days: number) =>
 // When it's due, in words, by each limit that applies: "due 2026-12-31
 // (30 days)", "5.2 hours overdue on the tach".
 export function describeDue(status: MaintenanceStatus, meterLabel?: string) {
+  if (status.notApplicable) return `Not applicable: ${status.notApplicable}`;
+  if (status.closedOn) return `Done ${formatDate(status.closedOn)}`;
   const parts: string[] = [];
   if (status.dueOn !== undefined && status.daysLeft !== undefined) {
     parts.push(

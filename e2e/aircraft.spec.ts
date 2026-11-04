@@ -267,7 +267,7 @@ test("changing the logbook meter moves hours maintenance to it", async ({
   await expect(page.getByText("Counted on the tach")).toBeVisible();
   await page.getByLabel("Name").fill("Oil change");
   await page.getByLabel("Hours", { exact: true }).fill("100");
-  await page.getByLabel("Date").fill("2026-10-01");
+  await page.getByLabel("Last done on").fill("2026-10-01");
   await page.getByLabel("Logbook reading").fill("930.0");
   await page.getByLabel(/Only warn/).check();
   await page.getByRole("button", { name: "Add item" }).click();

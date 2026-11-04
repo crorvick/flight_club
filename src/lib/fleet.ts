@@ -18,6 +18,7 @@ import {
   worstGrounding,
 } from "@/lib/grounding";
 import { maintenanceStatus, type MaintenanceStatus } from "@/lib/maintenance";
+import { itemTitle } from "@/lib/maintenance-kinds";
 
 // Open squawks that restrict flying, at the level each restricts it.
 async function restrictingSquawks(aircraftIds: string[]) {
@@ -107,12 +108,12 @@ export async function aircraftAlerts(
         },
         date,
       );
-      if (status.state === "ok") continue;
+      if (status.state === "ok" || status.state === "closed") continue;
       const level = item.grounding;
       entries.get(item.aircraftId)!.maintenance.push({
         ...status,
         id: item.id,
-        name: item.name,
+        name: itemTitle(item),
         grounding: level,
         meterLabel: item.aircraft.logbookMeter?.label,
       });

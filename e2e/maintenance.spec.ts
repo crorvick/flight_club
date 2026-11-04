@@ -67,7 +67,7 @@ async function addItem(
   if (item.hours) {
     await page.getByLabel("Hours", { exact: true }).fill(item.hours);
   }
-  await page.getByLabel("Date").fill(item.lastOn);
+  await page.getByLabel("Last done on").fill(item.lastOn);
   if (item.lastReading) {
     await page.getByLabel("Logbook reading").fill(item.lastReading);
   }
@@ -209,7 +209,7 @@ test("an overdue IFR item limits the aircraft to VFR", async ({ page }) => {
 test("an item needs an interval, and a reading for hours", async ({ page }) => {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Name").fill("Mystery item");
-  await page.getByLabel("Date").fill(monthsAgo(1));
+  await page.getByLabel("Last done on").fill(monthsAgo(1));
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(
     page.getByText("Give a calendar interval, hours, or both."),

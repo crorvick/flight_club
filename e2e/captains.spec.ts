@@ -69,7 +69,7 @@ test("a plane captain manages their own aircraft's squawks and maintenance", asy
     .click();
   await captainPage.getByLabel("Name").fill("Oil change");
   await captainPage.getByLabel("Hours", { exact: true }).fill("50");
-  await captainPage.getByLabel("Date").fill("2026-10-01");
+  await captainPage.getByLabel("Last done on").fill("2026-10-01");
   await captainPage.getByLabel("Logbook reading").fill("40.0");
   await captainPage.getByLabel(/Only warn/).check();
   await captainPage.getByRole("button", { name: "Add item" }).click();

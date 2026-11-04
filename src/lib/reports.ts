@@ -27,7 +27,7 @@ import {
 } from "@/db/schema";
 import { maintainedAircraft } from "@/lib/captains";
 import { parseHours } from "@/lib/hours";
-import type { OilChangeDetails } from "@/lib/maintenance-kinds";
+import { isDirective, type OilChangeDetails } from "@/lib/maintenance-kinds";
 import {
   byMeterOrder,
   METER_DISPLAY_ORDER,
@@ -168,7 +168,8 @@ export async function oilReport(aircraftId: string) {
 }
 
 // What a mechanic wants at an annual: what's been reported since the last
-// one, what's been done, and where every recurring item stands.
+// one, what's been done, where every item stands, and the status of each
+// AD and SB, which the annual has to review.
 export async function mechanicReport(aircraftId: string) {
   const [lastAnnual] = await db()
     .select({
@@ -201,7 +202,19 @@ export async function mechanicReport(aircraftId: string) {
     with: {
       meters: true,
       logbookMeter: { columns: { label: true, currentReading: true } },
-      maintenanceItems: { orderBy: asc(maintenanceItem.name) },
+      maintenanceItems: {
+        orderBy: asc(maintenanceItem.name),
+        // For an AD or SB, how it was last complied with.
+        with: {
+          completions: {
+            orderBy: [
+              desc(maintenanceCompletion.completedOn),
+              desc(maintenanceCompletion.createdAt),
+            ],
+            limit: 1,
+          },
+        },
+      },
     },
   }))!;
 
@@ -255,7 +268,15 @@ export async function mechanicReport(aircraftId: string) {
     lastAnnual,
     meters: [...plane.meters].sort(byMeterOrder),
     logbook: plane.logbookMeter,
-    items: plane.maintenanceItems,
+    items: plane.maintenanceItems.filter((i) => !isDirective(i.kind)),
+    // ADs then SBs, each by number.
+    directives: plane.maintenanceItems
+      .filter((i) => isDirective(i.kind))
+      .sort(
+        (a, b) =>
+          a.kind.localeCompare(b.kind) ||
+          (a.reference ?? "").localeCompare(b.reference ?? ""),
+      ),
     squawks,
     completions,
   };

@@ -5,6 +5,7 @@ import {
   addMonths,
   describeDue,
   dueDate,
+  hundredHourFrom,
   maintenanceStatus,
   moveReading,
   type MaintenanceInput,
@@ -264,5 +265,104 @@ describe("moveReading", () => {
 
   it("never goes below zero", () => {
     expect(moveReading("10.00", "500.00", "20.00")).toBe("0.00");
+  });
+});
+
+describe("maintenanceStatus for an item done once", () => {
+  const once: MaintenanceInput = {
+    ...none,
+    schedule: "once",
+    dueOn: "2026-12-01",
+    dueReading: "1300.00",
+    currentReading: "1250.00",
+  };
+
+  it("is due by whichever comes first", () => {
+    expect(maintenanceStatus(once, "2026-10-01")).toMatchObject({
+      state: "ok",
+      dueOn: "2026-12-01",
+      daysLeft: 61,
+      dueAt: 130000,
+      hoursLeft: 5000,
+    });
+    expect(
+      maintenanceStatus({ ...once, currentReading: "1301.00" }, "2026-10-01")
+        .state,
+    ).toBe("overdue");
+  });
+
+  it("warns 30 days or 10 hours ahead, having no interval", () => {
+    expect(maintenanceStatus(once, "2026-11-01").state).toBe("due-soon");
+    expect(
+      maintenanceStatus({ ...once, currentReading: "1290.00" }, "2026-10-01")
+        .state,
+    ).toBe("due-soon");
+  });
+
+  it("ignores intervals and the last completion", () => {
+    expect(
+      maintenanceStatus(
+        { ...once, intervalDays: 1, lastCompletedOn: "2020-01-01" },
+        "2026-10-01",
+      ).state,
+    ).toBe("ok");
+  });
+
+  it("is closed once done, and never due", () => {
+    expect(
+      maintenanceStatus({ ...once, closedOn: "2026-10-05" }, "2027-06-01"),
+    ).toEqual({ state: "closed", closedOn: "2026-10-05" });
+  });
+
+  it("is closed when it doesn't apply", () => {
+    const status = maintenanceStatus(
+      { ...once, notApplicable: "Serial number not affected" },
+      "2027-06-01",
+    );
+    expect(status).toEqual({
+      state: "closed",
+      notApplicable: "Serial number not affected",
+    });
+    expect(describeDue(status)).toBe(
+      "Not applicable: Serial number not affected",
+    );
+  });
+});
+
+describe("maintenanceStatus for an item that expires", () => {
+  const expires: MaintenanceInput = {
+    ...none,
+    schedule: "expires",
+    dueOn: "2027-03-31",
+  };
+
+  it("is due on its expiration date", () => {
+    expect(maintenanceStatus(expires, "2027-03-31").state).toBe("due-soon");
+    expect(maintenanceStatus(expires, "2027-04-01").state).toBe("overdue");
+    expect(maintenanceStatus(expires, "2027-02-01").state).toBe("ok");
+  });
+
+  it("warns only a week ahead for a navigation database", () => {
+    const database = { ...expires, kind: "nav_database" as const };
+    expect(maintenanceStatus(database, "2027-03-20").state).toBe("ok");
+    expect(maintenanceStatus(database, "2027-03-24").state).toBe("due-soon");
+  });
+});
+
+describe("hundredHourFrom", () => {
+  it("counts from when it was done, if done early", () => {
+    expect(hundredHourFrom("1095.00", "1000.00", "100.00")).toBe("1095.00");
+  });
+
+  it("counts from when it was due, if flown over", () => {
+    expect(hundredHourFrom("1106.50", "1000.00", "100.00")).toBe("1100.00");
+  });
+});
+
+describe("describeDue for a closed item", () => {
+  it("says when it was done", () => {
+    expect(describeDue({ state: "closed", closedOn: "2026-10-05" })).toBe(
+      "Done Oct 5, 2026",
+    );
   });
 });

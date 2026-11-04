@@ -10,13 +10,20 @@ import { DetailSkeleton } from "@/components/page-skeleton";
 import { SectionCard } from "@/components/section-card";
 import { db } from "@/db";
 import { maintenanceCompletion, maintenanceItem } from "@/db/schema";
+import { cycleChoice } from "@/lib/airac";
 import { requireMaintainer } from "@/lib/captains";
 import { formatDate } from "@/lib/dates";
 import { today } from "@/lib/fleet";
 import { formatHours, parseHours } from "@/lib/hours";
 import { isUuid } from "@/lib/ids";
 import { describeDue, maintenanceStatus } from "@/lib/maintenance";
-import { describeDetails, KIND_LABELS } from "@/lib/maintenance-kinds";
+import {
+  describeDetails,
+  isDirective,
+  itemTitle,
+  KIND_LABELS,
+  SCOPE_LABELS,
+} from "@/lib/maintenance-kinds";
 import { requireMember } from "@/lib/session";
 
 import { completeItem, deleteItem, updateItem } from "../actions";
@@ -71,10 +78,12 @@ async function ItemDetails({
   await requireMaintainer(item.aircraft.id);
 
   const logbook = item.aircraft.logbookMeter;
-  const hours = item.intervalHours !== null;
+  const hours = item.intervalHours !== null || item.dueReading !== null;
+  const date = today();
+  const cycles = cycleChoice(date);
   const status = maintenanceStatus(
     { ...item, currentReading: logbook?.currentReading ?? null },
-    today(),
+    date,
   );
   const confirmation = typeof saved === "string" && CONFIRMATIONS[saved];
   const lastOilType =
@@ -86,10 +95,17 @@ async function ItemDetails({
     <>
       <Flash message={confirmation} />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{item.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {itemTitle(item)}
+        </h1>
         {/* The kind, unless the name already says it. */}
         {item.kind !== "general" && KIND_LABELS[item.kind] !== item.name && (
-          <p className="text-muted-foreground">{KIND_LABELS[item.kind]}</p>
+          <p className="text-muted-foreground">
+            {KIND_LABELS[item.kind]}
+            {isDirective(item.kind) &&
+              item.appliesTo &&
+              ` · ${SCOPE_LABELS[item.appliesTo]}`}
+          </p>
         )}
         <Link
           href={`/aircraft/${item.aircraft.id}/maintenance`}
@@ -105,32 +121,46 @@ async function ItemDetails({
           status.state === "overdue" && "bg-destructive/10 text-destructive",
           status.state === "due-soon" &&
             "bg-amber-500/10 text-amber-800 dark:text-amber-300",
-          status.state === "ok" && "bg-muted",
+          (status.state === "ok" || status.state === "closed") && "bg-muted",
         )}
       >
-        {status.state === "overdue"
-          ? {
-              all: "Overdue: the aircraft is grounded",
-              ifr: "Overdue: the aircraft is VFR only",
-              none: "Overdue",
-            }[item.grounding]
-          : status.state === "due-soon"
-            ? "Due soon"
-            : "Not due yet"}
+        {status.state === "closed"
+          ? status.notApplicable
+            ? "Not applicable"
+            : "Done for good"
+          : status.state === "overdue"
+            ? {
+                all: "Overdue: the aircraft is grounded",
+                ifr: "Overdue: the aircraft is VFR only",
+                none: "Overdue",
+              }[item.grounding]
+            : status.state === "due-soon"
+              ? "Due soon"
+              : "Not due yet"}
         <span className="block text-sm font-normal">
-          {describeDue(status, logbook?.label)}
+          {status.notApplicable ?? describeDue(status, logbook?.label)}
         </span>
+        {item.kind === "hundred_hour" && status.state === "overdue" && (
+          <span className="block text-sm font-normal">
+            It may be flown up to 10 hours over only to reach a place where it
+            can be done.
+          </span>
+        )}
       </p>
 
-      <CompletionForm
-        key={`${item.lastCompletedOn}-${item.lastCompletedReading}`}
-        action={completeItem.bind(null, item.id)}
-        kind={item.kind}
-        engines={item.aircraft.engineCount}
-        lastOilType={lastOilType}
-        meterLabel={hours ? logbook?.label : undefined}
-        currentReading={hours ? logbook?.currentReading : undefined}
-      />
+      {status.state !== "closed" && (
+        <CompletionForm
+          key={`${item.lastCompletedOn}-${item.lastCompletedReading}-${item.dueOn}`}
+          action={completeItem.bind(null, item.id)}
+          kind={item.kind}
+          schedule={item.schedule}
+          cycles={cycles}
+          engines={item.aircraft.engineCount}
+          lastOilType={lastOilType}
+          meterLabel={hours ? logbook?.label : undefined}
+          currentReading={hours ? logbook?.currentReading : undefined}
+        />
+      )}
 
       {item.completions.length > 0 && (
         <SectionCard title="History">
@@ -148,6 +178,9 @@ async function ItemDetails({
                 {c.details && (
                   <p className="mt-1">{describeDetails(c.details)}</p>
                 )}
+                {c.expiresOn && (
+                  <p className="mt-1">Expires {formatDate(c.expiresOn)}</p>
+                )}
                 {c.note && <p className="mt-1 whitespace-pre-wrap">{c.note}</p>}
               </li>
             ))}
@@ -161,6 +194,7 @@ async function ItemDetails({
           action={updateItem.bind(null, item.id)}
           logbookMeter={logbook?.label}
           item={item}
+          cycles={cycles}
           submitLabel="Save item"
         />
         <DeleteItemForm action={deleteItem.bind(null, item.id)} />

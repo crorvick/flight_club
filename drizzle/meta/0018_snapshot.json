@@ -1,0 +1,2437 @@
+{
+  "id": "ee8cc152-c4b6-4318-afe9-bfe032ebe253",
+  "prevId": "f5b9f970-6573-418f-81ba-bf3c28f8326b",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "account_user_id_idx": {
+          "name": "account_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_user_id_member_id_fk": {
+          "name": "account_user_id_member_id_fk",
+          "tableFrom": "account",
+          "tableTo": "member",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.aircraft": {
+      "name": "aircraft",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "tail_number": {
+          "name": "tail_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "make_model": {
+          "name": "make_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "has_fuel_totalizer": {
+          "name": "has_fuel_totalizer",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "engine_count": {
+          "name": "engine_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "fuel_totalizers": {
+          "name": "fuel_totalizers",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "billing_meter_id": {
+          "name": "billing_meter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logbook_meter_id": {
+          "name": "logbook_meter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "aircraft_billing_meter_fk": {
+          "name": "aircraft_billing_meter_fk",
+          "tableFrom": "aircraft",
+          "tableTo": "meter",
+          "columnsFrom": [
+            "billing_meter_id",
+            "id"
+          ],
+          "columnsTo": [
+            "id",
+            "aircraft_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "aircraft_logbook_meter_fk": {
+          "name": "aircraft_logbook_meter_fk",
+          "tableFrom": "aircraft",
+          "tableTo": "meter",
+          "columnsFrom": [
+            "logbook_meter_id",
+            "id"
+          ],
+          "columnsTo": [
+            "id",
+            "aircraft_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "aircraft_tail_number_unique": {
+          "name": "aircraft_tail_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tail_number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "aircraft_engine_count": {
+          "name": "aircraft_engine_count",
+          "value": "\"aircraft\".\"engine_count\" between 1 and 2"
+        },
+        "aircraft_fuel_totalizers": {
+          "name": "aircraft_fuel_totalizers",
+          "value": "\"aircraft\".\"fuel_totalizers\" between 0 and \"aircraft\".\"engine_count\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.aircraft_captain": {
+      "name": "aircraft_captain",
+      "schema": "",
+      "columns": {
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "aircraft_captain_member_idx": {
+          "name": "aircraft_captain_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "aircraft_captain_aircraft_id_aircraft_id_fk": {
+          "name": "aircraft_captain_aircraft_id_aircraft_id_fk",
+          "tableFrom": "aircraft_captain",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "aircraft_captain_member_id_member_id_fk": {
+          "name": "aircraft_captain_member_id_member_id_fk",
+          "tableFrom": "aircraft_captain",
+          "tableTo": "member",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "aircraft_captain_aircraft_id_member_id_pk": {
+          "name": "aircraft_captain_aircraft_id_member_id_pk",
+          "columns": [
+            "aircraft_id",
+            "member_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.aircraft_checkout": {
+      "name": "aircraft_checkout",
+      "schema": "",
+      "columns": {
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checked_out_on": {
+          "name": "checked_out_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_by_id": {
+          "name": "recorded_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "aircraft_checkout_member_id_member_id_fk": {
+          "name": "aircraft_checkout_member_id_member_id_fk",
+          "tableFrom": "aircraft_checkout",
+          "tableTo": "member",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "aircraft_checkout_aircraft_id_aircraft_id_fk": {
+          "name": "aircraft_checkout_aircraft_id_aircraft_id_fk",
+          "tableFrom": "aircraft_checkout",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "aircraft_checkout_recorded_by_id_member_id_fk": {
+          "name": "aircraft_checkout_recorded_by_id_member_id_fk",
+          "tableFrom": "aircraft_checkout",
+          "tableTo": "member",
+          "columnsFrom": [
+            "recorded_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "aircraft_checkout_member_id_aircraft_id_pk": {
+          "name": "aircraft_checkout_member_id_aircraft_id_pk",
+          "columns": [
+            "member_id",
+            "aircraft_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.audit_log": {
+      "name": "audit_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "after": {
+          "name": "after",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "audit_log_entity_idx": {
+          "name": "audit_log_entity_idx",
+          "columns": [
+            {
+              "expression": "entity_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "audit_log_actor_id_member_id_fk": {
+          "name": "audit_log_actor_id_member_id_fk",
+          "tableFrom": "audit_log",
+          "tableTo": "member",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.dispatch": {
+      "name": "dispatch",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pilot_id": {
+          "name": "pilot_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "dispatch_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'out'"
+        },
+        "checked_out_at": {
+          "name": "checked_out_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_by_id": {
+          "name": "closed_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flight_id": {
+          "name": "flight_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vfr_only": {
+          "name": "vfr_only",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "gap_reviewed_at": {
+          "name": "gap_reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gap_reviewed_by_id": {
+          "name": "gap_reviewed_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_out": {
+          "name": "totalizer_out",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_out_2": {
+          "name": "totalizer_out_2",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dispatch_one_out_per_aircraft": {
+          "name": "dispatch_one_out_per_aircraft",
+          "columns": [
+            {
+              "expression": "aircraft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"dispatch\".\"status\" = 'out'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "dispatch_one_out_per_pilot": {
+          "name": "dispatch_one_out_per_pilot",
+          "columns": [
+            {
+              "expression": "pilot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"dispatch\".\"status\" = 'out'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dispatch_aircraft_id_aircraft_id_fk": {
+          "name": "dispatch_aircraft_id_aircraft_id_fk",
+          "tableFrom": "dispatch",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "dispatch_pilot_id_member_id_fk": {
+          "name": "dispatch_pilot_id_member_id_fk",
+          "tableFrom": "dispatch",
+          "tableTo": "member",
+          "columnsFrom": [
+            "pilot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "dispatch_closed_by_id_member_id_fk": {
+          "name": "dispatch_closed_by_id_member_id_fk",
+          "tableFrom": "dispatch",
+          "tableTo": "member",
+          "columnsFrom": [
+            "closed_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "dispatch_flight_id_flight_id_fk": {
+          "name": "dispatch_flight_id_flight_id_fk",
+          "tableFrom": "dispatch",
+          "tableTo": "flight",
+          "columnsFrom": [
+            "flight_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "dispatch_gap_reviewed_by_id_member_id_fk": {
+          "name": "dispatch_gap_reviewed_by_id_member_id_fk",
+          "tableFrom": "dispatch",
+          "tableTo": "member",
+          "columnsFrom": [
+            "gap_reviewed_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "dispatch_flight_id_unique": {
+          "name": "dispatch_flight_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "flight_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "dispatch_closed_complete": {
+          "name": "dispatch_closed_complete",
+          "value": "(\"dispatch\".\"status\" = 'out') = (\"dispatch\".\"closed_at\" is null)\n        and (\"dispatch\".\"status\" = 'in') = (\"dispatch\".\"flight_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.dispatch_fluid": {
+      "name": "dispatch_fluid",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "dispatch_id": {
+          "name": "dispatch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_by_id": {
+          "name": "recorded_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fuel_added": {
+          "name": "fuel_added",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oil_added": {
+          "name": "oil_added",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "oil_added_2": {
+          "name": "oil_added_2",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_remaining": {
+          "name": "totalizer_remaining",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_reset": {
+          "name": "totalizer_reset",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_remaining_2": {
+          "name": "totalizer_remaining_2",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_reset_2": {
+          "name": "totalizer_reset_2",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "dispatch_fluid_dispatch_idx": {
+          "name": "dispatch_fluid_dispatch_idx",
+          "columns": [
+            {
+              "expression": "dispatch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "dispatch_fluid_dispatch_id_dispatch_id_fk": {
+          "name": "dispatch_fluid_dispatch_id_dispatch_id_fk",
+          "tableFrom": "dispatch_fluid",
+          "tableTo": "dispatch",
+          "columnsFrom": [
+            "dispatch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dispatch_fluid_recorded_by_id_member_id_fk": {
+          "name": "dispatch_fluid_recorded_by_id_member_id_fk",
+          "tableFrom": "dispatch_fluid",
+          "tableTo": "member",
+          "columnsFrom": [
+            "recorded_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "dispatch_fluid_nonnegative": {
+          "name": "dispatch_fluid_nonnegative",
+          "value": "\"dispatch_fluid\".\"fuel_added\" >= 0\n        and \"dispatch_fluid\".\"oil_added\" >= 0\n        and coalesce(\"dispatch_fluid\".\"oil_added_2\", 0) >= 0\n        and coalesce(\"dispatch_fluid\".\"totalizer_remaining\", 0) >= 0\n        and coalesce(\"dispatch_fluid\".\"totalizer_reset\", 0) >= 0\n        and coalesce(\"dispatch_fluid\".\"totalizer_remaining_2\", 0) >= 0\n        and coalesce(\"dispatch_fluid\".\"totalizer_reset_2\", 0) >= 0"
+        },
+        "dispatch_fluid_reset_complete": {
+          "name": "dispatch_fluid_reset_complete",
+          "value": "(\"dispatch_fluid\".\"totalizer_remaining\" is null) = (\"dispatch_fluid\".\"totalizer_reset\" is null)\n        and (\"dispatch_fluid\".\"totalizer_remaining_2\" is null) = (\"dispatch_fluid\".\"totalizer_reset_2\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.dispatch_meter_reading": {
+      "name": "dispatch_meter_reading",
+      "schema": "",
+      "columns": {
+        "dispatch_id": {
+          "name": "dispatch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected": {
+          "name": "expected",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "out": {
+          "name": "out",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dispatch_meter_reading_dispatch_id_dispatch_id_fk": {
+          "name": "dispatch_meter_reading_dispatch_id_dispatch_id_fk",
+          "tableFrom": "dispatch_meter_reading",
+          "tableTo": "dispatch",
+          "columnsFrom": [
+            "dispatch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dispatch_meter_reading_meter_id_meter_id_fk": {
+          "name": "dispatch_meter_reading_meter_id_meter_id_fk",
+          "tableFrom": "dispatch_meter_reading",
+          "tableTo": "meter",
+          "columnsFrom": [
+            "meter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "dispatch_meter_reading_dispatch_id_meter_id_pk": {
+          "name": "dispatch_meter_reading_dispatch_id_meter_id_pk",
+          "columns": [
+            "dispatch_id",
+            "meter_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "dispatch_meter_reading_nonnegative": {
+          "name": "dispatch_meter_reading_nonnegative",
+          "value": "\"dispatch_meter_reading\".\"out\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.dispatch_squawk_ack": {
+      "name": "dispatch_squawk_ack",
+      "schema": "",
+      "columns": {
+        "dispatch_id": {
+          "name": "dispatch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "squawk_id": {
+          "name": "squawk_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dispatch_squawk_ack_dispatch_id_dispatch_id_fk": {
+          "name": "dispatch_squawk_ack_dispatch_id_dispatch_id_fk",
+          "tableFrom": "dispatch_squawk_ack",
+          "tableTo": "dispatch",
+          "columnsFrom": [
+            "dispatch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "dispatch_squawk_ack_squawk_id_squawk_id_fk": {
+          "name": "dispatch_squawk_ack_squawk_id_squawk_id_fk",
+          "tableFrom": "dispatch_squawk_ack",
+          "tableTo": "squawk",
+          "columnsFrom": [
+            "squawk_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "dispatch_squawk_ack_dispatch_id_squawk_id_pk": {
+          "name": "dispatch_squawk_ack_dispatch_id_squawk_id_pk",
+          "columns": [
+            "dispatch_id",
+            "squawk_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.flight": {
+      "name": "flight",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pilot_id": {
+          "name": "pilot_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fuel_added": {
+          "name": "fuel_added",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oil_added": {
+          "name": "oil_added",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oil_added_2": {
+          "name": "oil_added_2",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_fuel": {
+          "name": "totalizer_fuel",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "totalizer_fuel_2": {
+          "name": "totalizer_fuel_2",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fuel_used": {
+          "name": "fuel_used",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fuel_used_2": {
+          "name": "fuel_used_2",
+          "type": "numeric(4, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "billing_meter_kind": {
+          "name": "billing_meter_kind",
+          "type": "meter_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "billed_hours": {
+          "name": "billed_hours",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "locked_at": {
+          "name": "locked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "flight_aircraft_date_idx": {
+          "name": "flight_aircraft_date_idx",
+          "columns": [
+            {
+              "expression": "aircraft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "flight_pilot_date_idx": {
+          "name": "flight_pilot_date_idx",
+          "columns": [
+            {
+              "expression": "pilot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "flight_aircraft_id_aircraft_id_fk": {
+          "name": "flight_aircraft_id_aircraft_id_fk",
+          "tableFrom": "flight",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "flight_pilot_id_member_id_fk": {
+          "name": "flight_pilot_id_member_id_fk",
+          "tableFrom": "flight",
+          "tableTo": "member",
+          "columnsFrom": [
+            "pilot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "flight_billed_hours_positive": {
+          "name": "flight_billed_hours_positive",
+          "value": "\"flight\".\"billed_hours\" > 0"
+        },
+        "flight_fluids_nonnegative": {
+          "name": "flight_fluids_nonnegative",
+          "value": "coalesce(\"flight\".\"fuel_added\", 0) >= 0\n        and coalesce(\"flight\".\"oil_added\", 0) >= 0\n        and coalesce(\"flight\".\"oil_added_2\", 0) >= 0\n        and coalesce(\"flight\".\"totalizer_fuel\", 0) >= 0\n        and coalesce(\"flight\".\"totalizer_fuel_2\", 0) >= 0\n        and coalesce(\"flight\".\"fuel_used\", 0) >= 0\n        and coalesce(\"flight\".\"fuel_used_2\", 0) >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.flight_meter_reading": {
+      "name": "flight_meter_reading",
+      "schema": "",
+      "columns": {
+        "flight_id": {
+          "name": "flight_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "meter_id": {
+          "name": "meter_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "out": {
+          "name": "out",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "in": {
+          "name": "in",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "flight_meter_reading_meter_idx": {
+          "name": "flight_meter_reading_meter_idx",
+          "columns": [
+            {
+              "expression": "meter_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "flight_meter_reading_flight_id_flight_id_fk": {
+          "name": "flight_meter_reading_flight_id_flight_id_fk",
+          "tableFrom": "flight_meter_reading",
+          "tableTo": "flight",
+          "columnsFrom": [
+            "flight_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "flight_meter_reading_meter_id_meter_id_fk": {
+          "name": "flight_meter_reading_meter_id_meter_id_fk",
+          "tableFrom": "flight_meter_reading",
+          "tableTo": "meter",
+          "columnsFrom": [
+            "meter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "flight_meter_reading_flight_id_meter_id_pk": {
+          "name": "flight_meter_reading_flight_id_meter_id_pk",
+          "columns": [
+            "flight_id",
+            "meter_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "flight_meter_reading_in_after_out": {
+          "name": "flight_meter_reading_in_after_out",
+          "value": "\"flight_meter_reading\".\"in\" > \"flight_meter_reading\".\"out\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.maintenance_completion": {
+      "name": "maintenance_completion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed_on": {
+          "name": "completed_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reading": {
+          "name": "reading",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "details": {
+          "name": "details",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_on": {
+          "name": "expires_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_by_id": {
+          "name": "recorded_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "maintenance_completion_item_idx": {
+          "name": "maintenance_completion_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "completed_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "maintenance_completion_item_id_maintenance_item_id_fk": {
+          "name": "maintenance_completion_item_id_maintenance_item_id_fk",
+          "tableFrom": "maintenance_completion",
+          "tableTo": "maintenance_item",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "maintenance_completion_recorded_by_id_member_id_fk": {
+          "name": "maintenance_completion_recorded_by_id_member_id_fk",
+          "tableFrom": "maintenance_completion",
+          "tableTo": "member",
+          "columnsFrom": [
+            "recorded_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.maintenance_item": {
+      "name": "maintenance_item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "maintenance_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'general'"
+        },
+        "schedule": {
+          "name": "schedule",
+          "type": "maintenance_schedule",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'recurring'"
+        },
+        "interval_months": {
+          "name": "interval_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval_days": {
+          "name": "interval_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_end_of_month": {
+          "name": "due_end_of_month",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "interval_hours": {
+          "name": "interval_hours",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_completed_on": {
+          "name": "last_completed_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_completed_reading": {
+          "name": "last_completed_reading",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_on": {
+          "name": "due_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_reading": {
+          "name": "due_reading",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_on": {
+          "name": "closed_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applies_to": {
+          "name": "applies_to",
+          "type": "directive_scope",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "not_applicable": {
+          "name": "not_applicable",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grounding": {
+          "name": "grounding",
+          "type": "grounding",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "maintenance_item_aircraft_idx": {
+          "name": "maintenance_item_aircraft_idx",
+          "columns": [
+            {
+              "expression": "aircraft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "maintenance_item_aircraft_id_aircraft_id_fk": {
+          "name": "maintenance_item_aircraft_id_aircraft_id_fk",
+          "tableFrom": "maintenance_item",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "maintenance_item_has_interval": {
+          "name": "maintenance_item_has_interval",
+          "value": "\"maintenance_item\".\"schedule\" <> 'recurring'\n        or \"maintenance_item\".\"not_applicable\" is not null\n        or \"maintenance_item\".\"interval_months\" is not null\n        or \"maintenance_item\".\"interval_days\" is not null\n        or \"maintenance_item\".\"interval_hours\" is not null"
+        },
+        "maintenance_item_intervals_recur": {
+          "name": "maintenance_item_intervals_recur",
+          "value": "\"maintenance_item\".\"schedule\" = 'recurring'\n        or (\"maintenance_item\".\"interval_months\" is null\n          and \"maintenance_item\".\"interval_days\" is null\n          and \"maintenance_item\".\"interval_hours\" is null)"
+        },
+        "maintenance_item_once_due": {
+          "name": "maintenance_item_once_due",
+          "value": "\"maintenance_item\".\"schedule\" <> 'once'\n        or \"maintenance_item\".\"not_applicable\" is not null\n        or \"maintenance_item\".\"due_on\" is not null\n        or \"maintenance_item\".\"due_reading\" is not null"
+        },
+        "maintenance_item_expires_due": {
+          "name": "maintenance_item_expires_due",
+          "value": "\"maintenance_item\".\"schedule\" <> 'expires'\n        or \"maintenance_item\".\"not_applicable\" is not null\n        or \"maintenance_item\".\"due_on\" is not null"
+        },
+        "maintenance_item_due_reading_once": {
+          "name": "maintenance_item_due_reading_once",
+          "value": "\"maintenance_item\".\"due_reading\" is null or \"maintenance_item\".\"schedule\" = 'once'"
+        },
+        "maintenance_item_one_calendar_interval": {
+          "name": "maintenance_item_one_calendar_interval",
+          "value": "\"maintenance_item\".\"interval_months\" is null or \"maintenance_item\".\"interval_days\" is null"
+        },
+        "maintenance_item_months_positive": {
+          "name": "maintenance_item_months_positive",
+          "value": "\"maintenance_item\".\"interval_months\" is null or \"maintenance_item\".\"interval_months\" > 0"
+        },
+        "maintenance_item_days_positive": {
+          "name": "maintenance_item_days_positive",
+          "value": "\"maintenance_item\".\"interval_days\" is null or \"maintenance_item\".\"interval_days\" > 0"
+        },
+        "maintenance_item_hours_complete": {
+          "name": "maintenance_item_hours_complete",
+          "value": "\"maintenance_item\".\"interval_hours\" is null\n        or (\"maintenance_item\".\"interval_hours\" > 0\n          and \"maintenance_item\".\"last_completed_reading\" is not null)"
+        },
+        "maintenance_item_calendar_complete": {
+          "name": "maintenance_item_calendar_complete",
+          "value": "(\"maintenance_item\".\"interval_months\" is null and \"maintenance_item\".\"interval_days\" is null)\n        or \"maintenance_item\".\"last_completed_on\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.member": {
+      "name": "member",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "roles": {
+          "name": "roles",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "last_seen_release_note": {
+          "name": "last_seen_release_note",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "member_email_unique": {
+          "name": "member_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "member_roles_known": {
+          "name": "member_roles_known",
+          "value": "\"member\".\"roles\" <@ ARRAY['pilot', 'officer']::text[]"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.meter": {
+      "name": "meter",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "meter_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "current_reading": {
+          "name": "current_reading",
+          "type": "numeric(9, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "meter_aircraft_id_aircraft_id_fk": {
+          "name": "meter_aircraft_id_aircraft_id_fk",
+          "tableFrom": "meter",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "meter_aircraft_kind_unique": {
+          "name": "meter_aircraft_kind_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "aircraft_id",
+            "kind"
+          ]
+        },
+        "meter_id_aircraft_unique": {
+          "name": "meter_id_aircraft_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "aircraft_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "meter_reading_nonnegative": {
+          "name": "meter_reading_nonnegative",
+          "value": "\"meter\".\"current_reading\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pilot_qualification": {
+      "name": "pilot_qualification",
+      "schema": "",
+      "columns": {
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "medical_class": {
+          "name": "medical_class",
+          "type": "medical_class",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "medical_expires_on": {
+          "name": "medical_expires_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flight_review_on": {
+          "name": "flight_review_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pilot_qualification_member_id_member_id_fk": {
+          "name": "pilot_qualification_member_id_member_id_fk",
+          "tableFrom": "pilot_qualification",
+          "tableTo": "member",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "session_user_id_idx": {
+          "name": "session_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_user_id_member_id_fk": {
+          "name": "session_user_id_member_id_fk",
+          "tableFrom": "session",
+          "tableTo": "member",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_token_unique": {
+          "name": "session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.squawk": {
+      "name": "squawk",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "aircraft_id": {
+          "name": "aircraft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reported_by_id": {
+          "name": "reported_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reported_at": {
+          "name": "reported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "squawk_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'other'"
+        },
+        "grounding": {
+          "name": "grounding",
+          "type": "grounding",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'none'"
+        },
+        "status": {
+          "name": "status",
+          "type": "squawk_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "resolved_by_id": {
+          "name": "resolved_by_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution_note": {
+          "name": "resolution_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "squawk_unresolved_idx": {
+          "name": "squawk_unresolved_idx",
+          "columns": [
+            {
+              "expression": "aircraft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"squawk\".\"status\" <> 'resolved'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "squawk_aircraft_id_aircraft_id_fk": {
+          "name": "squawk_aircraft_id_aircraft_id_fk",
+          "tableFrom": "squawk",
+          "tableTo": "aircraft",
+          "columnsFrom": [
+            "aircraft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "squawk_reported_by_id_member_id_fk": {
+          "name": "squawk_reported_by_id_member_id_fk",
+          "tableFrom": "squawk",
+          "tableTo": "member",
+          "columnsFrom": [
+            "reported_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "squawk_resolved_by_id_member_id_fk": {
+          "name": "squawk_resolved_by_id_member_id_fk",
+          "tableFrom": "squawk",
+          "tableTo": "member",
+          "columnsFrom": [
+            "resolved_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "squawk_resolution_complete": {
+          "name": "squawk_resolution_complete",
+          "value": "case when \"squawk\".\"status\" = 'resolved'\n        then \"squawk\".\"resolved_by_id\" is not null\n          and \"squawk\".\"resolved_at\" is not null\n          and \"squawk\".\"resolution_note\" is not null\n        else \"squawk\".\"resolved_by_id\" is null\n          and \"squawk\".\"resolved_at\" is null\n          and \"squawk\".\"resolution_note\" is null\n      end"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.squawk_photo": {
+      "name": "squawk_photo",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "squawk_id": {
+          "name": "squawk_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_type": {
+          "name": "content_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "squawk_photo_squawk_idx": {
+          "name": "squawk_photo_squawk_idx",
+          "columns": [
+            {
+              "expression": "squawk_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "squawk_photo_squawk_id_squawk_id_fk": {
+          "name": "squawk_photo_squawk_id_squawk_id_fk",
+          "tableFrom": "squawk_photo",
+          "tableTo": "squawk",
+          "columnsFrom": [
+            "squawk_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "squawk_photo_storage_key_unique": {
+          "name": "squawk_photo_storage_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "storage_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification": {
+      "name": "verification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "verification_identifier_idx": {
+          "name": "verification_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.directive_scope": {
+      "name": "directive_scope",
+      "schema": "public",
+      "values": [
+        "airframe",
+        "engine",
+        "propeller",
+        "appliance"
+      ]
+    },
+    "public.dispatch_status": {
+      "name": "dispatch_status",
+      "schema": "public",
+      "values": [
+        "out",
+        "cancelled",
+        "in"
+      ]
+    },
+    "public.grounding": {
+      "name": "grounding",
+      "schema": "public",
+      "values": [
+        "none",
+        "ifr",
+        "all"
+      ]
+    },
+    "public.maintenance_kind": {
+      "name": "maintenance_kind",
+      "schema": "public",
+      "values": [
+        "general",
+        "annual",
+        "vor_check",
+        "oil_change",
+        "hundred_hour",
+        "airworthiness_directive",
+        "service_bulletin",
+        "nav_database"
+      ]
+    },
+    "public.maintenance_schedule": {
+      "name": "maintenance_schedule",
+      "schema": "public",
+      "values": [
+        "recurring",
+        "once",
+        "expires"
+      ]
+    },
+    "public.medical_class": {
+      "name": "medical_class",
+      "schema": "public",
+      "values": [
+        "first",
+        "second",
+        "third",
+        "basicmed"
+      ]
+    },
+    "public.meter_kind": {
+      "name": "meter_kind",
+      "schema": "public",
+      "values": [
+        "tach",
+        "hobbs",
+        "air_time"
+      ]
+    },
+    "public.squawk_category": {
+      "name": "squawk_category",
+      "schema": "public",
+      "values": [
+        "engine",
+        "avionics",
+        "airframe",
+        "other"
+      ]
+    },
+    "public.squawk_status": {
+      "name": "squawk_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "deferred",
+        "resolved"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

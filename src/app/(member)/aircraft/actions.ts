@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, isNotNull } from "drizzle-orm";
+import { and, count, eq, isNotNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -339,10 +339,10 @@ export async function updateAircraft(
   redirect(`/aircraft/${aircraftId}?saved=details`);
 }
 
-// Hours intervals count on the logbook meter, so when it changes they
-// move to the new one, each keeping the hours it has left (see
-// moveReading).  Each move is audited, since it rewrites the item's
-// last-done reading.
+// Hours intervals, and readings things done once are due at, count on the
+// logbook meter, so when it changes they move to the new one, each
+// keeping the hours it has left (see moveReading).  Each move is audited,
+// since it rewrites the item's readings.
 async function moveHoursItems(
   tx: Transaction,
   {
@@ -362,26 +362,36 @@ async function moveHoursItems(
   const items = await tx
     .select({
       id: maintenanceItem.id,
+      intervalHours: maintenanceItem.intervalHours,
       lastCompletedReading: maintenanceItem.lastCompletedReading,
+      dueReading: maintenanceItem.dueReading,
     })
     .from(maintenanceItem)
     .where(
       and(
         eq(maintenanceItem.aircraftId, aircraftId),
-        isNotNull(maintenanceItem.intervalHours),
+        or(
+          isNotNull(maintenanceItem.intervalHours),
+          isNotNull(maintenanceItem.dueReading),
+        ),
       ),
     )
     .for("update");
   for (const item of items) {
-    // Set whenever there's an hours interval (maintenance_item_hours_complete).
-    const before = { lastCompletedReading: item.lastCompletedReading! };
-    const after = {
-      lastCompletedReading: moveReading(
-        before.lastCompletedReading,
-        readings.get(from)!,
-        readings.get(to)!,
-      ),
-    };
+    const move = (reading: string) =>
+      moveReading(reading, readings.get(from)!, readings.get(to)!);
+    // The last-done reading is set whenever there's an hours interval
+    // (maintenance_item_hours_complete).
+    const [before, after] =
+      item.intervalHours !== null
+        ? [
+            { lastCompletedReading: item.lastCompletedReading! },
+            { lastCompletedReading: move(item.lastCompletedReading!) },
+          ]
+        : [
+            { dueReading: item.dueReading! },
+            { dueReading: move(item.dueReading!) },
+          ];
     await tx
       .update(maintenanceItem)
       .set(after)

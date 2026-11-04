@@ -49,6 +49,14 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "The flight report can count hours on the Hobbs, tach or air time instead of billed hours.",
         for: ["officer", "captain"],
       },
+      {
+        text: "Track airworthiness directives and service bulletins, including ones that don't apply. The mechanic's report lists each with how it was complied with.",
+        for: ["officer", "captain"],
+      },
+      {
+        text: "Maintenance items can be done once, or expire on a date and be renewed. New kinds cover 100-hour inspections and navigation database updates.",
+        for: ["officer", "captain"],
+      },
     ],
   },
   {

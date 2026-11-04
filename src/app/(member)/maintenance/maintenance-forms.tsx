@@ -11,15 +11,26 @@ import {
 import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import type { Cycle, CycleChoice } from "@/lib/airac";
+import { formatDate } from "@/lib/dates";
+import { engineLabels } from "@/lib/engines";
 import type { FormState } from "@/lib/form-state";
 import type { Grounding } from "@/lib/grounding";
-import { engineLabels } from "@/lib/engines";
 import { formatHours, parseHours } from "@/lib/hours";
 import {
+  defaultName,
+  DIRECTIVE_SCOPES,
+  type DirectiveScope,
   FIELDS,
+  isDirective,
+  KIND_GROUNDING,
   KIND_LABELS,
+  KIND_SCHEDULES,
   MAINTENANCE_KINDS,
   type MaintenanceKind,
+  type Schedule,
+  scheduleFor,
+  SCOPE_LABELS,
   VOR_LIMITS,
   VOR_METHOD_LABELS,
   VOR_METHODS,
@@ -51,25 +62,46 @@ function ErrorText({ errors }: { errors?: string[] }) {
 export type ItemValues = {
   name: string;
   kind: MaintenanceKind;
+  schedule: Schedule;
   intervalMonths: number | null;
   intervalDays: number | null;
   dueEndOfMonth: boolean;
   intervalHours: string | null;
   lastCompletedOn: string | null;
   lastCompletedReading: string | null;
+  dueOn: string | null;
+  dueReading: string | null;
+  reference: string | null;
+  appliesTo: DirectiveScope | null;
+  notApplicable: string | null;
   grounding: Grounding;
 };
+
+const SCHEDULE_CHOICES: Record<Schedule, [string, string]> = {
+  recurring: ["Again and again", "Every so many months, days or hours"],
+  once: ["Once", "By a day, the hours on the logbook meter, or both"],
+  expires: [
+    "When it expires",
+    "Renewed each time, e.g. an ELT battery or the registration",
+  ],
+};
+
+const select =
+  "h-11 rounded-lg border border-input bg-transparent px-2 text-base";
 
 export function ItemForm({
   action,
   logbookMeter,
   item,
+  cycles,
   submitLabel,
 }: {
   action: Action;
   // The label of the meter hours intervals count on, if one is chosen.
   logbookMeter?: string;
   item?: ItemValues;
+  // AIRAC cycles a navigation database might have installed.
+  cycles: CycleChoice;
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
@@ -78,12 +110,35 @@ export function ItemForm({
   const [kind, setKind] = useState<MaintenanceKind>(
     (values?.kind as MaintenanceKind) ?? item?.kind ?? "general",
   );
-  // A name that's only the kind's own shows as blank, so changing the
-  // kind renames the item too.
+  const [schedule, setSchedule] = useState<Schedule>(() =>
+    scheduleFor(kind, values?.schedule ?? item?.schedule ?? ""),
+  );
+  const [notApplicable, setNotApplicable] = useState(
+    values ? values.notApplicable === "on" : item?.notApplicable != null,
+  );
+  const [grounding, setGrounding] = useState<Grounding>(
+    (values?.grounding as Grounding) ?? item?.grounding ?? KIND_GROUNDING[kind],
+  );
+  // A new item starts with what's usual for its kind; an existing one
+  // keeps what it can.
+  const changeKind = (next: MaintenanceKind) => {
+    setKind(next);
+    setSchedule((current) => scheduleFor(next, item ? current : ""));
+    if (!item) setGrounding(KIND_GROUNDING[next]);
+  };
+  // A name that's only the kind's own (or an AD's number) shows as blank,
+  // so changing the kind renames the item too.
   const ownName =
-    item && item.kind !== "general" && item.name === KIND_LABELS[item.kind]
+    item &&
+    item.kind !== "general" &&
+    item.name === defaultName(item.kind, item.reference)
       ? ""
       : item?.name;
+  const directive = isDirective(kind);
+  const ad = kind === "airworthiness_directive";
+  const choices = KIND_SCHEDULES[kind];
+  const value = (name: string, stored?: string | null) =>
+    values?.[name] ?? stored ?? "";
 
   return (
     <form
@@ -98,8 +153,8 @@ export function ItemForm({
           id="kind"
           name="kind"
           value={kind}
-          onChange={(e) => setKind(e.target.value as MaintenanceKind)}
-          className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
+          onChange={(e) => changeKind(e.target.value as MaintenanceKind)}
+          className={select}
         >
           {MAINTENANCE_KINDS.map((kind) => (
             <option key={kind} value={kind}>
@@ -109,163 +164,388 @@ export function ItemForm({
         </select>
         <p className="text-sm text-muted-foreground">
           What logging it asks for: a VOR check its bearing errors, an oil
-          change the oil put in. General is a date and a note.
+          change the oil put in, an AD how it was complied with. General is a
+          date and a note.
         </p>
         <ErrorText errors={errors.kind} />
       </div>
+
+      {directive && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field
+            name="reference"
+            label={ad ? "AD number" : "Bulletin"}
+            placeholder={ad ? "2020-12-05" : "Lycoming SB 480F"}
+            defaultValue={value("reference", item?.reference)}
+            errors={errors.reference}
+          />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="appliesTo">Applies to</Label>
+            <select
+              id="appliesTo"
+              name="appliesTo"
+              defaultValue={value("appliesTo", item?.appliesTo)}
+              className={select}
+            >
+              <option value="" disabled>
+                Choose…
+              </option>
+              {DIRECTIVE_SCOPES.map((scope) => (
+                <option key={scope} value={scope}>
+                  {SCOPE_LABELS[scope]}
+                </option>
+              ))}
+            </select>
+            <ErrorText errors={errors.appliesTo} />
+          </div>
+        </div>
+      )}
       {/* Only a general item needs a name; another kind is named for it
           unless given one. */}
       <Field
         name="name"
-        label={kind === "general" ? "Name" : "Name (optional)"}
+        label={
+          kind === "general"
+            ? "Name"
+            : directive
+              ? "Subject (optional)"
+              : "Name (optional)"
+        }
         placeholder={
-          kind === "general" ? "Annual inspection" : KIND_LABELS[kind]
+          kind === "general"
+            ? "Annual inspection"
+            : directive
+              ? "Oil filter adapter"
+              : KIND_LABELS[kind]
         }
         defaultValue={values?.name ?? ownName}
         errors={errors.name}
       />
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">
-          Due every… (either or both; whichever comes first)
-        </legend>
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            name="calendarInterval"
-            label="Calendar time"
-            inputMode="numeric"
-            placeholder="12"
-            defaultValue={
-              values?.calendarInterval ??
-              (item?.intervalMonths ?? item?.intervalDays)?.toString()
-            }
-            errors={errors.calendarInterval}
-          />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="calendarUnit">In</Label>
-            <select
-              id="calendarUnit"
-              name="calendarUnit"
-              defaultValue={
-                values?.calendarUnit ?? (item?.intervalDays ? "days" : "months")
-              }
-              className="h-11 rounded-lg border border-input bg-transparent px-2 text-base"
-            >
-              <option value="months">months</option>
-              <option value="days">days</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 text-sm">
-          <span className="font-medium">For months, due</span>
-          {(
-            [
-              ["end-of-month", "By the end of the month (annual, ELT)"],
-              ["exact", "To the day"],
-            ] as const
-          ).map(([value, label]) => (
-            <label
-              key={value}
-              className="flex min-h-11 cursor-pointer items-center gap-3"
-            >
-              <input
-                type="radio"
-                name="calendarDeadline"
-                value={value}
-                defaultChecked={
-                  (values?.calendarDeadline ??
-                    (item && !item.dueEndOfMonth
-                      ? "exact"
-                      : "end-of-month")) === value
-                }
-                className="size-5 accent-primary"
-              />
-              {label}
-            </label>
-          ))}
-          <span className="text-muted-foreground">
-            Days are always to the day, e.g. a VOR check every 30 days.
-          </span>
-        </div>
-        <Field
-          name="intervalHours"
-          label="Hours"
-          inputMode="decimal"
-          placeholder="100"
-          defaultValue={
-            values?.intervalHours ?? display(item?.intervalHours ?? null)
-          }
-          errors={errors.intervalHours}
-        />
-        <p className="-mt-1 text-sm text-muted-foreground">
-          {logbookMeter
-            ? `Counted on the ${logbookMeter.toLowerCase()}, the aircraft's logbook time.`
-            : "Choose which meter is the aircraft's logbook time to count hours."}
-        </p>
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 font-medium">Last done</legend>
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            name="lastCompletedOn"
-            label="Date"
-            type="date"
-            defaultValue={
-              values?.lastCompletedOn ?? item?.lastCompletedOn ?? ""
-            }
-            errors={errors.lastCompletedOn}
-          />
-          <Field
-            name="lastCompletedReading"
-            label="Logbook reading"
-            inputMode="decimal"
-            placeholder="For an hours interval"
-            defaultValue={
-              values?.lastCompletedReading ??
-              display(item?.lastCompletedReading ?? null)
-            }
-            errors={errors.lastCompletedReading}
-          />
-        </div>
-      </fieldset>
-
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 font-medium">When it&apos;s overdue</legend>
-        {(
-          [
-            ["all", "Ground the aircraft", "e.g. annual, 100-hour"],
-            ["ifr", "Ground it for IFR only", "e.g. VOR check, pitot-static"],
-            ["none", "Only warn", "e.g. oil change"],
-          ] as const
-        ).map(([value, label, example]) => (
-          <label
-            key={value}
-            className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2"
-          >
+      {directive && (
+        <div className="flex flex-col gap-3">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3">
             <input
-              type="radio"
-              name="grounding"
-              value={value}
-              defaultChecked={
-                (values?.grounding ?? item?.grounding ?? "all") === value
-              }
+              type="checkbox"
+              name="notApplicable"
+              checked={notApplicable}
+              onChange={(e) => setNotApplicable(e.target.checked)}
               className="size-5 accent-primary"
             />
-            <span>
-              <span className="block font-medium">{label}</span>
-              <span className="block text-sm text-muted-foreground">
-                {example}
-              </span>
-            </span>
+            Doesn&apos;t apply to this aircraft
           </label>
-        ))}
-      </fieldset>
+          {notApplicable && (
+            <Field
+              name="notApplicableReason"
+              label="Why not"
+              placeholder="Serial number isn't in the affected range"
+              defaultValue={value("notApplicableReason", item?.notApplicable)}
+              errors={errors.notApplicableReason}
+            />
+          )}
+        </div>
+      )}
+
+      {!(directive && notApplicable) && (
+        <>
+          {choices.length > 1 ? (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 font-medium">Due</legend>
+              {choices.map((choice) => (
+                <label
+                  key={choice}
+                  className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2"
+                >
+                  <input
+                    type="radio"
+                    name="schedule"
+                    value={choice}
+                    checked={schedule === choice}
+                    onChange={() => setSchedule(choice)}
+                    className="size-5 accent-primary"
+                  />
+                  <span>
+                    <span className="block font-medium">
+                      {SCHEDULE_CHOICES[choice][0]}
+                    </span>
+                    <span className="block text-sm text-muted-foreground">
+                      {SCHEDULE_CHOICES[choice][1]}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          ) : (
+            <input type="hidden" name="schedule" value={schedule} />
+          )}
+
+          {schedule === "recurring" && kind !== "hundred_hour" && (
+            <IntervalFields
+              logbookMeter={logbookMeter}
+              item={item}
+              values={values}
+              errors={errors}
+            />
+          )}
+          {kind === "hundred_hour" && (
+            <p className="text-sm text-muted-foreground">
+              Every 100 hours on the{" "}
+              {logbookMeter?.toLowerCase() ?? "logbook meter"}. It may run up to
+              10 hours over to reach a place where it can be done, but that time
+              counts toward the next one.
+            </p>
+          )}
+          {schedule === "recurring" && (
+            <fieldset className="flex flex-col gap-3">
+              <legend className="mb-1 font-medium">Last done</legend>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  name="lastCompletedOn"
+                  label="Last done on"
+                  type="date"
+                  defaultValue={value("lastCompletedOn", item?.lastCompletedOn)}
+                  errors={errors.lastCompletedOn}
+                />
+                <Field
+                  name="lastCompletedReading"
+                  label="Logbook reading"
+                  inputMode="decimal"
+                  placeholder="For an hours interval"
+                  defaultValue={
+                    values?.lastCompletedReading ??
+                    display(item?.lastCompletedReading ?? null)
+                  }
+                  errors={errors.lastCompletedReading}
+                />
+              </div>
+            </fieldset>
+          )}
+
+          {schedule === "once" && (
+            <fieldset className="flex flex-col gap-3">
+              <legend className="mb-1 font-medium">
+                Due by… (either or both; whichever comes first)
+              </legend>
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  name="dueOn"
+                  label="Due by"
+                  type="date"
+                  defaultValue={value("dueOn", item?.dueOn)}
+                  errors={errors.dueOn}
+                />
+                <Field
+                  name="dueReading"
+                  label="Due at (logbook)"
+                  inputMode="decimal"
+                  placeholder="1234.5"
+                  defaultValue={
+                    values?.dueReading ?? display(item?.dueReading ?? null)
+                  }
+                  errors={errors.dueReading}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {logbookMeter
+                  ? `A reading on the ${logbookMeter.toLowerCase()}, the aircraft's logbook time.`
+                  : "Choose which meter is the aircraft's logbook time to give a reading."}
+              </p>
+            </fieldset>
+          )}
+
+          {schedule === "expires" &&
+            (kind === "nav_database" ? (
+              <CycleSelect
+                name="itemCycle"
+                label="Installed cycle"
+                cycles={cycles.recent}
+                defaultValue={
+                  values?.itemCycle ??
+                  cycles.recent.find((c) => c.ends === item?.dueOn)?.id ??
+                  cycles.current
+                }
+                errors={errors.itemCycle}
+              />
+            ) : (
+              <Field
+                name="dueOn"
+                label="Expires on"
+                type="date"
+                defaultValue={value("dueOn", item?.dueOn)}
+                errors={errors.dueOn}
+              />
+            ))}
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 font-medium">When it&apos;s overdue</legend>
+            {(
+              [
+                ["all", "Ground the aircraft", "e.g. annual, 100-hour, AD"],
+                [
+                  "ifr",
+                  "Ground it for IFR only",
+                  "e.g. VOR check, pitot-static, navigation database",
+                ],
+                ["none", "Only warn", "e.g. oil change, service bulletin"],
+              ] as const
+            ).map(([choice, label, example]) => (
+              <label
+                key={choice}
+                className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2"
+              >
+                <input
+                  type="radio"
+                  name="grounding"
+                  value={choice}
+                  checked={grounding === choice}
+                  onChange={() => setGrounding(choice)}
+                  className="size-5 accent-primary"
+                />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-sm text-muted-foreground">
+                    {example}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </>
+      )}
+      {directive && notApplicable && (
+        <input type="hidden" name="grounding" value={grounding} />
+      )}
 
       <Button type="submit" className="h-11 text-base" disabled={pending}>
         {pending ? "Saving…" : submitLabel}
       </Button>
     </form>
+  );
+}
+
+// A recurring item's intervals, by calendar, hours, or both.
+function IntervalFields({
+  logbookMeter,
+  item,
+  values,
+  errors,
+}: {
+  logbookMeter?: string;
+  item?: ItemValues;
+  values?: Record<string, string>;
+  errors: Partial<Record<string, string[]>>;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1 font-medium">
+        Due every… (either or both; whichever comes first)
+      </legend>
+      <div className="grid grid-cols-2 gap-3">
+        <Field
+          name="calendarInterval"
+          label="Calendar time"
+          inputMode="numeric"
+          placeholder="12"
+          defaultValue={
+            values?.calendarInterval ??
+            (item?.intervalMonths ?? item?.intervalDays)?.toString()
+          }
+          errors={errors.calendarInterval}
+        />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="calendarUnit">In</Label>
+          <select
+            id="calendarUnit"
+            name="calendarUnit"
+            defaultValue={
+              values?.calendarUnit ?? (item?.intervalDays ? "days" : "months")
+            }
+            className={select}
+          >
+            <option value="months">months</option>
+            <option value="days">days</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 text-sm">
+        <span className="font-medium">For months, due</span>
+        {(
+          [
+            ["end-of-month", "By the end of the month (annual, ELT)"],
+            ["exact", "To the day"],
+          ] as const
+        ).map(([value, label]) => (
+          <label
+            key={value}
+            className="flex min-h-11 cursor-pointer items-center gap-3"
+          >
+            <input
+              type="radio"
+              name="calendarDeadline"
+              value={value}
+              defaultChecked={
+                (values?.calendarDeadline ??
+                  (item && !item.dueEndOfMonth ? "exact" : "end-of-month")) ===
+                value
+              }
+              className="size-5 accent-primary"
+            />
+            {label}
+          </label>
+        ))}
+        <span className="text-muted-foreground">
+          Days are always to the day, e.g. a VOR check every 30 days.
+        </span>
+      </div>
+      <Field
+        name="intervalHours"
+        label="Hours"
+        inputMode="decimal"
+        placeholder="100"
+        defaultValue={
+          values?.intervalHours ?? display(item?.intervalHours ?? null)
+        }
+        errors={errors.intervalHours}
+      />
+      <p className="-mt-1 text-sm text-muted-foreground">
+        {logbookMeter
+          ? `Counted on the ${logbookMeter.toLowerCase()}, the aircraft's logbook time.`
+          : "Choose which meter is the aircraft's logbook time to count hours."}
+      </p>
+    </fieldset>
+  );
+}
+
+function CycleSelect({
+  name,
+  label,
+  cycles,
+  defaultValue,
+  errors,
+}: {
+  name: string;
+  label: string;
+  cycles: Cycle[];
+  defaultValue: string;
+  errors?: string[];
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={name}>{label}</Label>
+      <select
+        id={name}
+        name={name}
+        defaultValue={defaultValue}
+        className={select}
+      >
+        {cycles.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.id}, {formatDate(c.effective)} to {formatDate(c.ends)}
+          </option>
+        ))}
+      </select>
+      <ErrorText errors={errors} />
+    </div>
   );
 }
 
@@ -279,6 +559,8 @@ function localToday() {
 export function CompletionForm({
   action,
   kind,
+  schedule,
+  cycles,
   engines,
   lastOilType,
   meterLabel,
@@ -286,11 +568,13 @@ export function CompletionForm({
 }: {
   action: Action;
   kind: MaintenanceKind;
+  schedule: Schedule;
+  cycles: CycleChoice;
   // The aircraft's, for an oil change's per-engine amounts.
   engines: number;
   // What the last oil change on the aircraft used, to suggest.
   lastOilType?: string;
-  // Set when the item has an hours interval.
+  // Set when the item counts hours.
   meterLabel?: string;
   currentReading?: string;
 }) {
@@ -342,6 +626,46 @@ export function CompletionForm({
           lastOilType={lastOilType}
           values={values}
           errors={errors}
+        />
+      )}
+      {isDirective(kind) && (
+        <div className="flex flex-col gap-3">
+          <Field
+            name={FIELDS.directiveMethod}
+            label="Method of compliance"
+            placeholder="Inspected per paragraph (g); no cracks found"
+            defaultValue={values?.[FIELDS.directiveMethod]}
+            errors={errors[FIELDS.directiveMethod]}
+          />
+          {schedule === "recurring" && (
+            <label className="flex min-h-11 cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                name={FIELDS.directiveTerminating}
+                defaultChecked={values?.[FIELDS.directiveTerminating] === "on"}
+                className="size-5 accent-primary"
+              />
+              The terminating action: nothing more is due
+            </label>
+          )}
+        </div>
+      )}
+      {kind === "nav_database" && (
+        <CycleSelect
+          name={FIELDS.navCycle}
+          label="Cycle installed"
+          cycles={cycles.toInstall}
+          defaultValue={values?.[FIELDS.navCycle] ?? cycles.suggested}
+          errors={errors[FIELDS.navCycle]}
+        />
+      )}
+      {schedule === "expires" && kind !== "nav_database" && (
+        <Field
+          name="expiresOn"
+          label="New expiration date"
+          type="date"
+          defaultValue={values?.expiresOn}
+          errors={errors.expiresOn}
         />
       )}
       <div className="flex flex-col gap-2">

@@ -49,7 +49,7 @@ async function addItem(
     await page.getByLabel("Hours", { exact: true }).fill(item.hours);
     await page.getByLabel("Logbook reading").fill("380.0");
   }
-  await page.getByLabel("Date").fill("2026-10-20");
+  await page.getByLabel("Last done on").fill("2026-10-20");
   await page.getByLabel(/Only warn/).check();
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(page.getByText("Item added.")).toBeVisible();
@@ -159,7 +159,7 @@ test("only a general item needs a name", async ({ page }) => {
   await page.goto(`/aircraft/${aircraft.id}/maintenance`);
   await page.getByLabel("Calendar time").fill("30");
   await page.getByLabel("In", { exact: true }).selectOption("days");
-  await page.getByLabel("Date").fill("2026-10-20");
+  await page.getByLabel("Last done on").fill("2026-10-20");
   await page.getByRole("button", { name: "Add item" }).click();
   await expect(
     page.getByText("Name the item, e.g. Annual inspection."),
