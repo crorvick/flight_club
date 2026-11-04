@@ -145,10 +145,8 @@ export async function createAircraft(
   if (!details.success || Object.keys(fieldErrors).length > 0) {
     return { fieldErrors, values };
   }
-  // hasFuelTotalizer is still written for the previous release.
   const fluids = {
     fuelTotalizers: totalizers.count,
-    hasFuelTotalizer: totalizers.count > 0,
     engineCount: engineCount(formData),
   };
 
@@ -298,11 +296,7 @@ export async function updateAircraft(
 
       const diff = changedFields(current, next);
       if (!diff.changed) return;
-      // hasFuelTotalizer is still written for the previous release.
-      await tx
-        .update(aircraft)
-        .set({ ...next, hasFuelTotalizer: next.fuelTotalizers > 0 })
-        .where(eq(aircraft.id, aircraftId));
+      await tx.update(aircraft).set(next).where(eq(aircraft.id, aircraftId));
       // An aircraft without a logbook meter has no hours items to move.
       if (
         current.logbookMeterId !== null &&

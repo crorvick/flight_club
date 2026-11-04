@@ -124,12 +124,9 @@ try {
       const aircraftIds: Record<string, string> = {};
       for (const plane of fleet) {
         const [{ id: aircraftId }] = await tx`
-          insert into aircraft (
-            tail_number, make_model, has_fuel_totalizer, fuel_totalizers
-          )
+          insert into aircraft (tail_number, make_model, fuel_totalizers)
           values (
             ${plane.tailNumber}, ${plane.makeModel},
-            ${plane.tailNumber === "N182FC"},
             ${plane.tailNumber === "N182FC" ? 1 : 0}
           )
           returning id

@@ -177,8 +177,9 @@ export const aircraft = pgTable(
     tailNumber: text("tail_number").notNull().unique(),
     makeModel: text("make_model").notNull(),
     active: boolean("active").default(true).notNull(),
-    // Superseded by fuelTotalizers, and still written from it so the
-    // previous release works during a deploy.  A later migration drops it.
+    // Superseded by fuelTotalizers and no longer written.  Kept until the
+    // release that stopped writing it is in production, since the one
+    // before still reads it; drop it after that.
     hasFuelTotalizer: boolean("has_fuel_totalizer").default(false).notNull(),
     // 1, or 2 for a twin, whose oil is recorded per engine.
     engineCount: integer("engine_count").default(1).notNull(),
