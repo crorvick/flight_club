@@ -117,6 +117,17 @@ test("the flight report shows who flew what", async ({ page }, testInfo) => {
   const byPilot = page.getByRole("region", { name: "By pilot" });
   await expect(byPilot).toContainText(me.name);
   await expect(byPilot).toContainText(`${aircraft.tailNumber} 1.5`);
+
+  // Billed by the Hobbs; the tach ran 1.2.
+  await page.getByLabel("Hours from").selectOption("Tach");
+  await page.getByRole("button", { name: "Show" }).click();
+  await expect(page.getByText("tach hours")).toBeVisible();
+  await expect(byPilot).toContainText(`${aircraft.tailNumber} 1.2`);
+  await expect(page.getByLabel("Hours from").getByRole("option")).toHaveText([
+    "Billing meter",
+    "Hobbs",
+    "Tach",
+  ]);
 });
 
 test("captains see only their aircraft; pilots get no reports", async ({

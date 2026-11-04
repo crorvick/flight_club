@@ -28,7 +28,11 @@ import {
 import { maintainedAircraft } from "@/lib/captains";
 import { parseHours } from "@/lib/hours";
 import type { OilChangeDetails } from "@/lib/maintenance-kinds";
-import { byMeterOrder } from "@/lib/meters";
+import {
+  byMeterOrder,
+  METER_DISPLAY_ORDER,
+  type MeterKind,
+} from "@/lib/meters";
 import { type OilChange, type OilFlight, oilPeriods } from "@/lib/oil-report";
 import { requireMember } from "@/lib/session";
 
@@ -257,14 +261,39 @@ export async function mechanicReport(aircraftId: string) {
   };
 }
 
+// The kinds of meter the given aircraft have between them, to choose
+// which one the flight report counts hours on.
+export async function meterKinds(aircraftIds: string[]) {
+  if (aircraftIds.length === 0) return [];
+  const rows = await db()
+    .selectDistinct({ kind: meter.kind })
+    .from(meter)
+    .where(inArray(meter.aircraftId, aircraftIds));
+  return METER_DISPLAY_ORDER.filter((k) => rows.some((r) => r.kind === k));
+}
+
 // Who flew what, when, between two dates (inclusive), on the given
-// aircraft.
+// aircraft.  Hours are what each flight was billed, or with `kind`, what
+// it ran on that meter: null for a flight with no reading on one, from an
+// aircraft without that meter or before it was added.
 export async function flightReport(
   aircraftIds: string[],
   from: string,
   to: string,
+  kind?: MeterKind,
 ) {
   if (aircraftIds.length === 0) return [];
+  // An aircraft has at most one meter of each kind, so at most one
+  // reading per flight.
+  const hours = kind
+    ? sql<string | null>`(
+        select ${flightMeterReading.in} - ${flightMeterReading.out}
+        from ${flightMeterReading}
+        inner join ${meter} on ${meter.id} = ${flightMeterReading.meterId}
+        where ${flightMeterReading.flightId} = ${flight.id}
+          and ${meter.kind} = ${kind}
+      )`
+    : flight.billedHours;
   return db()
     .select({
       id: flight.id,
@@ -273,8 +302,7 @@ export async function flightReport(
       tailNumber: aircraft.tailNumber,
       pilotId: flight.pilotId,
       pilot: member.name,
-      billedHours: flight.billedHours,
-      billingMeterKind: flight.billingMeterKind,
+      hours,
       fuelAdded: flight.fuelAdded,
       oilAdded: flight.oilAdded,
       oilAdded2: flight.oilAdded2,

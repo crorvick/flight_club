@@ -45,6 +45,10 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "Manage takes you straight to your aircraft's maintenance and flights, and to reports.",
         for: ["captain"],
       },
+      {
+        text: "The flight report can count hours on the Hobbs, tach or air time instead of billed hours.",
+        for: ["officer", "captain"],
+      },
     ],
   },
   {

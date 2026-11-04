@@ -183,7 +183,7 @@ Most aircraft have tach + Hobbs; one club aircraft has all three; some may have 
 - For officers (every aircraft) and plane captains (their own), on a tablet or computer; not offered on phones, where the tables don't fit.
 - **Oil**: each oil change (the oil, quarts put in, filter), then the hours run on it, quarts added on flights until the next change, and hours per quart; the oil in it now so far.
 - **Mechanic's report**: from the last completion of the aircraft's **Annual** item: squawks reported since (and any older still open) with their status and resolution, maintenance logged since, and every recurring item's next due.
-- **Flights**: for a period and one or all aircraft, billed hours by aircraft and by pilot (with what each flew), and every flight.
+- **Flights**: for a period and one or all aircraft, hours by aircraft and by pilot (with what each flew), and every flight.  Hours are billed hours, or those run on a chosen kind of meter (Hobbs, tach, air time); a flight with no reading on that meter counts as a flight but not toward the hours.
 - Each renders as a page and saves as a PDF through the browser's print dialog, with a print layout (no navigation, ink on white, letter pages).
 
 ### What's new

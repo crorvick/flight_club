@@ -15,7 +15,8 @@ import { formatDate } from "@/lib/dates";
 import { today } from "@/lib/fleet";
 import { formatAmount } from "@/lib/fluids";
 import { formatHours, parseHours } from "@/lib/hours";
-import { flightReport, requireReporter } from "@/lib/reports";
+import { METER_LABELS } from "@/lib/meters";
+import { flightReport, meterKinds, requireReporter } from "@/lib/reports";
 
 export const metadata: Metadata = { title: "Flight report · Flight Club" };
 
@@ -53,11 +54,11 @@ async function FlightReport({
   const to = isDate(params.to) ? params.to : today();
   const from = isDate(params.from) ? params.from : `${to.slice(0, 8)}01`;
   const only = planes.find((p) => p.id === params.aircraft);
-  const flights = await flightReport(
-    only ? [only.id] : planes.map((p) => p.id),
-    from,
-    to,
-  );
+  const ids = only ? [only.id] : planes.map((p) => p.id);
+  // Billed hours, unless asked for one of the aircraft's meters.
+  const kinds = await meterKinds(ids);
+  const kind = kinds.find((k) => k === params.meter);
+  const flights = await flightReport(ids, from, to, kind);
 
   const byAircraft = new Map<string, Total>();
   const byPilot = new Map<string, Total>();
@@ -65,23 +66,30 @@ async function FlightReport({
   const pilotAircraft = new Map<string, Map<string, number>>();
   const pilotNames = new Map<string, string>();
   let totalHours = 0;
+  // Flights with no reading on the chosen meter count as flights, but
+  // not toward the hours.
+  let unread = 0;
   for (const f of flights) {
-    const billed = parseHours(f.billedHours)!;
-    totalHours += billed;
-    add(byAircraft, f.tailNumber, billed);
-    add(byPilot, f.pilotId, billed);
+    const flew = f.hours === null ? 0 : parseHours(f.hours)!;
+    if (f.hours === null) unread += 1;
+    totalHours += flew;
+    add(byAircraft, f.tailNumber, flew);
+    add(byPilot, f.pilotId, flew);
     pilotNames.set(f.pilotId, f.pilot);
     const flown = pilotAircraft.get(f.pilotId) ?? new Map<string, number>();
-    flown.set(f.tailNumber, (flown.get(f.tailNumber) ?? 0) + billed);
+    flown.set(f.tailNumber, (flown.get(f.tailNumber) ?? 0) + flew);
     pilotAircraft.set(f.pilotId, flown);
   }
+  const hoursName = kind
+    ? `${METER_LABELS[kind].toLowerCase()} hours`
+    : "billed hours";
   const pilots = [...byPilot.entries()].sort((a, b) => b[1].hours - a[1].hours);
 
   return (
     <>
       <ReportHeader
         title="Flight report"
-        subtitle={`${formatDate(from)} to ${formatDate(to)} · ${only ? only.tailNumber : "all aircraft"} · billed hours`}
+        subtitle={`${formatDate(from)} to ${formatDate(to)} · ${only ? only.tailNumber : "all aircraft"} · ${hoursName}`}
       >
         <Form
           action="/reports/flights"
@@ -120,6 +128,21 @@ async function FlightReport({
               ))}
             </select>
           </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            Hours from
+            <select
+              name="meter"
+              defaultValue={kind ?? ""}
+              className="h-10 min-w-40 rounded-lg border border-input bg-transparent px-2 text-base font-normal"
+            >
+              <option value="">Billing meter</option>
+              {kinds.map((k) => (
+                <option key={k} value={k}>
+                  {METER_LABELS[k]}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button type="submit" variant="outline" className="h-10 px-4">
             Show
           </Button>
@@ -130,6 +153,13 @@ async function FlightReport({
         <EmptyNote>No flights in this period.</EmptyNote>
       ) : (
         <>
+          {unread > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {unread === 1 ? "1 flight has" : `${unread} flights have`} no{" "}
+              {METER_LABELS[kind!].toLowerCase()} reading, so{" "}
+              {unread === 1 ? "isn't" : "aren't"} in the hours.
+            </p>
+          )}
           <div className="grid items-start gap-6 lg:grid-cols-2 print:grid-cols-2">
             <ReportSection title="By aircraft">
               <ReportTable head={["Aircraft", "Flights", "Hours"]}>
@@ -182,7 +212,9 @@ async function FlightReport({
                   </td>
                   <td>{f.tailNumber}</td>
                   <td>{f.pilot}</td>
-                  <td>{hours(parseHours(f.billedHours)!)}</td>
+                  <td>
+                    {f.hours === null ? "—" : hours(parseHours(f.hours)!)}
+                  </td>
                   <td>
                     {f.fuelAdded === null
                       ? "—"
