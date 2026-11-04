@@ -31,6 +31,12 @@ export default defineConfig({
       PORT: String(port),
       // Better Auth rejects requests from any origin but its own.
       BETTER_AUTH_URL: `http://localhost:${port}`,
+      // Placeholders, so the Google and Apple buttons show; the tests stop
+      // each sign-in at the provider (e2e/social-sign-in.spec.ts).
+      GOOGLE_CLIENT_ID: "e2e-google-client",
+      GOOGLE_CLIENT_SECRET: "e2e-google-secret",
+      APPLE_CLIENT_ID: "org.example.e2e",
+      APPLE_CLIENT_SECRET: "e2e-apple-secret",
     },
     url: `http://localhost:${port}/api/health`,
     reuseExistingServer: !isCI,

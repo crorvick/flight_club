@@ -39,6 +39,8 @@ import { pilotWarnings } from "@/lib/qualifications";
 import { getCurrentMember, type Member } from "@/lib/session";
 
 import { recentFlights } from "./flights/data";
+import { updateName } from "./settings/actions";
+import { NameForm } from "./settings/settings-forms";
 
 type Fleet = Awaited<ReturnType<typeof fleetStatus>>;
 
@@ -54,6 +56,23 @@ export default function Home() {
 async function Dashboard() {
   const member = await getCurrentMember();
   if (!member) return <Welcome />;
+  // Apple lets a new member keep their name to themselves, but officers
+  // need one to approve them, so ask before anything else.
+  if (!member.name.trim()) {
+    return (
+      <section className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">
+            What&apos;s your name?
+          </h1>
+          <p className="text-muted-foreground">
+            It&apos;s how officers and other pilots will know you.
+          </p>
+        </div>
+        <NameForm action={updateName} name="" from="home" />
+      </section>
+    );
+  }
   if (!member.active) {
     return (
       <section className="flex flex-col gap-2 rounded-xl border bg-card p-5">

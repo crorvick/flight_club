@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { type FormState, formValues } from "@/lib/form-state";
+import { SOCIAL_PROVIDERS, type SocialProvider } from "@/lib/sign-in-methods";
 
 const signInSchema = z.object({
   email: z.email("Enter your email address."),
@@ -71,6 +72,18 @@ export async function signUp(
     throw error;
   }
   redirect("/");
+}
+
+// Off to Google or Apple, which send the member back to the home page:
+// signed in, or with a new account waiting for approval.  Failures come
+// back to the sign-in page to be explained (signInError).
+export async function continueWith(provider: SocialProvider) {
+  if (!SOCIAL_PROVIDERS.includes(provider)) redirect("/sign-in");
+  const { url } = await auth().api.signInSocial({
+    body: { provider, callbackURL: "/", errorCallbackURL: "/sign-in" },
+    headers: await headers(),
+  });
+  redirect(url!);
 }
 
 export async function signOut() {

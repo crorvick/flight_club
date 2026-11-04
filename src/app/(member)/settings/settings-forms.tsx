@@ -6,15 +6,26 @@ import { useActionState, useSyncExternalStore } from "react";
 import { Field, FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import type { FormState } from "@/lib/form-state";
+import { PROVIDER_LABELS, type SocialProvider } from "@/lib/sign-in-methods";
 import { applyTheme, readTheme, type Theme, THEME_KEY } from "@/lib/theme";
 
 type Action = (prev: FormState, formData: FormData) => Promise<FormState>;
 
-export function NameForm({ action, name }: { action: Action; name: string }) {
+export function NameForm({
+  action,
+  name,
+  from,
+}: {
+  action: Action;
+  name: string;
+  // Where it's asked from, for where saving goes next.
+  from?: "home";
+}) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   return (
     <form action={formAction} className="flex flex-col gap-4" noValidate>
       <FormError message={state.error} />
+      {from && <input type="hidden" name="from" value={from} />}
       <Field
         name="name"
         label="Name"
@@ -41,10 +52,13 @@ export function ContactForm({
   action,
   email,
   phone,
+  hasPassword,
 }: {
   action: Action;
   email: string;
   phone: string;
+  // Without one, changing the email waits until they set one.
+  hasPassword: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {} as FormState);
   const errors = state.fieldErrors ?? {};
@@ -67,13 +81,19 @@ export function ContactForm({
         defaultValue={state.values?.phone ?? phone}
         errors={errors.phone}
       />
-      <Field
-        name="password"
-        label="Password, to change your email"
-        type="password"
-        autoComplete="current-password"
-        errors={errors.password}
-      />
+      {hasPassword ? (
+        <Field
+          name="password"
+          label="Password, to change your email"
+          type="password"
+          autoComplete="current-password"
+          errors={errors.password}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          To change your email, set a password below first.
+        </p>
+      )}
       <Button
         type="submit"
         variant="outline"
@@ -128,6 +148,99 @@ export function PasswordForm({ action }: { action: Action }) {
       >
         {pending ? "Changing…" : "Change password"}
       </Button>
+    </form>
+  );
+}
+
+// For a member who signs in only with Google or Apple.
+export function SetPasswordForm({ action }: { action: Action }) {
+  const [state, formAction, pending] = useActionState(action, {} as FormState);
+  return (
+    <form action={formAction} className="flex flex-col gap-4" noValidate>
+      <FormError message={state.error} />
+      <Field
+        name="newPassword"
+        label="New password"
+        type="password"
+        autoComplete="new-password"
+        errors={state.fieldErrors?.newPassword}
+      />
+      <Button
+        type="submit"
+        variant="outline"
+        className="h-11 self-start px-5 text-base"
+        disabled={pending}
+      >
+        {pending ? "Saving…" : "Set password"}
+      </Button>
+    </form>
+  );
+}
+
+export type ProviderLink = {
+  provider: SocialProvider;
+  // Its account's id when linked.
+  accountId?: string;
+  // Link it, when it isn't and can be.
+  link?: () => Promise<void>;
+  unlink?: Action;
+};
+
+// Each of Google and Apple, linked or not.
+export function LinkedAccounts({ links }: { links: ProviderLink[] }) {
+  return (
+    <ul className="flex flex-col divide-y">
+      {links.map((link) => (
+        <li
+          key={link.provider}
+          className="flex min-h-14 items-center justify-between gap-3 py-2"
+        >
+          <span>
+            <span className="block font-medium">
+              {PROVIDER_LABELS[link.provider]}
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              {link.accountId ? "Linked" : "Not linked"}
+            </span>
+          </span>
+          {link.unlink ? (
+            <UnlinkButton
+              action={link.unlink}
+              label={PROVIDER_LABELS[link.provider]}
+            />
+          ) : (
+            link.link && (
+              <form action={link.link}>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="h-11 px-4 text-base"
+                >
+                  Link {PROVIDER_LABELS[link.provider]}
+                </Button>
+              </form>
+            )
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function UnlinkButton({ action, label }: { action: Action; label: string }) {
+  const [state, formAction, pending] = useActionState(action, {} as FormState);
+  return (
+    <form action={formAction} className="flex flex-col items-end gap-1">
+      <Button
+        type="submit"
+        variant="ghost"
+        className="h-11 px-4 text-base"
+        aria-label={`Unlink ${label}`}
+        disabled={pending}
+      >
+        {pending ? "Unlinking…" : "Unlink"}
+      </Button>
+      <FormError message={state.error} />
     </form>
   );
 }

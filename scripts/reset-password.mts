@@ -1,5 +1,6 @@
 // Set a member's password, for one who can't sign in to change it in
-// Settings:
+// Settings, or give one to a member who has only signed in with Google or
+// Apple:
 //
 //   node scripts/reset-password.mts <email>
 //
@@ -92,14 +93,19 @@ try {
       select id, name from member where email = ${email}
     `;
     if (!found) return { error: `No member with email ${email}` };
+    const hash = hashPassword(password);
     const updated = await tx`
       update account
-      set password = ${hashPassword(password)}, updated_at = now()
+      set password = ${hash}, updated_at = now()
       where user_id = ${found.id} and provider_id = 'credential'
       returning id
     `;
     if (updated.length === 0) {
-      return { error: `${found.name} <${email}> has no password to reset` };
+      // As Better Auth makes one: a password account's id is the member's.
+      await tx`
+        insert into account (account_id, provider_id, user_id, password)
+        values (${found.id}, 'credential', ${found.id}, ${hash})
+      `;
     }
     const sessions = await tx`
       delete from session where user_id = ${found.id} returning id

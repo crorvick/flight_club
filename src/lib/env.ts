@@ -9,6 +9,15 @@ const serverEnvSchema = z.object({
   // Set at image build time; reported by /api/health so deploys can
   // confirm which commit is live.
   GIT_SHA: z.string().default("dev"),
+  // Signing in with Google or Apple, each offered only when both its
+  // values are set (docs/deploy.md, "Signing in with Google and Apple").
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  // The Services ID, and the client secret: a JWT signed with the key
+  // from Apple, which Apple lets last at most six months
+  // (scripts/apple-client-secret.mts makes a new one).
+  APPLE_CLIENT_ID: z.string().min(1).optional(),
+  APPLE_CLIENT_SECRET: z.string().min(1).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

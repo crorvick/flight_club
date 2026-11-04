@@ -34,6 +34,9 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         text: "Add your phone number in Settings, where you can now change your email too. The member directory, in the account menu, shows how to reach everyone.",
       },
       {
+        text: "Sign in with Google or Apple: link either in Settings, then use it instead of your password.",
+      },
+      {
         text: "An aircraft's settings say how many fuel totalizers it has: none, one, or one per engine on a twin.",
         for: ["officer"],
       },

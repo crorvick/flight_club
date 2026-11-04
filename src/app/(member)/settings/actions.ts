@@ -14,6 +14,8 @@ import { auth } from "@/lib/auth";
 import { parsePhone } from "@/lib/contact";
 import { type FormState, formValues } from "@/lib/form-state";
 import { getCurrentMember } from "@/lib/session";
+import { hasPassword } from "@/lib/sign-in-accounts";
+import { SOCIAL_PROVIDERS, type SocialProvider } from "@/lib/sign-in-methods";
 
 // Settings are a member's own, so even one waiting for approval or
 // deactivated can change them; only being signed in matters.
@@ -39,7 +41,10 @@ export async function updateName(
   if (!name.success) {
     return { fieldErrors: { name: [name.error.issues[0].message] }, values };
   }
-  if (name.data === me.name) redirect("/settings?saved=name");
+  // Asked for on the home page of a new member who signed up through
+  // Apple without sharing it.
+  const done = formData.get("from") === "home" ? "/" : "/settings?saved=name";
+  if (name.data === me.name) redirect(done);
 
   // Officers see it on flights, squawks and the member list, so a change
   // is audited like their own changes to a member.
@@ -57,7 +62,7 @@ export async function updateName(
       after: { name: name.data },
     });
   });
-  redirect("/settings?saved=name");
+  redirect(done);
 }
 
 // Better Auth's own default limits, as at sign-up.
@@ -137,6 +142,13 @@ export async function updateContact(
   const after = { email: email.data, phone: phone.value };
 
   if (after.email !== before.email) {
+    // One who signs in only with Google or Apple sets a password first.
+    if (!(await hasPassword(me.id))) {
+      return {
+        error: "Set a password below first: changing your email needs it.",
+        values,
+      };
+    }
     const password = String(formData.get("password") ?? "");
     if (!password) {
       return {
@@ -203,4 +215,71 @@ export async function updateContact(
     });
   });
   redirect("/settings?saved=contact");
+}
+
+// For a member who has only signed in with Google or Apple: a password
+// lets them sign in with their email too, and change it.
+export async function setPassword(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await signedIn();
+  const parsed = passwordSchema.shape.newPassword.safeParse(
+    formData.get("newPassword") ?? "",
+  );
+  if (!parsed.success) {
+    return { fieldErrors: { newPassword: [parsed.error.issues[0].message] } };
+  }
+  try {
+    await auth().api.setPassword({
+      body: { newPassword: parsed.data },
+      headers: await headers(),
+    });
+  } catch (error) {
+    if (error instanceof APIError && error.statusCode < 500) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  redirect("/settings?saved=password-set");
+}
+
+// Off to Google or Apple to prove the account is theirs, and back to
+// Settings: linked, or with ?error=<code> (linkError).
+export async function linkProvider(provider: SocialProvider) {
+  await signedIn();
+  if (!SOCIAL_PROVIDERS.includes(provider)) redirect("/settings");
+  const { url } = await auth().api.linkSocialAccount({
+    body: {
+      provider,
+      callbackURL: "/settings?saved=linked",
+      errorCallbackURL: "/settings",
+    },
+    headers: await headers(),
+  });
+  redirect(url);
+}
+
+// By the account's own id, from the Settings page; Better Auth only
+// unlinks the member's own.
+export async function unlinkProvider(accountId: string): Promise<FormState> {
+  await signedIn();
+  try {
+    await auth().api.unlinkAccount({
+      body: { accountId },
+      headers: await headers(),
+    });
+  } catch (error) {
+    if (!(error instanceof APIError) || error.statusCode >= 500) throw error;
+    return {
+      error:
+        error.body?.code === "SESSION_NOT_FRESH"
+          ? // Better Auth asks for a sign-in within the last day.
+            "For safety, sign out and back in, then unlink it."
+          : error.body?.code === "FAILED_TO_UNLINK_LAST_ACCOUNT"
+            ? "It's your only way to sign in. Set a password or link another account first."
+            : error.message,
+    };
+  }
+  redirect("/settings?saved=unlinked");
 }

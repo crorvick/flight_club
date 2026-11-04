@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
+import { SocialSignIn } from "../social-sign-in";
 import { SignUpForm } from "./sign-up-form";
 
 export const metadata: Metadata = { title: "Create account · Flight Club" };
@@ -13,6 +15,9 @@ export default function SignUpPage() {
         An officer will approve your account before you can log flights or
         report squawks.
       </p>
+      <Suspense fallback={null}>
+        <SocialSignIn />
+      </Suspense>
       <SignUpForm />
       <p className="text-sm text-muted-foreground">
         Already have an account?{" "}

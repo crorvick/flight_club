@@ -111,6 +111,10 @@ Blueprint is created; change them under the service's Environment page.
 | `S3_BUCKET`            | The environment's photo bucket                             |
 | `S3_ACCESS_KEY_ID`     | Access key with read and write on that bucket only         |
 | `S3_SECRET_ACCESS_KEY` | Its secret                                                 |
+| `GOOGLE_CLIENT_ID`     | Google sign-in; omit both Google values to leave it off     |
+| `GOOGLE_CLIENT_SECRET` | Its secret                                                 |
+| `APPLE_CLIENT_ID`      | Apple sign-in: the Services ID; omit both to leave it off  |
+| `APPLE_CLIENT_SECRET`  | A JWT from `scripts/apple-client-secret.mts`, renewed twice a year |
 
 Changing `BETTER_AUTH_SECRET` signs everyone out.  If any of the first
 three is missing or invalid, the new version fails its health check and the
@@ -162,6 +166,66 @@ The roles given replace the member's current ones (`pilot`, `officer`);
 with none, their roles are left as they are.  Locally, it's
 `pnpm member:approve <email> [role...]`.
 
+## Signing in with Google and Apple
+
+Members can sign in with Google or Apple as well as a password.  Each is
+offered only where its two environment variables are set, so either can
+be left off.  Signing in with one the first time creates an account,
+waiting for an officer's approval like any other.  A member who already
+has an account links Google or Apple in Settings instead: the app never
+verifies email addresses, so it won't join a Google or Apple sign-in to
+an existing account on its own, and says so.
+
+Each environment needs its own redirect URL registered with the
+provider: the app's URL followed by `/api/auth/callback/google` or
+`/api/auth/callback/apple`.
+
+**Google.**  In the Google Cloud console, for a project of the club's:
+
+1. **Set up the consent screen.**  Google Auth Platform → Branding: the
+   app's name, a support email, and the app's domain.  Audience:
+   External.  Data access: only the `email`, `profile` and `openid`
+   scopes, which need no review by Google.  Publish it; while it's in
+   testing, only the test users listed can sign in.
+2. **Create a client.**  Clients → Create client, of type Web
+   application, with the authorized redirect URI above for each
+   environment it serves (`http://localhost:3000/…` too, for local
+   development).  A separate client for production keeps a mistake on
+   staging from touching it.
+3. **Give it to the service.**  Set `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET`, then Save and deploy.
+
+**Apple.**  This needs the club in the Apple Developer Program (US$99 a
+year).  In Certificates, Identifiers & Profiles:
+
+1. **Register an App ID** with Sign in with Apple enabled.  It's never
+   shipped; it's what the web sign-in hangs off.
+2. **Register a Services ID**, such as `org.example.flightclub.signin`,
+   with Sign in with Apple enabled and configured for that App ID: the
+   app's domain (no `https://`) and the return URL above.  Apple only
+   accepts HTTPS on a real domain, so there's no testing it on
+   localhost; use staging.
+3. **Create a key** with Sign in with Apple enabled, and download it.
+   Apple lets you download it only once; keep the `.p8` file somewhere
+   safe.  Note its key ID, and the team ID shown at the top right.
+4. **Make the client secret** on your own computer:
+
+   ```sh
+   node scripts/apple-client-secret.mts <team-id> <key-id> <services-id> AuthKey_XXXX.p8
+   ```
+
+   It prints a JWT and the date it stops working, 180 days on: Apple
+   allows no longer.  **Put a reminder in a calendar** to make a new one
+   before then; when it lapses, Apple sign-in fails until it's replaced.
+5. **Give them to the service.**  Set `APPLE_CLIENT_ID` to the Services
+   ID and `APPLE_CLIENT_SECRET` to the JWT, then Save and deploy.
+
+Apple lets members hide their email behind an address like
+`x7k2q9@privaterelay.appleid.com`, which other members can't use, and
+share their name only if they choose.  The app asks a new member with no
+name for one, and Settings asks one with a relay address for their own
+email.
+
 ## Resetting a password
 
 Members change their own passwords in Settings.  One who can't sign in
@@ -172,7 +236,8 @@ node scripts/reset-password.mts member@example.com
 ```
 
 It asks for the new password twice without showing it, then signs the
-member out of every session.  Locally, it's `pnpm member:password
+member out of every session.  For a member who has only signed in with
+Google or Apple, it gives them a password as well.  Locally, it's `pnpm member:password
 <email>`.
 
 ## Promoting to production
